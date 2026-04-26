@@ -10,6 +10,49 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+Node2Vec graph embeddings and BERT semantic duplicate detection are optional because they install heavier ML packages:
+
+```bash
+pip install -e '.[ml]'
+```
+
+## Run the Web UI
+
+Start the Flask backend:
+
+```bash
+python -m mcp4cm.api_server
+```
+
+Backend logs are written to stdout by default. Set `MCP4CM_LOG_LEVEL` and `MCP4CM_LOG_FILE` to control verbosity and file logging:
+
+```bash
+MCP4CM_LOG_LEVEL=DEBUG MCP4CM_LOG_FILE=backend.log python -m mcp4cm.api_server
+```
+
+In another terminal, start the React development server:
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+During development, the React app calls Flask at `http://127.0.0.1:8765`. In a production-style build served by Flask, it calls same-origin `/api/*` routes.
+
+Large uploads are sent as `multipart/form-data` so the browser does not read the full dataset into JavaScript memory. For very large datasets, prefer `.jsonl` or `.ndjson`; Flask streams those files line by line while parsing.
+
+To serve the built React app from Flask instead:
+
+```bash
+cd webapp
+npm run build
+cd ..
+python -m mcp4cm.api_server
+```
+
+Then open `http://127.0.0.1:8765`.
+
 ## Load Datasets
 
 ```python
@@ -97,9 +140,11 @@ for language, rows in summarize_filters_by_language(modelset).items():
 
 ```python
 from mcp4cm.duplicates import (
+    bert_semantic_similarity_pairs,
     detect_duplicates_by_node_name_hash,
     detect_duplicates_by_node_name_type_hash,
     duplicate_model_ids_from_votes,
+    graph_embedding_pairs,
     graph_isomorphism_pairs,
     graph_similarity_pairs,
     tfidf_duplicate_by_names,
@@ -122,17 +167,23 @@ near_by_names_and_types = tfidf_duplicate_by_names_and_types(uml, threshold=0.90
 # 5. Graph similarity using node-name, node-type, edge-type, degree, size, and density metrics.
 near_by_graph = graph_similarity_pairs(uml, threshold=0.85)
 
-# 6. Exact graph isomorphism. Modes: "structure", "types", or "names_types".
-same_structure = graph_isomorphism_pairs(uml, mode="types", match_edge_types=True)
+# 6. Node2Vec graph embedding similarity. Requires `pip install -e '.[ml]'`.
+near_by_graph_embeddings = graph_embedding_pairs(uml, threshold=0.90)
 
-# 7. Voting across hash, TF-IDF, graph metrics, and graph isomorphism.
+# 7. BERT semantic similarity over model names and types. Requires `pip install -e '.[ml]'`.
+near_by_bert = bert_semantic_similarity_pairs(uml, threshold=0.90)
+
+# 8. Exact graph isomorphism. Modes: "structure", "names", or "names_types".
+same_structure = graph_isomorphism_pairs(uml, mode="names", match_edge_types=True)
+
+# 9. Voting across hash, TF-IDF, graph metrics, and graph isomorphism.
 decisions = vote_duplicate_pairs(
     uml,
     min_votes=3,
     tfidf_name_threshold=0.90,
     tfidf_name_type_threshold=0.90,
     graph_threshold=0.85,
-    isomorphism_mode="types",
+    isomorphism_mode="names",
 )
 duplicate_model_ids = duplicate_model_ids_from_votes(decisions)
 ```

@@ -23,3 +23,25 @@ def require_sklearn():
         ) from exc
     return TfidfVectorizer, cosine_similarity
 
+
+def require_node2vec():
+    try:
+        from node2vec import Node2Vec
+    except ImportError as exc:
+        raise ImportError(
+            "Graph embedding duplicate detection requires node2vec. Install ML dependencies with "
+            "`pip install -e '.[ml]'`."
+        ) from exc
+    return Node2Vec
+
+
+def require_transformers_torch():
+    try:
+        from transformers import AutoModel, AutoTokenizer
+        import torch
+    except ImportError as exc:
+        raise ImportError(
+            "BERT semantic duplicate detection requires transformers and torch. Install ML dependencies with "
+            "`pip install -e '.[ml]'`."
+        ) from exc
+    return AutoTokenizer, AutoModel, torch

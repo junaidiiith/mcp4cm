@@ -7,6 +7,13 @@ from mcp4cm.dummy import (
     ecore_filters,
     summarize_filters_by_language,
     summarize_filters,
+    uml_dummy_class_filter,
+    uml_dummy_name_filter,
+    uml_generic_class_name_filter,
+    uml_median_name_length_filter,
+    uml_short_name_or_control_flow_filter,
+    uml_two_character_dummy_name_filter,
+    uml_vocabulary_uniqueness_filter,
     uml_filters,
 )
 from mcp4cm.duplicates import (
@@ -83,6 +90,22 @@ def test_duplicate_hash_modes_use_names_and_name_types():
     assert detect_duplicates_by_node_name_type_hash(dataset) == []
 
 
+def test_duplicate_hash_reports_progress():
+    parser = ArchimateParser()
+    records = [
+        parser.parse({"elements": [{"id": str(index), "name": "Order", "type": "BusinessObject"}], "relationships": []}, model_id=str(index))
+        for index in range(3)
+    ]
+    events = []
+
+    detect_duplicates_by_node_name_hash(Dataset(records, "archimate"), progress=events.append)
+
+    assert events
+    assert events[-1]["current"] == 3
+    assert events[-1]["total"] == 3
+    assert events[-1]["percent"] == 100
+
+
 def test_tfidf_duplicate_modes_and_graph_similarity():
     parser = ArchimateParser()
     first = parser.parse(
@@ -129,6 +152,32 @@ def test_tfidf_duplicate_modes_and_graph_similarity():
     ]
 
 
+def test_pairwise_duplicate_algorithms_report_progress():
+    parser = ArchimateParser()
+    records = [
+        parser.parse(
+            {
+                "elements": [{"id": str(index), "name": f"Order {index}", "type": "BusinessObject"}],
+                "relationships": [],
+            },
+            model_id=str(index),
+        )
+        for index in range(4)
+    ]
+    dataset = Dataset(records, "archimate")
+
+    tfidf_events = []
+    graph_events = []
+    isomorphism_events = []
+    tfidf_duplicate_by_names(dataset, threshold=0.1, progress=tfidf_events.append)
+    graph_similarity_pairs(dataset, threshold=0.1, progress=graph_events.append)
+    graph_isomorphism_pairs(dataset, mode="structure", progress=isomorphism_events.append)
+
+    assert tfidf_events[-1]["percent"] == 100
+    assert graph_events[-1]["percent"] == 100
+    assert isomorphism_events[-1]["percent"] == 100
+
+
 def test_graph_isomorphism_modes():
     parser = ArchimateParser()
     first = parser.parse(
@@ -144,8 +193,8 @@ def test_graph_isomorphism_modes():
     second = parser.parse(
         {
             "elements": [
-                {"id": "x", "name": "Invoice", "type": "BusinessObject"},
-                {"id": "y", "name": "Supplier", "type": "BusinessActor"},
+                {"id": "x", "name": "Order", "type": "DataObject"},
+                {"id": "y", "name": "Customer", "type": "BusinessActor"},
             ],
             "relationships": [{"id": "r2", "sourceId": "y", "targetId": "x", "type": "Association"}],
         },
@@ -155,7 +204,7 @@ def test_graph_isomorphism_modes():
     dataset = Dataset([first, second], "archimate")
 
     assert len(graph_isomorphism_pairs(dataset, mode="structure")) == 1
-    assert len(graph_isomorphism_pairs(dataset, mode="types")) == 1
+    assert len(graph_isomorphism_pairs(dataset, mode="names")) == 1
     assert graph_isomorphism_pairs(dataset, mode="names_types") == []
 
 
@@ -203,6 +252,78 @@ def test_dummy_detection_smoke():
     )
     findings = detect_dummy_models(Dataset([record], "archimate"))
     assert findings
+
+
+def uml_record(names, *, model_id="uml", node_type="Class"):
+    return UMLParser().parse(
+        {
+            "ids": model_id,
+            "graph": {
+                "directed": True,
+                "nodes": [
+                    {"id": str(index), "name": name, "type": node_type}
+                    for index, name in enumerate(names)
+                ],
+                "edges": [],
+            },
+        },
+        model_id=model_id,
+    )
+
+
+def test_uml_notebook_dummy_name_filter_flags_any_att_name():
+    record = uml_record(["Order", "Customer", "att1", "Invoice", "Payment"], node_type="Property")
+
+    finding = uml_dummy_name_filter()(record)
+
+    assert finding
+    assert finding.reason == "uml_att_dummy_names"
+
+
+def test_uml_notebook_dummy_class_filter_uses_thirteen_percent_cutoff():
+    record = uml_record(["Class1", "Order", "Customer", "Invoice", "Payment", "Account"], node_type="Class")
+
+    finding = uml_dummy_class_filter()(record)
+
+    assert finding
+    assert finding.reason == "uml_dummy_classes"
+
+
+def test_uml_notebook_generic_my_class_filter_requires_more_than_two_classes():
+    record = uml_record(["My Class", "My Class1", "My Class2", "Order"], node_type="Class")
+
+    finding = uml_generic_class_name_filter()(record)
+
+    assert finding
+    assert finding.reason == "uml_generic_my_class_names"
+
+
+def test_uml_notebook_short_name_filters():
+    short_record = uml_record(["a", "b", "Order", "Customer"])
+    control_flow_record = uml_record(["a", "control flow", "control flow", "Order"])
+    median_record = uml_record(["a", "bb", "ccc", "Order"])
+
+    assert uml_short_name_or_control_flow_filter()(short_record).reason == "uml_many_short_names"
+    assert uml_short_name_or_control_flow_filter()(control_flow_record).reason == "uml_short_names_with_control_flow"
+    assert uml_median_name_length_filter()(median_record).reason == "uml_median_name_length_too_short"
+
+
+def test_uml_notebook_two_character_dummy_name_ratio_filter():
+    record = uml_record(["a1", "b 2", "x y", "Order", "Customer"])
+
+    finding = uml_two_character_dummy_name_filter()(record)
+
+    assert finding
+    assert finding.reason == "uml_two_character_dummy_names"
+
+
+def test_uml_notebook_vocabulary_filter_is_inclusive():
+    record = uml_record(["Order", "Order 1", "Order 2", "Order 3"])
+
+    finding = uml_vocabulary_uniqueness_filter()(record)
+
+    assert finding
+    assert finding.reason == "uml_low_vocabulary_uniqueness"
 
 
 def test_archimate_filters_detect_type_name_templates():

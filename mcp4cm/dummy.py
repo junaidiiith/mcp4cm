@@ -64,12 +64,14 @@ UML_MIN_MEDIAN_SHORT_NAME_LENGTH = 4
 UML_MIN_NAMES_COUNT = 5
 UML_VOCABULARY_UNIQUENESS_THRESHOLD = 3
 UML_GENERIC_PATTERN_THRESHOLD_COUNT = 2
-UML_DUMMY_CLASSES_THRESHOLD = 0.5
-UML_DUMMY_NAMES_THRESHOLD = 0.3
+UML_DUMMY_CLASSES_THRESHOLD = 0.13
+UML_DUMMY_NAMES_THRESHOLD = 0.0
+UML_TWO_CHAR_NAMES_THRESHOLD = 0.3
 UML_SHORT_NAMES_UPPER_THRESHOLD = 0.30
 UML_SHORT_NAMES_LOWER_THRESHOLD = 0.25
 UML_STOPWORDS_THRESHOLD = 0.4
 UML_MIN_SHORT_NAME_LENGTH = 2
+UML_MIN_MEDIAN_NAME_LENGTH = 4
 UML_TFIDF_DUPLICATE_THRESHOLD = 0.8
 
 ARCHIMATE_DUMMY_KEYWORDS = {
@@ -248,16 +250,18 @@ def filters_for_language(language: str) -> tuple[Filter, ...]:
 def uml_filters() -> tuple[Filter, ...]:
     return (
         empty_model_filter(),
-        raw_text_pattern_filter(UML_EMPTY_CLASS_NAME_PATTERN, "uml_empty_class_name"),
-        raw_text_pattern_filter(UML_EMPTY_NAME_PATTERN, "uml_empty_name"),
+        uml_empty_class_name_filter(),
+        uml_empty_name_filter(),
         too_few_named_elements_filter(min_names=UML_MIN_NAMES_COUNT),
+        uml_median_name_length_filter(),
+        uml_short_name_or_control_flow_filter(),
         uml_dummy_class_filter(),
+        uml_generic_class_name_filter(),
         uml_dummy_name_filter(),
+        uml_two_character_dummy_name_filter(),
         uml_dummy_keyword_filter(),
         uml_sequential_numbered_filter(),
-        uml_short_name_filter(),
         uml_vocabulary_uniqueness_filter(),
-        generic_sequential_names_filter(threshold=UML_SEQUENTIAL_THRESHOLD),
     )
 
 
@@ -316,6 +320,74 @@ def too_few_named_elements_filter(min_names: int = 2) -> Filter:
     return named_filter(check, f"too_few_named_elements_filter_min_{min_names}")
 
 
+def uml_empty_name_filter() -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        names = normalized_names(record)
+        hits = [name for name in names if name == "empty name"]
+        if not hits and UML_EMPTY_NAME_PATTERN.search(record.raw_text):
+            hits = [match.group(0) for match in UML_EMPTY_NAME_PATTERN.finditer(record.raw_text)]
+        if hits:
+            return DummyFinding(record.model_id, "uml_empty_name", 1.0, tuple(hits[:10]))
+        return None
+
+    return named_filter(check, "uml_empty_name_filter")
+
+
+def uml_empty_class_name_filter() -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        hits = [f"class: {name}" for name in class_names(record) if normalize_name(name) == "empty name"]
+        if not hits and UML_EMPTY_CLASS_NAME_PATTERN.search(record.raw_text):
+            hits = [match.group(0) for match in UML_EMPTY_CLASS_NAME_PATTERN.finditer(record.raw_text)]
+        if hits:
+            return DummyFinding(record.model_id, "uml_empty_class_name", 1.0, tuple(hits[:10]))
+        return None
+
+    return named_filter(check, "uml_empty_class_name_filter")
+
+
+def uml_median_name_length_filter(min_median_length: int = UML_MIN_MEDIAN_NAME_LENGTH) -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        names = [name.strip() for name in record.names if name.strip()]
+        if not names:
+            return None
+        lengths = sorted(len(name) for name in names)
+        mid = len(lengths) // 2
+        median_length = lengths[mid] if len(lengths) % 2 else (lengths[mid - 1] + lengths[mid]) / 2
+        if median_length < min_median_length:
+            return DummyFinding(record.model_id, "uml_median_name_length_too_short", median_length, tuple(names[:10]))
+        return None
+
+    return named_filter(check, "uml_median_name_length_filter")
+
+
+def uml_short_name_or_control_flow_filter(
+    max_length: int = UML_MIN_SHORT_NAME_LENGTH,
+    high_short_threshold: float = UML_SHORT_NAMES_UPPER_THRESHOLD,
+    low_short_threshold: float = UML_SHORT_NAMES_LOWER_THRESHOLD,
+    control_flow_threshold: float = UML_STOPWORDS_THRESHOLD,
+) -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        names = normalized_names(record)
+        if not names:
+            return None
+        short_names = [name for name in names if len(name.strip()) <= max_length]
+        control_flow_names = [name for name in names if "control flow" in name]
+        short_ratio = len(short_names) / len(names)
+        control_flow_ratio = len(control_flow_names) / len(names)
+        if short_ratio >= high_short_threshold:
+            return DummyFinding(record.model_id, "uml_many_short_names", short_ratio, tuple(short_names[:10]))
+        if short_ratio >= low_short_threshold and control_flow_ratio >= control_flow_threshold:
+            return DummyFinding(
+                record.model_id,
+                "uml_short_names_with_control_flow",
+                max(short_ratio, control_flow_ratio),
+                tuple([*short_names[:5], *control_flow_names[:5]]),
+            )
+        return None
+
+    return named_filter(check, "uml_short_name_or_control_flow_filter")
+
+
 def uml_dummy_keyword_filter(
     words: set[str] | None = None,
     threshold: float = UML_DUMMY_WORD_THRESHOLD,
@@ -340,17 +412,11 @@ def uml_dummy_name_filter(threshold: float = UML_DUMMY_NAMES_THRESHOLD) -> Filte
         names = normalized_names(record)
         if not names:
             return None
-        hits = [
-            name
-            for name in names
-            if UML_DUMMY_NAME_PATTERN.match(name)
-            or UML_MYCLASS_PATTERN.match(name)
-            or UML_TWO_CHAR_PATTERN.match(name)
-            or UML_LETTER_SPACE_LETTER_PATTERN.match(name)
-        ]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "uml_dummy_names", ratio, tuple(hits[:10]))
+        hits = [name for name in names if UML_DUMMY_NAME_PATTERN.match(name)]
+        if hits:
+            ratio = len(hits) / len(names)
+            if ratio >= threshold:
+                return DummyFinding(record.model_id, "uml_att_dummy_names", ratio, tuple(hits[:10]))
         return None
 
     return named_filter(check, "uml_dummy_name_filter")
@@ -361,13 +427,41 @@ def uml_dummy_class_filter(threshold: float = UML_DUMMY_CLASSES_THRESHOLD) -> Fi
         names = [normalize_name(name) for name in class_names(record)]
         if not names:
             return None
-        hits = [name for name in names if UML_DUMMY_CLASS_PATTERN.match(name) or name in {"class", "my class"}]
+        hits = [name for name in names if UML_DUMMY_CLASS_PATTERN.match(name)]
         ratio = len(hits) / len(names)
-        if ratio >= threshold:
+        if ratio > threshold:
             return DummyFinding(record.model_id, "uml_dummy_classes", ratio, tuple(hits[:10]))
         return None
 
     return named_filter(check, "uml_dummy_class_filter")
+
+
+def uml_generic_class_name_filter(threshold_count: int = UML_GENERIC_PATTERN_THRESHOLD_COUNT) -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        hits = [f"class: {name}" for name in class_names(record) if normalize_name(name).startswith("my class")]
+        if len(hits) > threshold_count:
+            return DummyFinding(record.model_id, "uml_generic_my_class_names", float(len(hits)), tuple(hits[:10]))
+        return None
+
+    return named_filter(check, "uml_generic_class_name_filter")
+
+
+def uml_two_character_dummy_name_filter(threshold: float = UML_TWO_CHAR_NAMES_THRESHOLD) -> Filter:
+    def check(record: ModelRecord) -> DummyFinding | None:
+        names = normalized_names(record)
+        if not names:
+            return None
+        hits = [
+            name
+            for name in names
+            if UML_TWO_CHAR_PATTERN.match(name) or UML_LETTER_SPACE_LETTER_PATTERN.match(name)
+        ]
+        ratio = len(hits) / len(names)
+        if ratio >= threshold:
+            return DummyFinding(record.model_id, "uml_two_character_dummy_names", ratio, tuple(hits[:10]))
+        return None
+
+    return named_filter(check, "uml_two_character_dummy_name_filter")
 
 
 def uml_sequential_numbered_filter(threshold: float = UML_SEQUENTIAL_THRESHOLD) -> Filter:
@@ -406,7 +500,7 @@ def uml_vocabulary_uniqueness_filter(min_unique_words: int = UML_VOCABULARY_UNIQ
         words = set()
         for name in record.names:
             words.update(tokenize_name(name))
-        if len(words) < min_unique_words:
+        if len(words) <= min_unique_words:
             return DummyFinding(record.model_id, "uml_low_vocabulary_uniqueness", 1.0, tuple(sorted(words)))
         return None
 

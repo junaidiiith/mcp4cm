@@ -10,31 +10,34 @@ import {
   Loader2,
   Plus,
   Regex,
-  ShieldCheck,
+  SlidersHorizontal,
 } from "lucide-react";
 import "./styles.css";
 
-const API_URL = import.meta.env.VITE_MCP4CM_API_URL || "http://127.0.0.1:8765";
+const API_URL = import.meta.env.VITE_MCP4CM_API_URL || (import.meta.env.DEV ? "http://127.0.0.1:8765" : "");
 
 const techniques = [
-  { id: "hash_names", label: "Hash: names", detail: "Exact match on sorted node names" },
-  { id: "hash_names_types", label: "Hash: names + types", detail: "Exact match on sorted name/type pairs" },
-  { id: "tfidf_names", label: "TF-IDF: names", detail: "Near duplicate text similarity on names" },
-  { id: "tfidf_names_types", label: "TF-IDF: names + types", detail: "Near duplicate text similarity on names and types" },
+  { id: "hash", label: "Hash", detail: "Exact match on sorted node names" },
+  { id: "tfidf", label: "TF-IDF", detail: "Near duplicate text similarity on model tokens" },
   { id: "graph_similarity", label: "Graph metrics", detail: "Jaccard, degree, size, and density similarity" },
+  { id: "graph_embedding", label: "Graph embeddings", detail: "Node2Vec graph embedding cosine similarity" },
+  { id: "bert_semantic", label: "BERT semantic", detail: "bert-base-uncased semantic similarity on model names and types" },
   { id: "graph_isomorphism", label: "Isomorphism", detail: "Exact structural graph match" },
 ];
 
 const filterLabels = {
   empty_model: ["Empty graph", "Remove records with no graph nodes."],
-  uml_empty_class_name: ["UML empty class marker", "Regex over raw text for empty class-name placeholders."],
-  uml_empty_name: ["UML empty name marker", "Regex over raw text for empty-name placeholders."],
+  uml_empty_class_name: ["UML empty class name", "Find UML class elements whose extracted name is empty name."],
+  uml_empty_name: ["UML empty name", "Find any extracted UML name equal to empty name."],
   too_few_names: ["Too few named elements", "Minimum number of non-empty names required."],
+  uml_median_name_length: ["UML short median name", "Median extracted name length must meet the configured minimum."],
+  uml_short_name_or_control_flow: ["UML short/control-flow names", "Notebook rule for many short names or short names with control flow."],
   uml_dummy_class: ["UML dummy classes", "Ratio of UML class names such as class a or class 1."],
-  uml_dummy_name: ["UML dummy names", "Ratio of short placeholder names such as att1 or a b."],
+  uml_generic_class_name: ["UML my class pattern", "Find repeated class names such as my class or my class1."],
+  uml_dummy_name: ["UML att dummy names", "Find names such as att, att1, att A, or att 1."],
+  uml_two_character_dummy_name: ["UML two-character names", "Ratio of names such as a1 or a b."],
   uml_dummy_keyword: ["UML dummy keywords", "Ratio of UML placeholder keywords."],
   uml_sequential: ["UML sequential names", "Ratio of names ending in a sequence number."],
-  uml_short_name: ["UML short names", "Ratio of names below the short-name length rule."],
   uml_vocabulary: ["UML low vocabulary", "Minimum number of unique words across names."],
   generic_sequential: ["Generic sequential names", "Ratio of generic names such as class1 or node2."],
   ecore_type_name: ["Ecore type names", "Ratio of names that exactly match Ecore element types."],
@@ -53,16 +56,18 @@ const filterLabels = {
 const dummyFilterPresets = {
   uml: [
     { id: "empty_model", enabled: true },
-    { id: "uml_empty_class_name", enabled: true, pattern: "class:\\s*empty name" },
-    { id: "uml_empty_name", enabled: true, pattern: "empty name" },
+    { id: "uml_empty_class_name", enabled: true },
+    { id: "uml_empty_name", enabled: true },
     { id: "too_few_names", enabled: true, minNames: 5 },
-    { id: "uml_dummy_class", enabled: true, threshold: 0.5 },
-    { id: "uml_dummy_name", enabled: true, threshold: 0.3 },
+    { id: "uml_median_name_length", enabled: true, minMedianLength: 4 },
+    { id: "uml_short_name_or_control_flow", enabled: true, maxLength: 2, threshold: 0.3, lowThreshold: 0.25, controlFlowThreshold: 0.4 },
+    { id: "uml_dummy_class", enabled: true, threshold: 0.13 },
+    { id: "uml_generic_class_name", enabled: true, thresholdCount: 2 },
+    { id: "uml_dummy_name", enabled: true, threshold: 0 },
+    { id: "uml_two_character_dummy_name", enabled: true, threshold: 0.3 },
     { id: "uml_dummy_keyword", enabled: true, threshold: 0.82 },
     { id: "uml_sequential", enabled: true, threshold: 0.75 },
-    { id: "uml_short_name", enabled: true, threshold: 0.3 },
     { id: "uml_vocabulary", enabled: true, minUniqueWords: 3 },
-    { id: "generic_sequential", enabled: true, threshold: 0.75 },
   ],
   ecore: [
     { id: "empty_model", enabled: true },
@@ -95,16 +100,41 @@ function App() {
   const [files, setFiles] = useState([]);
   const [datasetId, setDatasetId] = useState("");
   const [stats, setStats] = useState(null);
+  const [uploadSummary, setUploadSummary] = useState(null);
+  const [preprocessId, setPreprocessId] = useState("");
+  const [modelLimit, setModelLimit] = useState(null);
   const [dummyRows, setDummyRows] = useState([]);
   const [duplicateResult, setDuplicateResult] = useState(null);
-  const [selected, setSelected] = useState(["hash_names", "hash_names_types", "tfidf_names"]);
-  const [mandatory, setMandatory] = useState(["hash_names"]);
+  const [duplicateProgress, setDuplicateProgress] = useState(null);
+  const [selected, setSelected] = useState(["hash", "tfidf"]);
+  const [mandatory, setMandatory] = useState(["hash"]);
   const [minVotes, setMinVotes] = useState(2);
   const [thresholds, setThresholds] = useState({
+    hashIncludeTypes: false,
+    tfidfIncludeTypes: false,
     tfidfNames: 0.9,
     tfidfNamesTypes: 0.9,
+    tfidfMaxFeatures: 50000,
     graphSimilarity: 0.85,
-    isomorphismMode: "types",
+    graphWeights: {
+      nodeNameJaccard: 0.25,
+      nodeTypeJaccard: 0.2,
+      edgeTypeJaccard: 0.15,
+      degreeHistogram: 0.15,
+      sizeSimilarity: 0.15,
+      densitySimilarity: 0.1,
+    },
+    graphEmbedding: 0.9,
+    graphEmbeddingDimensions: 64,
+    graphEmbeddingWalkLength: 10,
+    graphEmbeddingNumWalks: 20,
+    graphEmbeddingWorkers: 1,
+    graphEmbeddingSeed: 42,
+    bertSemantic: 0.9,
+    bertModelName: "bert-base-uncased",
+    bertBatchSize: 8,
+    bertMaxLength: 256,
+    isomorphismMode: "names",
     matchEdgeTypes: true,
   });
   const [regexFilter, setRegexFilter] = useState({ pattern: "", threshold: 0.5, target: "names" });
@@ -115,20 +145,53 @@ function App() {
   const canRun = Boolean(datasetId);
   const selectedTechniques = useMemo(() => new Set(selected), [selected]);
 
+  async function preprocessDataset(nextFiles = files) {
+    setError("");
+    if (!nextFiles.length) {
+      setError("Choose at least one JSON or JSONL file.");
+      return;
+    }
+    setBusy("preprocess");
+    try {
+      const formData = new FormData();
+      formData.append("language", language);
+      [...nextFiles].forEach((file) => formData.append("files", file, file.name));
+      const response = await postForm("/api/datasets/preprocess", formData);
+      setPreprocessId(response.preprocessId);
+      setUploadSummary(response.uploadSummary || null);
+      if (response.uploadSummary?.totalRecords) {
+        setModelLimit(response.uploadSummary.totalRecords);
+      }
+      setDatasetId("");
+      setStats(null);
+      setDummyRows([]);
+      setDuplicateResult(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function uploadDataset() {
     setError("");
-    if (!files.length) {
-      setError("Choose at least one JSON or JSONL file.");
+    if (!preprocessId) {
+      setError("Preprocess the upload before processing the dataset.");
       return;
     }
     setBusy("upload");
     try {
-      const payloadFiles = await Promise.all(
-        [...files].map(async (file) => ({ name: file.name, content: await file.text() }))
-      );
-      const response = await postJson("/api/datasets", { language, files: payloadFiles });
+      const formData = new FormData();
+      formData.append("language", language);
+      formData.append("preprocessId", preprocessId);
+      formData.append("modelLimit", String(modelLimit || uploadSummary?.totalRecords || ""));
+      const response = await postForm("/api/datasets", formData);
       setDatasetId(response.datasetId);
       setStats(response.statistics);
+      setUploadSummary(response.uploadSummary || null);
+      if (response.uploadSummary?.totalRecords) {
+        setModelLimit(response.uploadSummary.modelLimit || response.uploadSummary.totalRecords);
+      }
       setDummyRows([]);
       setDuplicateResult(null);
     } catch (err) {
@@ -155,15 +218,31 @@ function App() {
   async function runDuplicateDetection() {
     setError("");
     setBusy("duplicates");
+    setDuplicateResult(null);
+    setDuplicateProgress(null);
     try {
-      const response = await postJson("/api/duplicates", {
+      if (!selected.length) {
+        throw new Error("Select at least one duplicate technique.");
+      }
+      const selectedBackendTechniques = selected.flatMap((item) => backendTechniquesFor(item, thresholds));
+      const selectedBackendSet = new Set(selectedBackendTechniques);
+      const activeMandatory = mandatory
+        .filter((item) => selected.includes(item))
+        .flatMap((item) => backendTechniquesFor(item, thresholds))
+        .filter((item) => selectedBackendSet.has(item));
+      const payload = {
         datasetId,
-        techniques: selected,
-        mandatoryTechniques: mandatory,
+        techniques: selectedBackendTechniques,
+        selectedTechniques: selectedBackendTechniques,
+        mandatoryTechniques: activeMandatory,
         minVotes,
         thresholds,
-      });
-      setDuplicateResult(response);
+      };
+      const job = await postJson("/api/duplicates/jobs", payload);
+      setDuplicateProgress(job);
+      const result = await pollDuplicateJob(job.jobId);
+      setDuplicateProgress(result);
+      setDuplicateResult(result.result);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -172,8 +251,14 @@ function App() {
   }
 
   function toggleSelection(id) {
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-    setMandatory((current) => current.filter((item) => item !== id || selectedTechniques.has(id)));
+    setSelected((current) => {
+      const isSelected = current.includes(id);
+      if (isSelected) {
+        setMandatory((mandatoryCurrent) => mandatoryCurrent.filter((item) => item !== id));
+        return current.filter((item) => item !== id);
+      }
+      return [...current, id];
+    });
   }
 
   function toggleMandatory(id) {
@@ -185,6 +270,11 @@ function App() {
     setLanguage(nextLanguage);
     setDummyFilterConfigs(clonePreset(nextLanguage));
     setDummyRows([]);
+    setDatasetId("");
+    setStats(null);
+    setUploadSummary(null);
+    setPreprocessId("");
+    setModelLimit(null);
   }
 
   function updateDummyFilter(index, patch) {
@@ -200,7 +290,7 @@ function App() {
     <main>
       <aside className="sidebar">
         <div className="brand">
-          <div className="brandMark"><ShieldCheck size={22} /></div>
+          <img className="brandMark" src="/mcp4cm-icon.svg" alt="" />
           <div>
             <strong>MCP4CM</strong>
             <span>Model Cleansing Workbench</span>
@@ -239,17 +329,38 @@ function App() {
             <label className="fileDrop">
               <FileUp size={24} />
               <span>{files.length ? `${files.length} file(s) selected` : "Choose JSON / JSONL files"}</span>
-              <input type="file" multiple onChange={(event) => setFiles(event.target.files || [])} />
+              <input
+                type="file"
+                multiple
+                onChange={(event) => {
+                  const nextFiles = Array.from(event.target.files || []);
+                  setFiles(nextFiles);
+                  setUploadSummary(null);
+                  setPreprocessId("");
+                  setModelLimit(null);
+                  setDatasetId("");
+                  setStats(null);
+                  if (nextFiles.length) preprocessDataset(nextFiles);
+                }}
+              />
             </label>
-            <button className="primary" onClick={uploadDataset} disabled={busy === "upload"}>
-              {busy === "upload" ? <Loader2 className="spin" size={18} /> : <FileUp size={18} />}
-              Upload and Analyze
+            {uploadSummary?.totalRecords > 0 && (
+              <ModelLimitSlider
+                  total={uploadSummary.totalRecords}
+                  value={modelLimit || uploadSummary.totalRecords}
+                  onChange={setModelLimit}
+                />
+            )}
+            <button className="primary" onClick={uploadDataset} disabled={!preprocessId || busy === "upload" || busy === "preprocess"}>
+              {busy === "upload" || busy === "preprocess" ? <Loader2 className="spin" size={18} /> : <FileUp size={18} />}
+              {busy === "preprocess" ? "Preprocessing" : "Process Selected Models"}
             </button>
           </div>
         </section>
 
         <section className="panel" id="stats">
           <SectionTitle icon={<BarChart3 size={20} />} title="Descriptive Statistics" />
+          {uploadSummary && <UploadSummary summary={uploadSummary} />}
           {stats ? <Statistics stats={stats} /> : <EmptyState text="Upload a dataset to see descriptive statistics." />}
         </section>
 
@@ -330,16 +441,16 @@ function App() {
                   />
                   Mandatory
                 </label>
+                <details className="techConfig">
+                  <summary><SlidersHorizontal size={15} /> Configure</summary>
+                  <TechniqueConfig technique={technique.id} thresholds={thresholds} onChange={setThresholds} />
+                </details>
               </div>
             ))}
           </div>
 
-          <div className="thresholdGrid">
+          <div className="runConfig">
             <label>Min votes<input type="number" min="1" value={minVotes} onChange={(e) => setMinVotes(Number(e.target.value))} /></label>
-            <label>TF-IDF names<input type="number" min="0" max="1" step="0.01" value={thresholds.tfidfNames} onChange={(e) => setThresholds({ ...thresholds, tfidfNames: Number(e.target.value) })} /></label>
-            <label>TF-IDF names + types<input type="number" min="0" max="1" step="0.01" value={thresholds.tfidfNamesTypes} onChange={(e) => setThresholds({ ...thresholds, tfidfNamesTypes: Number(e.target.value) })} /></label>
-            <label>Graph threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.graphSimilarity} onChange={(e) => setThresholds({ ...thresholds, graphSimilarity: Number(e.target.value) })} /></label>
-            <label>Isomorphism mode<select value={thresholds.isomorphismMode} onChange={(e) => setThresholds({ ...thresholds, isomorphismMode: e.target.value })}><option value="structure">Structure</option><option value="types">Types</option><option value="names_types">Names + types</option></select></label>
           </div>
 
           <div className="actionBar">
@@ -348,6 +459,7 @@ function App() {
               Run Duplicate Detection
             </button>
           </div>
+          {duplicateProgress && <DuplicateProgress progress={duplicateProgress} />}
           <DuplicateResults result={duplicateResult} />
         </section>
       </section>
@@ -416,6 +528,32 @@ function BuiltInFilterEditor({ filters, onChange }) {
                   />
                 </label>
               )}
+              {"minMedianLength" in filter && (
+                <label>
+                  Min median length
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={filter.minMedianLength}
+                    disabled={!filter.enabled}
+                    onChange={(event) => onChange(index, { minMedianLength: Number(event.target.value) })}
+                  />
+                </label>
+              )}
+              {"thresholdCount" in filter && (
+                <label>
+                  Count threshold
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={filter.thresholdCount}
+                    disabled={!filter.enabled}
+                    onChange={(event) => onChange(index, { thresholdCount: Number(event.target.value) })}
+                  />
+                </label>
+              )}
               {"maxLength" in filter && (
                 <label>
                   Max length
@@ -426,6 +564,34 @@ function BuiltInFilterEditor({ filters, onChange }) {
                     value={filter.maxLength}
                     disabled={!filter.enabled}
                     onChange={(event) => onChange(index, { maxLength: Number(event.target.value) })}
+                  />
+                </label>
+              )}
+              {"lowThreshold" in filter && (
+                <label>
+                  Low threshold
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={filter.lowThreshold}
+                    disabled={!filter.enabled}
+                    onChange={(event) => onChange(index, { lowThreshold: Number(event.target.value) })}
+                  />
+                </label>
+              )}
+              {"controlFlowThreshold" in filter && (
+                <label>
+                  Control flow threshold
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={filter.controlFlowThreshold}
+                    disabled={!filter.enabled}
+                    onChange={(event) => onChange(index, { controlFlowThreshold: Number(event.target.value) })}
                   />
                 </label>
               )}
@@ -447,8 +613,132 @@ function BuiltInFilterEditor({ filters, onChange }) {
   );
 }
 
+function TechniqueConfig({ technique, thresholds, onChange }) {
+  const patch = (updates) => onChange({ ...thresholds, ...updates });
+  const patchWeights = (updates) => onChange({ ...thresholds, graphWeights: { ...thresholds.graphWeights, ...updates } });
+
+  if (technique === "hash") {
+    return (
+      <div className="configGrid compact">
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.hashIncludeTypes} onChange={(event) => patch({ hashIncludeTypes: event.target.checked })} />
+          Types
+        </label>
+      </div>
+    );
+  }
+
+  if (technique === "tfidf") {
+    const thresholdKey = thresholds.tfidfIncludeTypes ? "tfidfNamesTypes" : "tfidfNames";
+    return (
+      <div className="configGrid">
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.tfidfIncludeTypes} onChange={(event) => patch({ tfidfIncludeTypes: event.target.checked })} />
+          Types
+        </label>
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds[thresholdKey]} onChange={(event) => patch({ [thresholdKey]: Number(event.target.value) })} /></label>
+        <label>Max features<input type="number" min="1000" step="1000" value={thresholds.tfidfMaxFeatures} onChange={(event) => patch({ tfidfMaxFeatures: Number(event.target.value) })} /></label>
+      </div>
+    );
+  }
+
+  if (technique === "graph_similarity") {
+    const weights = thresholds.graphWeights;
+    return (
+      <div className="configGrid">
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.graphSimilarity} onChange={(event) => patch({ graphSimilarity: Number(event.target.value) })} /></label>
+        <label>Node names<input type="number" min="0" step="0.01" value={weights.nodeNameJaccard} onChange={(event) => patchWeights({ nodeNameJaccard: Number(event.target.value) })} /></label>
+        <label>Node types<input type="number" min="0" step="0.01" value={weights.nodeTypeJaccard} onChange={(event) => patchWeights({ nodeTypeJaccard: Number(event.target.value) })} /></label>
+        <label>Edge types<input type="number" min="0" step="0.01" value={weights.edgeTypeJaccard} onChange={(event) => patchWeights({ edgeTypeJaccard: Number(event.target.value) })} /></label>
+        <label>Degree histogram<input type="number" min="0" step="0.01" value={weights.degreeHistogram} onChange={(event) => patchWeights({ degreeHistogram: Number(event.target.value) })} /></label>
+        <label>Size<input type="number" min="0" step="0.01" value={weights.sizeSimilarity} onChange={(event) => patchWeights({ sizeSimilarity: Number(event.target.value) })} /></label>
+        <label>Density<input type="number" min="0" step="0.01" value={weights.densitySimilarity} onChange={(event) => patchWeights({ densitySimilarity: Number(event.target.value) })} /></label>
+      </div>
+    );
+  }
+
+  if (technique === "graph_embedding") {
+    return (
+      <div className="configGrid">
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.graphEmbedding} onChange={(event) => patch({ graphEmbedding: Number(event.target.value) })} /></label>
+        <label>Dimensions<input type="number" min="8" step="8" value={thresholds.graphEmbeddingDimensions} onChange={(event) => patch({ graphEmbeddingDimensions: Number(event.target.value) })} /></label>
+        <label>Walk length<input type="number" min="1" step="1" value={thresholds.graphEmbeddingWalkLength} onChange={(event) => patch({ graphEmbeddingWalkLength: Number(event.target.value) })} /></label>
+        <label>Walks<input type="number" min="1" step="1" value={thresholds.graphEmbeddingNumWalks} onChange={(event) => patch({ graphEmbeddingNumWalks: Number(event.target.value) })} /></label>
+        <label>Workers<input type="number" min="1" step="1" value={thresholds.graphEmbeddingWorkers} onChange={(event) => patch({ graphEmbeddingWorkers: Number(event.target.value) })} /></label>
+        <label>Seed<input type="number" step="1" value={thresholds.graphEmbeddingSeed} onChange={(event) => patch({ graphEmbeddingSeed: Number(event.target.value) })} /></label>
+      </div>
+    );
+  }
+
+  if (technique === "bert_semantic") {
+    return (
+      <div className="configGrid">
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.bertSemantic} onChange={(event) => patch({ bertSemantic: Number(event.target.value) })} /></label>
+        <label className="wideField">Model<input value={thresholds.bertModelName} onChange={(event) => patch({ bertModelName: event.target.value })} /></label>
+        <label>Batch size<input type="number" min="1" step="1" value={thresholds.bertBatchSize} onChange={(event) => patch({ bertBatchSize: Number(event.target.value) })} /></label>
+        <label>Max length<input type="number" min="16" max="512" step="16" value={thresholds.bertMaxLength} onChange={(event) => patch({ bertMaxLength: Number(event.target.value) })} /></label>
+      </div>
+    );
+  }
+
+  if (technique === "graph_isomorphism") {
+    return (
+      <div className="configGrid">
+        <label>Mode<select value={thresholds.isomorphismMode} onChange={(event) => patch({ isomorphismMode: event.target.value })}><option value="structure">Structure</option><option value="names">Names</option><option value="names_types">Names + types</option></select></label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.matchEdgeTypes} onChange={(event) => patch({ matchEdgeTypes: event.target.checked })} />
+          Match edge types
+        </label>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function Status({ datasetId, busy }) {
-  return <div className="status">{busy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}{datasetId ? "Dataset loaded" : "Ready"}</div>;
+  const label = busy === "upload" ? "Uploading and analyzing" : datasetId ? "Dataset loaded" : "Ready";
+  return <div className="status">{busy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}{label}</div>;
+}
+
+function UploadSummary({ summary }) {
+  return (
+    <div className="uploadSummary">
+      <span>{summary.usedRecords || summary.records} records used</span>
+      <span>{summary.totalRecords || summary.records} records parsed</span>
+      <span>{summary.payloads} payloads read</span>
+      <span>{summary.skipped} skipped</span>
+      <span>{summary.errors} errors</span>
+    </div>
+  );
+}
+
+function ModelLimitSlider({ total, value, onChange }) {
+  const min = Math.min(10, total);
+  return (
+    <label className="modelLimit">
+      Models to consider
+      <div>
+        <input
+          type="range"
+          min={min}
+          max={total}
+          step="1"
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+        <input
+          type="number"
+          min={min}
+          max={total}
+          step="1"
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+      </div>
+      <span>{min} to {total} models. Processing will use the selected count.</span>
+    </label>
+  );
 }
 
 function Statistics({ stats }) {
@@ -483,20 +773,111 @@ function FilterTable({ rows }) {
   return <table><thead><tr><th>Filter</th><th>Filtered</th><th>Remaining</th><th>Example evidence</th></tr></thead><tbody>{rows.map((row) => <tr key={row.filterName}><td>{row.filterName}</td><td>{row.filteredCount}</td><td>{row.remainingCount}</td><td>{row.examples?.[0]?.evidence?.slice(0, 3).join(", ") || ""}</td></tr>)}</tbody></table>;
 }
 
+function DuplicateProgress({ progress }) {
+  const completed = new Set(progress.completedTechniques || []);
+  return (
+    <div className="progressPanel">
+      <div className="progressHeader">
+        <div>
+          <h3>{progress.currentTechnique ? `Running ${techniqueLabel(progress.currentTechnique)}` : progress.message}</h3>
+          <p>{progress.totalModels} models, {completed.size} of {progress.totalTechniques} techniques complete, {formatDuration(progress.elapsedMs)} elapsed</p>
+          {progress.message && progress.currentTechnique && <p>{progress.message}</p>}
+          {progress.totalItems > 0 && (
+            <p>{progress.processedItems} of {progress.totalItems} items processed in this algorithm</p>
+          )}
+        </div>
+        <strong>{progress.progress}%</strong>
+      </div>
+      <div className="progressTrack">
+        <div className="progressFill" style={{ width: `${progress.progress}%` }} />
+      </div>
+      {progress.currentTechnique && (
+        <div className="subProgress">
+          <span>{techniqueLabel(progress.currentTechnique)} progress</span>
+          <strong>{progress.techniqueProgress || 0}%</strong>
+          <div className="progressTrack">
+            <div className="progressFill secondary" style={{ width: `${progress.techniqueProgress || 0}%` }} />
+          </div>
+        </div>
+      )}
+      <div className="techniqueProgressGrid">
+        {(progress.selectedTechniques || []).map((technique) => (
+          <div className={`techniqueProgress ${completed.has(technique) ? "done" : progress.currentTechnique === technique ? "active" : ""}`} key={technique}>
+            {completed.has(technique) ? <Check size={15} /> : progress.currentTechnique === technique ? <Loader2 className="spin" size={15} /> : <span />}
+            {techniqueLabel(technique)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DuplicateResults({ result }) {
   if (!result) return <EmptyState text="Run duplicate detection to see technique votes and candidate pairs." />;
   return (
     <div className="results">
       <div className="metricGrid small">
         <Metric label="Duplicate pairs" value={result.duplicatePairs} />
+        {"votedDuplicatePairs" in result && <Metric label="Vote-approved pairs" value={result.votedDuplicatePairs} />}
+        <Metric label="Runtime" value={formatDuration(result.elapsedMs)} />
         {Object.entries(result.techniqueCounts).map(([key, value]) => <Metric key={key} label={key} value={value} />)}
       </div>
+      <DuplicateModelCharts modelCounts={result.modelCounts || {}} />
       <table>
         <thead><tr><th>Left</th><th>Right</th><th>Duplicate</th><th>Votes</th><th>Techniques</th></tr></thead>
         <tbody>{result.decisions.map((row) => <tr key={`${row.leftId}-${row.rightId}`}><td>{row.leftId}</td><td>{row.rightId}</td><td>{row.isDuplicate ? "Yes" : "No"}</td><td>{row.voteCount}</td><td>{row.techniques.join(", ")}</td></tr>)}</tbody>
       </table>
     </div>
   );
+}
+
+function DuplicateModelCharts({ modelCounts }) {
+  const entries = Object.entries(modelCounts);
+  if (!entries.length) return null;
+  return (
+    <div className="duplicateCharts">
+      {entries.map(([technique, counts]) => (
+        <div className="duplicateChartCard" key={technique}>
+          <h3>{techniqueLabel(technique)}</h3>
+          <div className="piePair">
+            <PieStat label="Duplicate models" value={counts.duplicateModels} total={counts.totalModels} tone="duplicate" />
+            <PieStat label="Unique models" value={counts.uniqueModels} total={counts.totalModels} tone="unique" />
+          </div>
+          <p>{counts.pairCount} duplicate pair(s) found in {formatDuration(counts.elapsedMs)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PieStat({ label, value, total, tone }) {
+  const percent = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="pieStat">
+      <div className={`pie ${tone}`} style={{ "--percent": `${percent}%` }} aria-label={`${label}: ${value} of ${total}`} />
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{percent}% of {total}</small>
+      </div>
+    </div>
+  );
+}
+
+function techniqueLabel(id) {
+  const labels = {
+    hash_names: "Hash: names",
+    hash_names_types: "Hash: names + types",
+    tfidf_names: "TF-IDF: names",
+    tfidf_names_types: "TF-IDF: names + types",
+  };
+  return techniques.find((technique) => technique.id === id)?.label || labels[id] || id;
+}
+
+function backendTechniquesFor(id, thresholds) {
+  if (id === "hash") return [thresholds.hashIncludeTypes ? "hash_names_types" : "hash_names"];
+  if (id === "tfidf") return [thresholds.tfidfIncludeTypes ? "tfidf_names_types" : "tfidf_names"];
+  return [id];
 }
 
 function EmptyState({ text }) {
@@ -507,14 +888,69 @@ function round(value) {
   return Number.isInteger(value) ? value : Number(value || 0).toFixed(1);
 }
 
+function formatDuration(ms = 0) {
+  if (!ms) return "0 ms";
+  if (ms < 1000) return `${ms} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+  return `${minutes}m ${remainder}s`;
+}
+
 async function postJson(path, payload) {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed");
+  const data = await readJsonResponse(response);
+  return data;
+}
+
+async function postForm(path, formData) {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await readJsonResponse(response);
+  return data;
+}
+
+async function getJson(path) {
+  const response = await fetch(`${API_URL}${path}`);
+  return readJsonResponse(response);
+}
+
+async function pollDuplicateJob(jobId) {
+  for (;;) {
+    await delay(700);
+    const job = await getJson(`/api/duplicates/jobs/${jobId}`);
+    if (job.status === "complete") return job;
+    if (job.status === "error") throw new Error(job.error || job.message || "Duplicate detection failed");
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function readJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  const body = await response.text();
+  let data = {};
+  if (body && contentType.includes("application/json")) {
+    data = JSON.parse(body);
+  }
+  if (!response.ok) {
+    throw new Error(data.error || body || `Request failed with HTTP ${response.status}`);
+  }
+  if (!body) {
+    throw new Error("The backend returned an empty response. Make sure Flask is running on 127.0.0.1:8765.");
+  }
+  if (!contentType.includes("application/json")) {
+    throw new Error("The backend returned a non-JSON response. Make sure the Flask API is running and reachable.");
+  }
   return data;
 }
 
