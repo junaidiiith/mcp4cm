@@ -1,12 +1,35 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
 
-DEFAULT_DUMMY_WORDS = {
+DEFAULT_MIN_NODES = 5
+DEFAULT_MIN_EDGES = 4
+DEFAULT_MIN_NAMES = 5
+DEFAULT_MIN_MEDIAN_LENGTH = 4
+DEFAULT_PLACEHOLDER_THRESHOLD = 0.30
+DEFAULT_MIN_UNIQUE_WORDS = 3
+DEFAULT_TYPE_LIKE_THRESHOLD = 0.70
+DEFAULT_NAME_REPETITION_THRESHOLD = 0.50
+DEFAULT_REGEX_MIN_MATCHES = 1
+
+FILTER_ORDER: tuple[str, ...] = (
+    "empty_graph",
+    "min_size",
+    "too_few_named_elements",
+    "short_median_name_length",
+    "placeholder_name_ratio",
+    "low_vocabulary",
+    "type_like_name_ratio",
+    "name_repetition_ratio",
+    "regex_rule",
+)
+
+PLACEHOLDER_KEYWORDS = {
     "dummy",
     "test",
     "todo",
@@ -17,775 +40,740 @@ DEFAULT_DUMMY_WORDS = {
     "temp",
     "tmp",
     "asdf",
-}
-
-UML_DUMMY_KEYWORDS = {
-    "my class",
+    "placeholder",
+    "untitled",
+    "no name",
+    "new model",
+    "model",
     "class",
-    "use case",
-    "actor",
-    "attribute",
-    "association",
-    "control flow",
-    "activity",
-    "decision node",
-    "opaque action",
-    "lifeline",
-    "flow final node",
-    "activity final node",
-    "join node",
-    "fork node",
-    "initial node",
-    "merge node",
-    "action",
-    "component",
-    "ext point",
-    "empty name",
-    "package",
-}
-
-UML_FREQUENT_DUMMY_NAMES = {"control flow", "control-flow"}
-
-UML_EMPTY_NAME_PATTERN = re.compile(r"empty name", re.IGNORECASE)
-UML_EMPTY_CLASS_NAME_PATTERN = re.compile(r"class:\s*empty name", re.IGNORECASE)
-UML_COMMENT_PATTERN = re.compile(r"comment:", re.IGNORECASE)
-UML_DUMMY_NAME_PATTERN = re.compile(r"^att(\s+[A-Za-z]|\s+\d+|[a-z0-9])?$", re.IGNORECASE)
-UML_DUMMY_CLASS_PATTERN = re.compile(r"^class\s?[a-z0-9]$", re.IGNORECASE)
-UML_GENERAL_CLASS_PATTERN = re.compile(r"^[a-z]+", re.IGNORECASE)
-UML_MYCLASS_PATTERN = re.compile(r"^class:\s*my class\s?(\d+)?$", re.IGNORECASE)
-UML_NUMBERED_PATTERN = re.compile(r"(.+?)[\s_]?(\d+)$", re.IGNORECASE)
-UML_TWO_CHAR_PATTERN = re.compile(r"^[a-zA-Z]\d$", re.IGNORECASE)
-UML_LETTER_SPACE_LETTER_PATTERN = re.compile(r"^[a-zA-Z]\s[a-zA-Z]$", re.IGNORECASE)
-
-UML_SEQUENTIAL_THRESHOLD = 0.75
-UML_DUMMY_WORD_THRESHOLD = 0.82
-UML_SHORT_DUMMY_WORD_THRESHOLD = 0.3
-UML_MIN_MEDIAN_SHORT_NAME_LENGTH = 4
-UML_MIN_NAMES_COUNT = 5
-UML_VOCABULARY_UNIQUENESS_THRESHOLD = 3
-UML_GENERIC_PATTERN_THRESHOLD_COUNT = 2
-UML_DUMMY_CLASSES_THRESHOLD = 0.13
-UML_DUMMY_NAMES_THRESHOLD = 0.0
-UML_TWO_CHAR_NAMES_THRESHOLD = 0.3
-UML_SHORT_NAMES_UPPER_THRESHOLD = 0.30
-UML_SHORT_NAMES_LOWER_THRESHOLD = 0.25
-UML_STOPWORDS_THRESHOLD = 0.4
-UML_MIN_SHORT_NAME_LENGTH = 2
-UML_MIN_MEDIAN_NAME_LENGTH = 4
-UML_TFIDF_DUPLICATE_THRESHOLD = 0.8
-
-ARCHIMATE_DUMMY_KEYWORDS = {
-    "(new model)",
-    "asdf",
-    "bar",
-    "default",
-    "demo",
-    "dummy",
-    "empty name",
-    "example",
-    "foo",
-    "ipsum",
-    "lorem",
-    "my model",
-    "new model",
-    "no name",
-    "placeholder",
-    "sample",
-    "temp",
-    "test",
-    "tmp",
-    "todo",
-    "untitled",
-}
-
-ARCHIMATE_NEW_MODEL_NAMES = {"(new model)", "new model", "archimate model", "model"}
-ARCHIMATE_GENERIC_NUMBERED_PATTERN = re.compile(
-    r"^(aggregate|application service|business role|class|database|entity|method|microservice|node|service|system|table)\s*[-_]?\s*\d+$",
-    re.IGNORECASE,
-)
-ARCHIMATE_CRUD_OR_CODE_PATTERN = re.compile(
-    r"^(create|read|update|delete|get|set|return|equals|compare|check)\s*\(?|^[<>]=?$|^[-+*/=]$",
-    re.IGNORECASE,
-)
-
-ARCHIMATE_MIN_NAMES_COUNT = 5
-ARCHIMATE_DUMMY_KEYWORD_THRESHOLD = 0.70
-ARCHIMATE_TYPE_NAME_THRESHOLD = 0.60
-ARCHIMATE_GENERIC_NUMBERED_THRESHOLD = 0.25
-ARCHIMATE_CRUD_OR_CODE_THRESHOLD = 0.25
-ARCHIMATE_VOCABULARY_UNIQUENESS_THRESHOLD = 3
-ARCHIMATE_SHORT_NAME_THRESHOLD = 0.35
-
-ECORE_DUMMY_KEYWORDS = {
-    "asdf",
-    "bar",
-    "default",
-    "demo",
-    "dummy",
-    "empty name",
-    "example",
-    "foo",
-    "ipsum",
-    "lorem",
     "my class",
-    "my model",
-    "new model",
-    "no name",
-    "placeholder",
-    "sample",
-    "temp",
-    "test",
-    "tmp",
-    "todo",
-    "untitled",
+    "entity",
+    "node",
+    "package",
+    "component",
+    "attribute",
+    "control flow",
+    "empty name",
+    "att",
 }
 
-ECORE_GENERIC_NUMBERED_PATTERN = re.compile(
-    r"^(attribute|class|datatype|element|entity|enum|literal|model|operation|package|parameter|reference|type)\s*[-_]?\s*\d+$",
-    re.IGNORECASE,
+PLACEHOLDER_PATTERNS = (
+    re.compile(r"^my\s+class\s*\d*$", re.IGNORECASE),
+    re.compile(r"^att(\s+[A-Za-z]|\s+\d+|[a-z0-9])?$", re.IGNORECASE),
+    re.compile(r"^(class|entity|node|model|package|component|attribute|type)[\s_-]*\d*$", re.IGNORECASE),
+    re.compile(r"^[A-Za-z]\d$", re.IGNORECASE),
+    re.compile(r"^[A-Za-z]\s[A-Za-z]$", re.IGNORECASE),
 )
 
-ECORE_MIN_NAMES_COUNT = 5
-ECORE_DUMMY_KEYWORD_THRESHOLD = 0.50
-ECORE_GENERIC_NUMBERED_THRESHOLD = 0.30
-ECORE_TYPE_NAME_THRESHOLD = 0.60
-ECORE_VOCABULARY_UNIQUENESS_THRESHOLD = 3
-ECORE_SHORT_NAME_THRESHOLD = 0.40
+
+@dataclass(frozen=True, slots=True)
+class DerivedNode:
+    node_id: str
+    raw_name: str
+    node_type: str
+    normalized_name: str
+    normalized_type: str
+    classification: str
+    tokens: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class DummyFinding:
     model_id: str
+    filter_id: str
     reason: str
     score: float
+    threshold: float
+    decision: str
     evidence: tuple[str, ...] = ()
+    evidence_nodes: tuple[str, ...] = ()
+    metrics: dict[str, Any] | None = None
 
 
-Filter = Callable[[ModelRecord], DummyFinding | None]
+@dataclass(frozen=True, slots=True)
+class ModelOutcome:
+    model_id: str
+    removed: bool
+    primary_removal_reason: str | None
+    all_triggered_filters: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class FilterSummary:
-    filter_name: str
+    filter_id: str
     filtered_count: int
     remaining_count: int
+    triggered_model_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RunSummary:
+    total_models: int
+    removed_models: int
+    remaining_models: int
+    removal_rate: float
+
+
+@dataclass(frozen=True, slots=True)
+class DummyEvaluationResult:
+    run_summary: RunSummary
+    filter_summaries: tuple[FilterSummary, ...]
+    model_outcomes: tuple[ModelOutcome, ...]
     findings: tuple[DummyFinding, ...]
 
 
-def detect_dummy_models(dataset: Dataset, filters: Iterable[Filter] | None = None) -> list[DummyFinding]:
-    shared_filters = tuple(filters) if filters is not None else None
-    findings: list[DummyFinding] = []
+def default_filter_configs() -> list[dict[str, Any]]:
+    return [
+        {"id": "empty_graph", "enabled": True},
+        {"id": "min_size", "enabled": True, "minNodes": DEFAULT_MIN_NODES, "minEdges": DEFAULT_MIN_EDGES},
+        {"id": "too_few_named_elements", "enabled": True, "minNames": DEFAULT_MIN_NAMES},
+        {
+            "id": "short_median_name_length",
+            "enabled": True,
+            "minMedianLength": DEFAULT_MIN_MEDIAN_LENGTH,
+        },
+        {
+            "id": "placeholder_name_ratio",
+            "enabled": True,
+            "threshold": DEFAULT_PLACEHOLDER_THRESHOLD,
+        },
+        {"id": "low_vocabulary", "enabled": True, "minUniqueWords": DEFAULT_MIN_UNIQUE_WORDS},
+        {"id": "type_like_name_ratio", "enabled": True, "threshold": DEFAULT_TYPE_LIKE_THRESHOLD},
+        {
+            "id": "name_repetition_ratio",
+            "enabled": True,
+            "threshold": DEFAULT_NAME_REPETITION_THRESHOLD,
+        },
+        {
+            "id": "regex_rule",
+            "enabled": False,
+            "pattern": "",
+            "targetField": "name",
+            "scope": "eligible_only",
+            "minMatches": DEFAULT_REGEX_MIN_MATCHES,
+        },
+    ]
+
+
+def detect_dummy_models(dataset: Dataset, filter_configs: list[dict[str, Any]] | None = None) -> list[DummyFinding]:
+    result = evaluate_dummy_filters(dataset, filter_configs=filter_configs)
+    findings_by_model: dict[str, list[DummyFinding]] = {}
+    for finding in result.findings:
+        findings_by_model.setdefault(finding.model_id, []).append(finding)
+    primary: list[DummyFinding] = []
+    for outcome in result.model_outcomes:
+        if not outcome.primary_removal_reason:
+            continue
+        matching = [
+            finding
+            for finding in findings_by_model.get(outcome.model_id, [])
+            if finding.filter_id == outcome.primary_removal_reason and finding.decision == "removed"
+        ]
+        if matching:
+            primary.append(matching[0])
+    return primary
+
+
+def summarize_filters(
+    dataset: Dataset,
+    filter_configs: list[dict[str, Any]] | None = None,
+    cumulative: bool = True,
+) -> list[FilterSummary]:
+    result = evaluate_dummy_filters(dataset, filter_configs=filter_configs, cumulative=cumulative)
+    return list(result.filter_summaries)
+
+
+def summarize_filters_by_language(dataset: Dataset, cumulative: bool = True) -> dict[str, list[FilterSummary]]:
+    groups: dict[str, list[ModelRecord]] = {}
     for record in dataset:
-        active_filters = shared_filters or filters_for_language(record.language)
-        for filter_fn in active_filters:
-            finding = filter_fn(record)
-            if finding:
-                findings.append(finding)
-                break
-    return findings
+        groups.setdefault(record.language.lower(), []).append(record)
+    result: dict[str, list[FilterSummary]] = {}
+    for language, records in sorted(groups.items()):
+        eval_result = evaluate_dummy_filters(
+            Dataset(records=records, dataset_type=dataset.dataset_type, root=dataset.root),
+            filter_configs=default_filter_configs(),
+            cumulative=cumulative,
+        )
+        result[language] = list(eval_result.filter_summaries)
+    return result
 
 
-def summarize_filters(dataset: Dataset, filters: Iterable[Filter] | None = None, cumulative: bool = True) -> list[FilterSummary]:
-    """Count how many models are caught by each dummy filter."""
-
+def evaluate_dummy_filters(
+    dataset: Dataset,
+    filter_configs: list[dict[str, Any]] | None = None,
+    cumulative: bool = True,
+) -> DummyEvaluationResult:
+    configs = normalized_filter_configs(filter_configs)
     records = list(dataset)
-    active_filters = tuple(filters) if filters is not None else _dataset_filters(records)
-    remaining = records
+    all_findings: list[DummyFinding] = []
+    outcomes: list[ModelOutcome] = []
+
+    findings_by_filter: dict[str, dict[str, DummyFinding]] = {config["id"]: {} for config in configs}
+
+    for record in records:
+        model_findings: list[DummyFinding] = []
+        derived_nodes = derive_nodes(record)
+        for config in configs:
+            finding = evaluate_filter(record, derived_nodes, config)
+            model_findings.append(finding)
+            findings_by_filter[config["id"]][record.model_id] = finding
+        triggered = tuple(f.filter_id for f in model_findings if f.decision == "removed")
+        outcomes.append(
+            ModelOutcome(
+                model_id=record.model_id,
+                removed=bool(triggered),
+                primary_removal_reason=triggered[0] if triggered else None,
+                all_triggered_filters=triggered,
+            )
+        )
+        all_findings.extend(model_findings)
+
+    filter_summaries = summarize_findings(records, configs, findings_by_filter, cumulative=cumulative)
+    removed_models = sum(1 for outcome in outcomes if outcome.removed)
+    total_models = len(records)
+    run_summary = RunSummary(
+        total_models=total_models,
+        removed_models=removed_models,
+        remaining_models=total_models - removed_models,
+        removal_rate=(removed_models / total_models) if total_models else 0.0,
+    )
+    return DummyEvaluationResult(
+        run_summary=run_summary,
+        filter_summaries=tuple(filter_summaries),
+        model_outcomes=tuple(outcomes),
+        findings=tuple(all_findings),
+    )
+
+
+def normalized_filter_configs(filter_configs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    base = default_filter_configs()
+    by_id = {entry["id"]: dict(entry) for entry in base}
+    if isinstance(filter_configs, list):
+        for config in filter_configs:
+            if not isinstance(config, dict):
+                continue
+            filter_id = str(config.get("id") or "").strip()
+            if filter_id not in by_id:
+                continue
+            merged = {**by_id[filter_id], **config}
+            merged["id"] = filter_id
+            by_id[filter_id] = merged
+    ordered: list[dict[str, Any]] = []
+    for filter_id in FILTER_ORDER:
+        config = by_id.get(filter_id)
+        if config and config.get("enabled", True):
+            ordered.append(config)
+    return ordered
+
+
+def summarize_findings(
+    records: list[ModelRecord],
+    configs: list[dict[str, Any]],
+    findings_by_filter: dict[str, dict[str, DummyFinding]],
+    cumulative: bool,
+) -> list[FilterSummary]:
+    remaining = {record.model_id for record in records}
     summaries: list[FilterSummary] = []
-    for filter_fn in active_filters:
-        findings = [finding for record in remaining if (finding := filter_fn(record))]
+    for config in configs:
+        filter_id = str(config["id"])
+        per_model = findings_by_filter.get(filter_id, {})
         if cumulative:
-            filtered_ids = {finding.model_id for finding in findings}
-            remaining = [record for record in remaining if record.model_id not in filtered_ids]
+            triggered_ids = tuple(
+                model_id
+                for model_id in sorted(remaining)
+                if per_model.get(model_id) and per_model[model_id].decision == "removed"
+            )
+            remaining -= set(triggered_ids)
             remaining_count = len(remaining)
         else:
-            remaining_count = len(records) - len(findings)
+            triggered_ids = tuple(
+                model_id
+                for model_id in sorted(per_model)
+                if per_model[model_id].decision == "removed"
+            )
+            remaining_count = len(records) - len(triggered_ids)
         summaries.append(
             FilterSummary(
-                filter_name=filter_name(filter_fn),
-                filtered_count=len(findings),
+                filter_id=filter_id,
+                filtered_count=len(triggered_ids),
                 remaining_count=remaining_count,
-                findings=tuple(findings),
+                triggered_model_ids=triggered_ids,
             )
         )
     return summaries
 
 
-def summarize_filters_by_language(dataset: Dataset, cumulative: bool = True) -> dict[str, list[FilterSummary]]:
-    """Count dummy-filter matches with each language's own filter chain."""
+def evaluate_filter(record: ModelRecord, derived_nodes: list[DerivedNode], config: dict[str, Any]) -> DummyFinding:
+    filter_id = str(config.get("id") or "")
+    if filter_id == "empty_graph":
+        return _eval_empty_graph(record, filter_id)
+    if filter_id == "min_size":
+        return _eval_min_size(record, filter_id, config)
+    if filter_id == "too_few_named_elements":
+        return _eval_too_few_named_elements(record, derived_nodes, filter_id, config)
+    if filter_id == "short_median_name_length":
+        return _eval_short_median_name_length(record, derived_nodes, filter_id, config)
+    if filter_id == "placeholder_name_ratio":
+        return _eval_placeholder_name_ratio(record, derived_nodes, filter_id, config)
+    if filter_id == "low_vocabulary":
+        return _eval_low_vocabulary(record, derived_nodes, filter_id, config)
+    if filter_id == "type_like_name_ratio":
+        return _eval_type_like_ratio(record, derived_nodes, filter_id, config)
+    if filter_id == "name_repetition_ratio":
+        return _eval_name_repetition(record, derived_nodes, filter_id, config)
+    if filter_id == "regex_rule":
+        return _eval_regex_rule(record, derived_nodes, filter_id, config)
+    return _kept_finding(record.model_id, filter_id, "unknown_filter", 0.0, 1.0)
 
-    groups: dict[str, list[ModelRecord]] = {}
-    for record in dataset:
-        groups.setdefault(record.language.lower(), []).append(record)
-    return {
-        language: summarize_filters(
-            Dataset(records=records, dataset_type=dataset.dataset_type, root=dataset.root),
-            filters=filters_for_language(language),
-            cumulative=cumulative,
+
+def _eval_empty_graph(record: ModelRecord, filter_id: str) -> DummyFinding:
+    node_count = record.node_count
+    if node_count == 0:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "node_count_is_zero",
+            score=0.0,
+            threshold=0.0,
+            metrics={"nodeCount": node_count, "edgeCount": record.edge_count},
         )
-        for language, records in sorted(groups.items())
-    }
-
-
-def default_filters() -> tuple[Filter, ...]:
-    return (
-        empty_model_filter(),
-        too_few_named_elements_filter(min_names=2),
-        dummy_word_filter(),
-        generic_sequential_names_filter(),
-        short_name_ratio_filter(),
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "graph_has_nodes",
+        score=float(node_count),
+        threshold=0.0,
+        metrics={"nodeCount": node_count, "edgeCount": record.edge_count},
     )
 
 
-def filters_for_language(language: str) -> tuple[Filter, ...]:
-    if language.lower() == "uml":
-        return uml_filters()
-    if language.lower() == "ecore":
-        return ecore_filters()
-    if language.lower() == "archimate":
-        return archimate_filters()
-    return default_filters()
-
-
-def uml_filters() -> tuple[Filter, ...]:
-    return (
-        empty_model_filter(),
-        uml_empty_class_name_filter(),
-        uml_empty_name_filter(),
-        too_few_named_elements_filter(min_names=UML_MIN_NAMES_COUNT),
-        uml_median_name_length_filter(),
-        uml_short_name_or_control_flow_filter(),
-        uml_dummy_class_filter(),
-        uml_generic_class_name_filter(),
-        uml_dummy_name_filter(),
-        uml_two_character_dummy_name_filter(),
-        uml_dummy_keyword_filter(),
-        uml_sequential_numbered_filter(),
-        uml_vocabulary_uniqueness_filter(),
+def _eval_min_size(record: ModelRecord, filter_id: str, config: dict[str, Any]) -> DummyFinding:
+    min_nodes = int(config.get("minNodes", DEFAULT_MIN_NODES))
+    min_edges = int(config.get("minEdges", DEFAULT_MIN_EDGES))
+    node_count = record.node_count
+    edge_count = record.edge_count
+    too_small = node_count < min_nodes or edge_count < min_edges
+    if too_small:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "graph_below_min_size",
+            score=min(node_count / max(1, min_nodes), edge_count / max(1, min_edges)),
+            threshold=1.0,
+            metrics={
+                "nodeCount": node_count,
+                "edgeCount": edge_count,
+                "minNodes": min_nodes,
+                "minEdges": min_edges,
+            },
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "graph_meets_min_size",
+        score=1.0,
+        threshold=1.0,
+        metrics={"nodeCount": node_count, "edgeCount": edge_count, "minNodes": min_nodes, "minEdges": min_edges},
     )
 
 
-def archimate_filters() -> tuple[Filter, ...]:
-    return (
-        empty_model_filter(),
-        too_few_named_elements_filter(min_names=ARCHIMATE_MIN_NAMES_COUNT),
-        archimate_new_model_filter(),
-        archimate_type_name_filter(),
-        archimate_generic_numbered_filter(),
-        archimate_dummy_keyword_filter(),
-        archimate_crud_or_code_filter(),
-        archimate_vocabulary_uniqueness_filter(),
-        short_name_ratio_filter(max_length=2, threshold=ARCHIMATE_SHORT_NAME_THRESHOLD),
+def _eval_too_few_named_elements(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    min_names = int(config.get("minNames", DEFAULT_MIN_NAMES))
+    eligible = semantic_nodes(derived_nodes)
+    count = len(eligible)
+    if count < min_names:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "too_few_semantic_names",
+            score=float(count),
+            threshold=float(min_names),
+            evidence=tuple(node.normalized_name for node in eligible[:10]),
+            evidence_nodes=tuple(node.node_id for node in eligible[:10]),
+            metrics={"eligibleNameCount": count, "minNames": min_names},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "enough_semantic_names",
+        score=float(count),
+        threshold=float(min_names),
+        metrics={"eligibleNameCount": count, "minNames": min_names},
     )
 
 
-def ecore_filters() -> tuple[Filter, ...]:
-    return (
-        empty_model_filter(),
-        too_few_named_elements_filter(min_names=ECORE_MIN_NAMES_COUNT),
-        ecore_type_name_filter(),
-        ecore_generic_numbered_filter(),
-        ecore_dummy_keyword_filter(),
-        ecore_vocabulary_uniqueness_filter(),
-        short_name_ratio_filter(max_length=2, threshold=ECORE_SHORT_NAME_THRESHOLD),
+def _eval_short_median_name_length(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    min_median = int(config.get("minMedianLength", DEFAULT_MIN_MEDIAN_LENGTH))
+    eligible = semantic_nodes(derived_nodes)
+    lengths = sorted(len(node.normalized_name) for node in eligible)
+    if not lengths:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "no_eligible_names_for_median",
+            score=0.0,
+            threshold=float(min_median),
+            metrics={"eligibleNameCount": 0, "minMedianLength": min_median},
+        )
+    median = _median(lengths)
+    if median < min_median:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "median_name_length_below_minimum",
+            score=float(median),
+            threshold=float(min_median),
+            evidence=tuple(node.normalized_name for node in eligible[:10]),
+            evidence_nodes=tuple(node.node_id for node in eligible[:10]),
+            metrics={"medianNameLength": median, "minMedianLength": min_median, "eligibleNameCount": len(eligible)},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "median_name_length_ok",
+        score=float(median),
+        threshold=float(min_median),
+        metrics={"medianNameLength": median, "minMedianLength": min_median, "eligibleNameCount": len(eligible)},
     )
 
 
-def empty_model_filter() -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        if record.node_count == 0:
-            return DummyFinding(record.model_id, "empty_graph", 1.0)
-        return None
-
-    return named_filter(check, "empty_model_filter")
-
-
-def raw_text_pattern_filter(pattern: re.Pattern[str], reason: str) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        matches = tuple(match.group(0) for match in pattern.finditer(record.raw_text))
-        if matches:
-            return DummyFinding(record.model_id, reason, 1.0, matches[:10])
-        return None
-
-    return named_filter(check, reason)
-
-
-def too_few_named_elements_filter(min_names: int = 2) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [name for name in record.names if name.strip()]
-        if len(names) < min_names:
-            return DummyFinding(record.model_id, "too_few_named_elements", 1.0, tuple(names))
-        return None
-
-    return named_filter(check, f"too_few_named_elements_filter_min_{min_names}")
-
-
-def uml_empty_name_filter() -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        hits = [name for name in names if name == "empty name"]
-        if not hits and UML_EMPTY_NAME_PATTERN.search(record.raw_text):
-            hits = [match.group(0) for match in UML_EMPTY_NAME_PATTERN.finditer(record.raw_text)]
-        if hits:
-            return DummyFinding(record.model_id, "uml_empty_name", 1.0, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_empty_name_filter")
-
-
-def uml_empty_class_name_filter() -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        hits = [f"class: {name}" for name in class_names(record) if normalize_name(name) == "empty name"]
-        if not hits and UML_EMPTY_CLASS_NAME_PATTERN.search(record.raw_text):
-            hits = [match.group(0) for match in UML_EMPTY_CLASS_NAME_PATTERN.finditer(record.raw_text)]
-        if hits:
-            return DummyFinding(record.model_id, "uml_empty_class_name", 1.0, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_empty_class_name_filter")
-
-
-def uml_median_name_length_filter(min_median_length: int = UML_MIN_MEDIAN_NAME_LENGTH) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [name.strip() for name in record.names if name.strip()]
-        if not names:
-            return None
-        lengths = sorted(len(name) for name in names)
-        mid = len(lengths) // 2
-        median_length = lengths[mid] if len(lengths) % 2 else (lengths[mid - 1] + lengths[mid]) / 2
-        if median_length < min_median_length:
-            return DummyFinding(record.model_id, "uml_median_name_length_too_short", median_length, tuple(names[:10]))
-        return None
-
-    return named_filter(check, "uml_median_name_length_filter")
-
-
-def uml_short_name_or_control_flow_filter(
-    max_length: int = UML_MIN_SHORT_NAME_LENGTH,
-    high_short_threshold: float = UML_SHORT_NAMES_UPPER_THRESHOLD,
-    low_short_threshold: float = UML_SHORT_NAMES_LOWER_THRESHOLD,
-    control_flow_threshold: float = UML_STOPWORDS_THRESHOLD,
-) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        short_names = [name for name in names if len(name.strip()) <= max_length]
-        control_flow_names = [name for name in names if "control flow" in name]
-        short_ratio = len(short_names) / len(names)
-        control_flow_ratio = len(control_flow_names) / len(names)
-        if short_ratio >= high_short_threshold:
-            return DummyFinding(record.model_id, "uml_many_short_names", short_ratio, tuple(short_names[:10]))
-        if short_ratio >= low_short_threshold and control_flow_ratio >= control_flow_threshold:
-            return DummyFinding(
-                record.model_id,
-                "uml_short_names_with_control_flow",
-                max(short_ratio, control_flow_ratio),
-                tuple([*short_names[:5], *control_flow_names[:5]]),
-            )
-        return None
-
-    return named_filter(check, "uml_short_name_or_control_flow_filter")
-
-
-def uml_dummy_keyword_filter(
-    words: set[str] | None = None,
-    threshold: float = UML_DUMMY_WORD_THRESHOLD,
-) -> Filter:
-    words = {normalize_name(word) for word in (words or UML_DUMMY_KEYWORDS | UML_FREQUENT_DUMMY_NAMES)}
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if name in words]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "uml_dummy_keywords", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_dummy_keyword_filter")
-
-
-def uml_dummy_name_filter(threshold: float = UML_DUMMY_NAMES_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if UML_DUMMY_NAME_PATTERN.match(name)]
-        if hits:
-            ratio = len(hits) / len(names)
-            if ratio >= threshold:
-                return DummyFinding(record.model_id, "uml_att_dummy_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_dummy_name_filter")
-
-
-def uml_dummy_class_filter(threshold: float = UML_DUMMY_CLASSES_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [normalize_name(name) for name in class_names(record)]
-        if not names:
-            return None
-        hits = [name for name in names if UML_DUMMY_CLASS_PATTERN.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio > threshold:
-            return DummyFinding(record.model_id, "uml_dummy_classes", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_dummy_class_filter")
-
-
-def uml_generic_class_name_filter(threshold_count: int = UML_GENERIC_PATTERN_THRESHOLD_COUNT) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        hits = [f"class: {name}" for name in class_names(record) if normalize_name(name).startswith("my class")]
-        if len(hits) > threshold_count:
-            return DummyFinding(record.model_id, "uml_generic_my_class_names", float(len(hits)), tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_generic_class_name_filter")
-
-
-def uml_two_character_dummy_name_filter(threshold: float = UML_TWO_CHAR_NAMES_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [
-            name
-            for name in names
-            if UML_TWO_CHAR_PATTERN.match(name) or UML_LETTER_SPACE_LETTER_PATTERN.match(name)
-        ]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "uml_two_character_dummy_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_two_character_dummy_name_filter")
-
-
-def uml_sequential_numbered_filter(threshold: float = UML_SEQUENTIAL_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if UML_NUMBERED_PATTERN.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "uml_sequential_numbered_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "uml_sequential_numbered_filter")
-
-
-def uml_short_name_filter(
-    min_length: int = UML_MIN_SHORT_NAME_LENGTH,
-    threshold: float = UML_SHORT_NAMES_UPPER_THRESHOLD,
-) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        short_names = [name for name in names if len(name.replace(" ", "")) <= min_length]
-        ratio = len(short_names) / len(names)
-        if ratio > threshold:
-            return DummyFinding(record.model_id, "uml_short_names", ratio, tuple(short_names[:10]))
-        return None
-
-    return named_filter(check, "uml_short_name_filter")
-
-
-def uml_vocabulary_uniqueness_filter(min_unique_words: int = UML_VOCABULARY_UNIQUENESS_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        words = set()
-        for name in record.names:
-            words.update(tokenize_name(name))
-        if len(words) <= min_unique_words:
-            return DummyFinding(record.model_id, "uml_low_vocabulary_uniqueness", 1.0, tuple(sorted(words)))
-        return None
-
-    return named_filter(check, "uml_vocabulary_uniqueness_filter")
-
-
-def archimate_new_model_filter() -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        evidence = tuple(name for name in names[:3] if name in ARCHIMATE_NEW_MODEL_NAMES)
-        if evidence:
-            return DummyFinding(record.model_id, "archimate_new_model_placeholder", 1.0, evidence)
-        return None
-
-    return named_filter(check, "archimate_new_model_filter")
-
-
-def archimate_type_name_filter(threshold: float = ARCHIMATE_TYPE_NAME_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        comparable: list[tuple[str, str]] = []
-        for _, attrs in record.graph.nodes(data=True):
-            name = attrs.get("name")
-            node_type = attrs.get("type") or attrs.get("eClass")
-            if name and node_type:
-                comparable.append((normalize_name(str(name)), normalize_name(split_camel_case(str(node_type)))))
-        if not comparable:
-            return None
-        hits = [name for name, node_type in comparable if name == node_type]
-        ratio = len(hits) / len(comparable)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "archimate_type_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "archimate_type_name_filter")
-
-
-def archimate_generic_numbered_filter(threshold: float = ARCHIMATE_GENERIC_NUMBERED_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if ARCHIMATE_GENERIC_NUMBERED_PATTERN.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "archimate_generic_numbered_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "archimate_generic_numbered_filter")
-
-
-def archimate_dummy_keyword_filter(threshold: float = ARCHIMATE_DUMMY_KEYWORD_THRESHOLD) -> Filter:
-    words = {normalize_name(word) for word in ARCHIMATE_DUMMY_KEYWORDS}
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if name in words]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "archimate_dummy_keywords", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "archimate_dummy_keyword_filter")
-
-
-def archimate_crud_or_code_filter(threshold: float = ARCHIMATE_CRUD_OR_CODE_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if ARCHIMATE_CRUD_OR_CODE_PATTERN.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "archimate_crud_or_code_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "archimate_crud_or_code_filter")
-
-
-def archimate_vocabulary_uniqueness_filter(min_unique_words: int = ARCHIMATE_VOCABULARY_UNIQUENESS_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        words = set()
-        for name in record.names:
-            words.update(tokenize_name(name))
-        if len(words) < min_unique_words:
-            return DummyFinding(record.model_id, "archimate_low_vocabulary_uniqueness", 1.0, tuple(sorted(words)))
-        return None
-
-    return named_filter(check, "archimate_vocabulary_uniqueness_filter")
-
-
-def ecore_type_name_filter(threshold: float = ECORE_TYPE_NAME_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        comparable: list[tuple[str, str]] = []
-        for _, attrs in record.graph.nodes(data=True):
-            name = attrs.get("name")
-            node_type = attrs.get("eClass")
-            if name and node_type:
-                comparable.append((normalize_name(str(name)), normalize_ecore_type_name(str(node_type))))
-        if not comparable:
-            return None
-        hits = [name for name, node_type in comparable if name == node_type]
-        ratio = len(hits) / len(comparable)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "ecore_type_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "ecore_type_name_filter")
-
-
-def ecore_generic_numbered_filter(threshold: float = ECORE_GENERIC_NUMBERED_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if ECORE_GENERIC_NUMBERED_PATTERN.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "ecore_generic_numbered_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "ecore_generic_numbered_filter")
-
-
-def ecore_dummy_keyword_filter(threshold: float = ECORE_DUMMY_KEYWORD_THRESHOLD) -> Filter:
-    words = {normalize_name(word) for word in ECORE_DUMMY_KEYWORDS}
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = normalized_names(record)
-        if not names:
-            return None
-        hits = [name for name in names if name in words]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "ecore_dummy_keywords", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "ecore_dummy_keyword_filter")
-
-
-def ecore_vocabulary_uniqueness_filter(min_unique_words: int = ECORE_VOCABULARY_UNIQUENESS_THRESHOLD) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        words = set()
-        for name in record.names:
-            words.update(tokenize_name(name))
-        if len(words) < min_unique_words:
-            return DummyFinding(record.model_id, "ecore_low_vocabulary_uniqueness", 1.0, tuple(sorted(words)))
-        return None
-
-    return named_filter(check, "ecore_vocabulary_uniqueness_filter")
-
-
-def dummy_word_filter(words: set[str] | None = None, threshold: float = 0.35) -> Filter:
-    words = {word.lower() for word in (words or DEFAULT_DUMMY_WORDS)}
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [name.lower() for name in record.names if name.strip()]
-        if not names:
-            return None
-        hits = [name for name in names if any(word in tokenize_name(name) for word in words)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "dummy_words", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "dummy_word_filter")
-
-
-def regex_name_filter(pattern: str, threshold: float, include_types: bool = False, flags: int = re.IGNORECASE) -> Filter:
-    """Create a dummy filter from a user-provided regex.
-
-    The regex is evaluated against each node name by default. When
-    ``include_types`` is true, the tested text is ``"<name> <type>"``.
-    A model is flagged when the fraction of matching nodes reaches
-    ``threshold``.
-    """
-
-    compiled = re.compile(pattern, flags)
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        values = regex_filter_values(record, include_types=include_types)
-        if not values:
-            return None
-        hits = [value for value in values if compiled.search(value)]
-        ratio = len(hits) / len(values)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "regex_name_filter", ratio, tuple(hits[:10]))
-        return None
-
-    target = "names_types" if include_types else "names"
-    return named_filter(check, f"regex_name_filter_{target}")
-
-
-def generic_sequential_names_filter(threshold: float = 0.5) -> Filter:
-    pattern = re.compile(r"^(class|node|element|package|model|entity|attribute|relation|relationship|process|task)\d*$", re.I)
-
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [compact_name(name) for name in record.names if name.strip()]
-        if not names:
-            return None
-        hits = [name for name in names if pattern.match(name)]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "generic_sequential_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "generic_sequential_names_filter")
-
-
-def short_name_ratio_filter(max_length: int = 2, threshold: float = 0.6) -> Filter:
-    def check(record: ModelRecord) -> DummyFinding | None:
-        names = [name.strip() for name in record.names if name.strip()]
-        if not names:
-            return None
-        hits = [name for name in names if len(name) <= max_length]
-        ratio = len(hits) / len(names)
-        if ratio >= threshold:
-            return DummyFinding(record.model_id, "mostly_short_names", ratio, tuple(hits[:10]))
-        return None
-
-    return named_filter(check, "short_name_ratio_filter")
-
-
-def class_names(record: ModelRecord) -> list[str]:
-    names: list[str] = []
-    for _, attrs in record.graph.nodes(data=True):
-        node_type = str(attrs.get("eClass") or attrs.get("type") or "").lower()
-        name = attrs.get("name")
-        if name and "class" in node_type:
-            names.append(str(name))
-    return names
-
-
-def normalized_names(record: ModelRecord) -> list[str]:
-    return [normalize_name(name) for name in record.names if name.strip()]
-
-
-def regex_filter_values(record: ModelRecord, include_types: bool = False) -> list[str]:
-    values: list[str] = []
-    for _, attrs in record.graph.nodes(data=True):
-        name = normalize_name(str(attrs.get("name") or ""))
-        if not name:
-            continue
-        if include_types:
-            node_type = normalize_name(str(attrs.get("type") or attrs.get("eClass") or ""))
-            values.append(f"{name} {node_type}".strip())
+def _eval_placeholder_name_ratio(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    threshold = float(config.get("threshold", DEFAULT_PLACEHOLDER_THRESHOLD))
+    named = named_nodes(derived_nodes)
+    placeholders = [node for node in named if node.classification == "placeholder"]
+    ratio = len(placeholders) / len(named) if named else 0.0
+    if named and ratio >= threshold:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "placeholder_ratio_above_threshold",
+            score=ratio,
+            threshold=threshold,
+            evidence=tuple(node.normalized_name for node in placeholders[:10]),
+            evidence_nodes=tuple(node.node_id for node in placeholders[:10]),
+            metrics={"placeholderHits": len(placeholders), "namedNodes": len(named), "ratio": ratio},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "placeholder_ratio_ok",
+        score=ratio,
+        threshold=threshold,
+        metrics={"placeholderHits": len(placeholders), "namedNodes": len(named), "ratio": ratio},
+    )
+
+
+def _eval_low_vocabulary(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    min_unique_words = int(config.get("minUniqueWords", DEFAULT_MIN_UNIQUE_WORDS))
+    eligible = semantic_nodes(derived_nodes)
+    tokens = sorted({token for node in eligible for token in node.tokens})
+    token_count = len(tokens)
+    if token_count < min_unique_words:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "vocabulary_below_minimum",
+            score=float(token_count),
+            threshold=float(min_unique_words),
+            evidence=tuple(tokens[:10]),
+            metrics={"uniqueTokenCount": token_count, "minUniqueWords": min_unique_words},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "vocabulary_ok",
+        score=float(token_count),
+        threshold=float(min_unique_words),
+        metrics={"uniqueTokenCount": token_count, "minUniqueWords": min_unique_words},
+    )
+
+
+def _eval_type_like_ratio(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    threshold = float(config.get("threshold", DEFAULT_TYPE_LIKE_THRESHOLD))
+    named = named_nodes(derived_nodes)
+    hits = [node for node in named if node.classification == "type_like"]
+    ratio = len(hits) / len(named) if named else 0.0
+    if named and ratio >= threshold:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "type_like_ratio_above_threshold",
+            score=ratio,
+            threshold=threshold,
+            evidence=tuple(node.normalized_name for node in hits[:10]),
+            evidence_nodes=tuple(node.node_id for node in hits[:10]),
+            metrics={"typeLikeCount": len(hits), "namedNodes": len(named), "ratio": ratio},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "type_like_ratio_ok",
+        score=ratio,
+        threshold=threshold,
+        metrics={"typeLikeCount": len(hits), "namedNodes": len(named), "ratio": ratio},
+    )
+
+
+def _eval_name_repetition(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    threshold = float(config.get("threshold", DEFAULT_NAME_REPETITION_THRESHOLD))
+    named = [node.normalized_name for node in named_nodes(derived_nodes)]
+    if not named:
+        return _kept_finding(
+            record.model_id,
+            filter_id,
+            "no_named_nodes",
+            score=0.0,
+            threshold=threshold,
+            metrics={"namedNodes": 0, "ratio": 0.0},
+        )
+    counts = Counter(named)
+    most_name, most_count = counts.most_common(1)[0]
+    ratio = most_count / len(named)
+    if ratio >= threshold:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "name_repetition_above_threshold",
+            score=ratio,
+            threshold=threshold,
+            evidence=(most_name,),
+            metrics={"mostFrequentName": most_name, "mostFrequentCount": most_count, "namedNodes": len(named), "ratio": ratio},
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "name_repetition_ok",
+        score=ratio,
+        threshold=threshold,
+        metrics={"mostFrequentName": most_name, "mostFrequentCount": most_count, "namedNodes": len(named), "ratio": ratio},
+    )
+
+
+def _eval_regex_rule(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    pattern = str(config.get("pattern") or "").strip()
+    min_matches = int(config.get("minMatches", DEFAULT_REGEX_MIN_MATCHES))
+    target_field = str(config.get("targetField") or "name")
+    scope = str(config.get("scope") or "eligible_only")
+    if not pattern:
+        return _kept_finding(record.model_id, filter_id, "regex_not_configured", score=0.0, threshold=float(min_matches))
+
+    try:
+        compiled = re.compile(pattern, re.IGNORECASE)
+    except re.error as exc:
+        return _kept_finding(
+            record.model_id,
+            filter_id,
+            "invalid_regex_pattern",
+            score=0.0,
+            threshold=float(min_matches),
+            metrics={"error": str(exc), "pattern": pattern},
+        )
+
+    pool = semantic_nodes(derived_nodes) if scope == "eligible_only" else named_nodes(derived_nodes)
+    values: list[tuple[DerivedNode, str]] = []
+    for node in pool:
+        if target_field == "type":
+            values.append((node, node.normalized_type))
+        elif target_field == "name+type":
+            values.append((node, f"{node.normalized_name} {node.normalized_type}".strip()))
         else:
-            values.append(name)
-    return values
+            values.append((node, node.normalized_name))
+
+    hits = [(node, value) for node, value in values if value and compiled.search(value)]
+    if len(hits) >= min_matches:
+        return _removed_finding(
+            record.model_id,
+            filter_id,
+            "regex_rule_matched",
+            score=float(len(hits)),
+            threshold=float(min_matches),
+            evidence=tuple(value for _, value in hits[:10]),
+            evidence_nodes=tuple(node.node_id for node, _ in hits[:10]),
+            metrics={
+                "matchCount": len(hits),
+                "minMatches": min_matches,
+                "scope": scope,
+                "targetField": target_field,
+                "pattern": pattern,
+            },
+        )
+    return _kept_finding(
+        record.model_id,
+        filter_id,
+        "regex_rule_not_matched",
+        score=float(len(hits)),
+        threshold=float(min_matches),
+        metrics={
+            "matchCount": len(hits),
+            "minMatches": min_matches,
+            "scope": scope,
+            "targetField": target_field,
+            "pattern": pattern,
+        },
+    )
+
+
+def derive_nodes(record: ModelRecord) -> list[DerivedNode]:
+    nodes: list[DerivedNode] = []
+    for node_id, attrs in record.graph.nodes(data=True):
+        raw_name = str(attrs.get("name") or "")
+        node_type = str(attrs.get("type") or attrs.get("eClass") or "")
+        normalized_name = normalize_name(raw_name)
+        normalized_type = normalize_name(split_camel_case(node_type))
+        if not normalized_name:
+            classification = "missing"
+        elif is_type_like_name(normalized_name, normalized_type):
+            classification = "type_like"
+        elif is_placeholder_name(normalized_name):
+            classification = "placeholder"
+        else:
+            classification = "semantic"
+        nodes.append(
+            DerivedNode(
+                node_id=str(node_id),
+                raw_name=raw_name,
+                node_type=node_type,
+                normalized_name=normalized_name,
+                normalized_type=normalized_type,
+                classification=classification,
+                tokens=tuple(sorted(tokenize_name(normalized_name))),
+            )
+        )
+    return nodes
+
+
+def is_type_like_name(normalized_name: str, normalized_type: str) -> bool:
+    compact_name = compact_identifier(normalized_name)
+    compact_type = compact_identifier(normalized_type)
+    if not compact_name or not compact_type:
+        return False
+    if compact_name == compact_type:
+        return True
+    if compact_name.startswith(compact_type):
+        suffix = compact_name[len(compact_type) :]
+        return bool(suffix) and suffix.isdigit()
+    return False
+
+
+def is_placeholder_name(normalized_name: str) -> bool:
+    if normalized_name in PLACEHOLDER_KEYWORDS:
+        return True
+    for pattern in PLACEHOLDER_PATTERNS:
+        if pattern.match(normalized_name):
+            return True
+    return False
+
+
+def named_nodes(nodes: list[DerivedNode]) -> list[DerivedNode]:
+    return [node for node in nodes if node.classification != "missing"]
+
+
+def semantic_nodes(nodes: list[DerivedNode]) -> list[DerivedNode]:
+    return [node for node in nodes if node.classification == "semantic"]
+
+
+def _removed_finding(
+    model_id: str,
+    filter_id: str,
+    reason: str,
+    score: float,
+    threshold: float,
+    evidence: tuple[str, ...] = (),
+    evidence_nodes: tuple[str, ...] = (),
+    metrics: dict[str, Any] | None = None,
+) -> DummyFinding:
+    return DummyFinding(
+        model_id=model_id,
+        filter_id=filter_id,
+        reason=reason,
+        score=score,
+        threshold=threshold,
+        decision="removed",
+        evidence=evidence,
+        evidence_nodes=evidence_nodes,
+        metrics=metrics,
+    )
+
+
+def _kept_finding(
+    model_id: str,
+    filter_id: str,
+    reason: str,
+    score: float,
+    threshold: float,
+    evidence: tuple[str, ...] = (),
+    evidence_nodes: tuple[str, ...] = (),
+    metrics: dict[str, Any] | None = None,
+) -> DummyFinding:
+    return DummyFinding(
+        model_id=model_id,
+        filter_id=filter_id,
+        reason=reason,
+        score=score,
+        threshold=threshold,
+        decision="kept",
+        evidence=evidence,
+        evidence_nodes=evidence_nodes,
+        metrics=metrics,
+    )
+
+
+def _median(values: list[int]) -> float:
+    length = len(values)
+    if not length:
+        return 0.0
+    mid = length // 2
+    if length % 2 == 1:
+        return float(values[mid])
+    return (values[mid - 1] + values[mid]) / 2
 
 
 def normalize_name(value: str) -> str:
-    return re.sub(r"\s+", " ", str(value).strip().lower())
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
 
 def split_camel_case(value: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", " ", value).replace("_", " ").replace("-", " ")
-
-
-def normalize_ecore_type_name(value: str) -> str:
-    value = split_camel_case(value)
-    value = re.sub(r"^e\s+", "", value, flags=re.IGNORECASE)
-    return normalize_name(value)
-
-
-def named_filter(filter_fn: Filter, name: str) -> Filter:
-    setattr(filter_fn, "_mcp4cm_filter_name", name)
-    return filter_fn
-
-
-def filter_name(filter_fn: Filter) -> str:
-    return str(getattr(filter_fn, "_mcp4cm_filter_name", getattr(filter_fn, "__name__", "filter")))
-
-
-def _dataset_filters(records: list[ModelRecord]) -> tuple[Filter, ...]:
-    languages = {record.language.lower() for record in records}
-    if len(languages) == 1:
-        return filters_for_language(next(iter(languages)))
-    return default_filters()
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", str(value)).replace("_", " ").replace("-", " ")
 
 
 def tokenize_name(value: str) -> set[str]:
     return {match.group(0).lower() for match in re.finditer(r"[A-Za-z][A-Za-z0-9_]*", value)}
 
 
-def compact_name(value: str) -> str:
+def compact_identifier(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "", value).lower()

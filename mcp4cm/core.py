@@ -10,6 +10,7 @@ class ModelingLanguage(str, Enum):
     UML = "uml"
     ECORE = "ecore"
     ARCHIMATE = "archimate"
+    BPMN = "bpmn"
 
 
 class DatasetType(str, Enum):

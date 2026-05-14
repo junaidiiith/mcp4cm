@@ -4,73 +4,27 @@ import argparse
 import json
 import logging
 import os
+import re
 import signal
+import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
 from collections.abc import Iterable
-from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, g, jsonify, request, send_from_directory
 from werkzeug.datastructures import FileStorage
+from werkzeug.exceptions import RequestEntityTooLarge
 
-from mcp4cm.core import Dataset
+from mcp4cm._deps import require_networkx
+from mcp4cm.core import Dataset, ModelRecord
 from mcp4cm.dummy import (
-    ARCHIMATE_CRUD_OR_CODE_THRESHOLD,
-    ARCHIMATE_DUMMY_KEYWORD_THRESHOLD,
-    ARCHIMATE_GENERIC_NUMBERED_THRESHOLD,
-    ARCHIMATE_MIN_NAMES_COUNT,
-    ARCHIMATE_SHORT_NAME_THRESHOLD,
-    ARCHIMATE_TYPE_NAME_THRESHOLD,
-    ARCHIMATE_VOCABULARY_UNIQUENESS_THRESHOLD,
-    ECORE_DUMMY_KEYWORD_THRESHOLD,
-    ECORE_GENERIC_NUMBERED_THRESHOLD,
-    ECORE_MIN_NAMES_COUNT,
-    ECORE_SHORT_NAME_THRESHOLD,
-    ECORE_TYPE_NAME_THRESHOLD,
-    ECORE_VOCABULARY_UNIQUENESS_THRESHOLD,
-    UML_DUMMY_CLASSES_THRESHOLD,
-    UML_DUMMY_NAMES_THRESHOLD,
-    UML_DUMMY_WORD_THRESHOLD,
-    UML_MIN_NAMES_COUNT,
-    UML_MIN_MEDIAN_NAME_LENGTH,
-    UML_SEQUENTIAL_THRESHOLD,
-    UML_SHORT_NAMES_UPPER_THRESHOLD,
-    UML_SHORT_NAMES_LOWER_THRESHOLD,
-    UML_STOPWORDS_THRESHOLD,
-    UML_TWO_CHAR_NAMES_THRESHOLD,
-    UML_VOCABULARY_UNIQUENESS_THRESHOLD,
-    archimate_crud_or_code_filter,
-    archimate_dummy_keyword_filter,
-    archimate_generic_numbered_filter,
-    archimate_new_model_filter,
-    archimate_type_name_filter,
-    archimate_vocabulary_uniqueness_filter,
-    dummy_word_filter,
-    ecore_dummy_keyword_filter,
-    ecore_generic_numbered_filter,
-    ecore_type_name_filter,
-    ecore_vocabulary_uniqueness_filter,
-    empty_model_filter,
-    generic_sequential_names_filter,
-    regex_name_filter,
-    short_name_ratio_filter,
-    summarize_filters,
-    too_few_named_elements_filter,
-    uml_empty_class_name_filter,
-    uml_empty_name_filter,
-    uml_dummy_class_filter,
-    uml_dummy_keyword_filter,
-    uml_dummy_name_filter,
-    uml_generic_class_name_filter,
-    uml_median_name_length_filter,
-    uml_sequential_numbered_filter,
-    uml_short_name_or_control_flow_filter,
-    uml_two_character_dummy_name_filter,
-    uml_vocabulary_uniqueness_filter,
+    default_filter_configs,
+    evaluate_dummy_filters,
 )
 from mcp4cm.duplicates import (
     bert_semantic_similarity_pairs,
@@ -83,71 +37,35 @@ from mcp4cm.duplicates import (
     tfidf_duplicate_by_names_and_types,
 )
 from mcp4cm.parsers.archimate import ArchimateParser
+from mcp4cm.parsers.extended import (
+    ArchimateArchiModelParser,
+    BPMNSignavioModelParser,
+    EcoreXMIModelParser,
+    RepresentationProfile,
+    UMLXMIModelParser,
+)
 from mcp4cm.parsers.modelset import EcoreParser, UMLParser
-from mcp4cm.statistics import dataset_summary, name_counts, type_counts, word_counts
+from mcp4cm.statistics import dataset_summary, name_counts, node_names, type_counts
 
 DATASETS: dict[str, Dataset] = {}
-PREPROCESSED_UPLOADS: dict[str, dict[str, Any]] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
+UPLOAD_SESSIONS: dict[str, dict[str, Any]] = {}
+UPLOAD_PARSE_JOBS: dict[str, dict[str, Any]] = {}
 DUPLICATE_JOBS_LOCK = threading.Lock()
+UPLOAD_LOCK = threading.Lock()
 WEBAPP_DIST = Path(__file__).resolve().parents[1] / "webapp" / "dist"
+RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime"
+RUNTIME_IR_DIR = RUNTIME_DIR / "ir"
+RUNTIME_INDEX = RUNTIME_DIR / "index.json"
 LOG = logging.getLogger("mcp4cm.api")
+SUPPORTED_LANGUAGES = {"uml", "ecore", "archimate", "bpmn"}
+SUPPORTED_FORMATS = {"json", "xmi", "ecore", "signavio"}
+RUNTIME_LOCK = threading.Lock()
 
 
 def default_dummy_filter_configs(language: str) -> list[dict[str, Any]]:
-    language = language.lower()
-    if language == "uml":
-        return [
-            {"id": "empty_model", "enabled": True},
-            {"id": "uml_empty_class_name", "enabled": True},
-            {"id": "uml_empty_name", "enabled": True},
-            {"id": "too_few_names", "enabled": True, "minNames": UML_MIN_NAMES_COUNT},
-            {"id": "uml_median_name_length", "enabled": True, "minMedianLength": UML_MIN_MEDIAN_NAME_LENGTH},
-            {
-                "id": "uml_short_name_or_control_flow",
-                "enabled": True,
-                "maxLength": 2,
-                "threshold": UML_SHORT_NAMES_UPPER_THRESHOLD,
-                "lowThreshold": UML_SHORT_NAMES_LOWER_THRESHOLD,
-                "controlFlowThreshold": UML_STOPWORDS_THRESHOLD,
-            },
-            {"id": "uml_dummy_class", "enabled": True, "threshold": UML_DUMMY_CLASSES_THRESHOLD},
-            {"id": "uml_generic_class_name", "enabled": True, "thresholdCount": 2},
-            {"id": "uml_dummy_name", "enabled": True, "threshold": UML_DUMMY_NAMES_THRESHOLD},
-            {"id": "uml_two_character_dummy_name", "enabled": True, "threshold": UML_TWO_CHAR_NAMES_THRESHOLD},
-            {"id": "uml_dummy_keyword", "enabled": True, "threshold": UML_DUMMY_WORD_THRESHOLD},
-            {"id": "uml_sequential", "enabled": True, "threshold": UML_SEQUENTIAL_THRESHOLD},
-            {"id": "uml_vocabulary", "enabled": True, "minUniqueWords": UML_VOCABULARY_UNIQUENESS_THRESHOLD},
-        ]
-    if language == "ecore":
-        return [
-            {"id": "empty_model", "enabled": True},
-            {"id": "too_few_names", "enabled": True, "minNames": ECORE_MIN_NAMES_COUNT},
-            {"id": "ecore_type_name", "enabled": True, "threshold": ECORE_TYPE_NAME_THRESHOLD},
-            {"id": "ecore_numbered", "enabled": True, "threshold": ECORE_GENERIC_NUMBERED_THRESHOLD},
-            {"id": "ecore_dummy_keyword", "enabled": True, "threshold": ECORE_DUMMY_KEYWORD_THRESHOLD},
-            {"id": "ecore_vocabulary", "enabled": True, "minUniqueWords": ECORE_VOCABULARY_UNIQUENESS_THRESHOLD},
-            {"id": "short_names", "enabled": True, "maxLength": 2, "threshold": ECORE_SHORT_NAME_THRESHOLD},
-        ]
-    if language == "archimate":
-        return [
-            {"id": "empty_model", "enabled": True},
-            {"id": "too_few_names", "enabled": True, "minNames": ARCHIMATE_MIN_NAMES_COUNT},
-            {"id": "archimate_new_model", "enabled": True},
-            {"id": "archimate_type_name", "enabled": True, "threshold": ARCHIMATE_TYPE_NAME_THRESHOLD},
-            {"id": "archimate_numbered", "enabled": True, "threshold": ARCHIMATE_GENERIC_NUMBERED_THRESHOLD},
-            {"id": "archimate_dummy_keyword", "enabled": True, "threshold": ARCHIMATE_DUMMY_KEYWORD_THRESHOLD},
-            {"id": "archimate_crud_code", "enabled": True, "threshold": ARCHIMATE_CRUD_OR_CODE_THRESHOLD},
-            {"id": "archimate_vocabulary", "enabled": True, "minUniqueWords": ARCHIMATE_VOCABULARY_UNIQUENESS_THRESHOLD},
-            {"id": "short_names", "enabled": True, "maxLength": 2, "threshold": ARCHIMATE_SHORT_NAME_THRESHOLD},
-        ]
-    return [
-        {"id": "empty_model", "enabled": True},
-        {"id": "too_few_names", "enabled": True, "minNames": 2},
-        {"id": "dummy_words", "enabled": True, "threshold": 0.35},
-        {"id": "generic_sequential", "enabled": True, "threshold": 0.5},
-        {"id": "short_names", "enabled": True, "maxLength": 2, "threshold": 0.6},
-    ]
+    _ = language
+    return default_filter_configs()
 
 
 def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
@@ -173,21 +91,40 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
     def health():
         return jsonify({"ok": True})
 
-    @app.route("/api/datasets", methods=["POST"])
-    def upload_dataset():
-        return jsonify(handle_upload(read_upload_request()))
+    @app.route("/api/datasets/<dataset_id>/models/<model_id>/inspect", methods=["GET"])
+    def inspect_model_route(dataset_id: str, model_id: str):
+        node_limit = request.args.get("nodeLimit")
+        edge_limit = request.args.get("edgeLimit")
+        include_attrs = parse_form_bool(request.args.get("includeAttrs"), True)
+        return jsonify(
+            inspect_dataset_model(
+                dataset_id=dataset_id,
+                model_id=model_id,
+                node_limit=parse_positive_int_param(node_limit, "nodeLimit"),
+                edge_limit=parse_positive_int_param(edge_limit, "edgeLimit"),
+                include_attrs=include_attrs,
+            )
+        )
 
-    @app.route("/api/datasets/preprocess", methods=["POST"])
-    def preprocess_dataset():
-        return jsonify(handle_preprocess_upload(read_upload_request()))
+    @app.route("/api/uploads/start", methods=["POST"])
+    def start_upload_session_route():
+        return jsonify(start_upload_session(read_json_body()))
+
+    @app.route("/api/uploads/<upload_id>/chunks", methods=["POST"])
+    def upload_chunk_route(upload_id: str):
+        return jsonify(upload_chunk(upload_id, read_upload_request()))
+
+    @app.route("/api/uploads/<upload_id>/parse", methods=["POST"])
+    def start_upload_parse_route(upload_id: str):
+        return jsonify(start_upload_parse(upload_id))
+
+    @app.route("/api/uploads/<upload_id>/jobs/<job_id>", methods=["GET"])
+    def get_upload_parse_job_route(upload_id: str, job_id: str):
+        return jsonify(get_upload_parse_job(upload_id, job_id))
 
     @app.route("/api/dummy", methods=["POST"])
     def dummy_filters():
         return jsonify(handle_dummy(read_json_body()))
-
-    @app.route("/api/duplicates", methods=["POST"])
-    def duplicates():
-        return jsonify(handle_duplicates(read_json_body()))
 
     @app.route("/api/duplicates/jobs", methods=["POST"])
     def start_duplicates_job():
@@ -221,6 +158,11 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
         LOG.warning("invalid_json path=%s error=%s", request.path, exc)
         return jsonify({"error": f"Invalid JSON: {exc.msg}"}), 400
 
+    @app.errorhandler(RequestEntityTooLarge)
+    def request_too_large(exc: RequestEntityTooLarge):
+        LOG.warning("request_too_large path=%s error=%s", request.path, exc)
+        return jsonify({"error": "Upload too large for a single request. Use chunked upload session endpoints."}), 413
+
     @app.errorhandler(Exception)
     def unexpected_error(exc: Exception):
         LOG.exception("unhandled_error path=%s", request.path)
@@ -248,6 +190,299 @@ def configure_logging() -> None:
     logging.basicConfig(level=level, handlers=handlers, force=True)
 
 
+def runtime_index_template() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "updatedAt": time.time(),
+        "datasets": {},
+    }
+
+
+def ensure_runtime_store() -> None:
+    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
+    if not RUNTIME_INDEX.exists():
+        RUNTIME_INDEX.write_text(json.dumps(runtime_index_template(), ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_runtime_index() -> dict[str, Any]:
+    ensure_runtime_store()
+    try:
+        payload = json.loads(RUNTIME_INDEX.read_text(encoding="utf-8"))
+    except Exception:
+        payload = runtime_index_template()
+    if not isinstance(payload, dict):
+        payload = runtime_index_template()
+    payload.setdefault("version", 1)
+    payload.setdefault("updatedAt", time.time())
+    payload.setdefault("datasets", {})
+    if not isinstance(payload["datasets"], dict):
+        payload["datasets"] = {}
+    return payload
+
+
+def save_runtime_index(index_payload: dict[str, Any]) -> None:
+    index_payload["updatedAt"] = time.time()
+    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
+    temp_path = RUNTIME_INDEX.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(index_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(RUNTIME_INDEX)
+
+
+def runtime_model_filename(model_id: str, index: int, seen: set[str]) -> str:
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(model_id or "").strip()) or f"model_{index + 1}"
+    candidate = f"{base}.json"
+    counter = 1
+    while candidate in seen:
+        candidate = f"{base}_{counter}.json"
+        counter += 1
+    seen.add(candidate)
+    return candidate
+
+
+def _flatten_runtime_attrs(attrs: Any, *, skip_keys: set[str]) -> dict[str, Any]:
+    if not isinstance(attrs, dict):
+        return {}
+    flattened: dict[str, Any] = {}
+    for raw_key, raw_value in attrs.items():
+        key = str(raw_key)
+        if key == "attrs" or key in skip_keys:
+            continue
+        flattened[key] = json_safe(raw_value)
+    return flattened
+
+
+def _drop_runtime_data_duplicates(payload: dict[str, Any], *, protected_keys: set[str]) -> dict[str, Any]:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return payload
+    for key in list(payload.keys()):
+        if key == "data" or key in protected_keys:
+            continue
+        if key in data and payload.get(key) == data.get(key):
+            payload.pop(key, None)
+    return payload
+
+
+def serialize_graph_for_runtime(graph) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "directed": bool(graph.is_directed()),
+        "multigraph": bool(graph.is_multigraph()),
+        "graphAttrs": json_safe(dict(graph.graph)),
+        "nodes": [],
+        "edges": [],
+    }
+    for node_id, attrs in graph.nodes(data=True):
+        node_entry: dict[str, Any] = {"id": json_safe(node_id)}
+        node_entry.update(_flatten_runtime_attrs(attrs, skip_keys={"id"}))
+        payload["nodes"].append(
+            _drop_runtime_data_duplicates(
+                node_entry,
+                protected_keys={"id", "type", "name"},
+            )
+        )
+    if graph.is_multigraph():
+        for source, target, key, attrs in graph.edges(keys=True, data=True):
+            edge_entry: dict[str, Any] = {
+                "source": json_safe(source),
+                "target": json_safe(target),
+                "key": json_safe(key),
+            }
+            edge_entry.update(_flatten_runtime_attrs(attrs, skip_keys=set()))
+            if "id" not in edge_entry and edge_entry.get("key") is not None:
+                edge_entry["id"] = edge_entry["key"]
+            payload["edges"].append(
+                _drop_runtime_data_duplicates(
+                    edge_entry,
+                    protected_keys={"source", "target", "key", "id", "type"},
+                )
+            )
+    else:
+        for source, target, attrs in graph.edges(data=True):
+            edge_entry = {"source": json_safe(source), "target": json_safe(target)}
+            edge_entry.update(_flatten_runtime_attrs(attrs, skip_keys=set()))
+            payload["edges"].append(
+                _drop_runtime_data_duplicates(
+                    edge_entry,
+                    protected_keys={"source", "target", "id", "type"},
+                )
+            )
+    return payload
+
+
+def serialize_model_for_runtime(record: ModelRecord) -> dict[str, Any]:
+    return {
+        "modelId": str(record.model_id),
+        "language": str(record.language),
+        "labels": [str(label) for label in record.labels],
+        "name": str(record.name or ""),
+        "sourcePath": str(record.source_path or ""),
+        "rawText": str(record.raw_text or ""),
+        "rawXmi": str(record.raw_xmi or ""),
+        "metadata": json_safe(record.metadata if isinstance(record.metadata, dict) else {}),
+        "graph": serialize_graph_for_runtime(record.graph),
+    }
+
+
+def deserialize_graph_from_runtime(payload: dict[str, Any]):
+    nx = require_networkx()
+    directed = bool(payload.get("directed", True))
+    multigraph = bool(payload.get("multigraph", False))
+    graph_cls = (
+        nx.MultiDiGraph
+        if directed and multigraph
+        else nx.DiGraph
+        if directed
+        else nx.MultiGraph
+        if multigraph
+        else nx.Graph
+    )
+    graph = graph_cls()
+    graph.graph.update(payload.get("graphAttrs") or {})
+    for node in payload.get("nodes") or []:
+        node_id = node.get("id")
+        attrs: dict[str, Any] = {}
+        legacy_attrs = node.get("attrs")
+        if isinstance(legacy_attrs, dict):
+            attrs.update(legacy_attrs)
+        for key, value in (node or {}).items():
+            if key in {"id", "attrs"}:
+                continue
+            attrs[str(key)] = value
+        graph.add_node(node_id, **attrs)
+    for edge in payload.get("edges") or []:
+        source = edge.get("source")
+        target = edge.get("target")
+        attrs: dict[str, Any] = {}
+        legacy_attrs = edge.get("attrs")
+        if isinstance(legacy_attrs, dict):
+            attrs.update(legacy_attrs)
+        for key, value in (edge or {}).items():
+            if key in {"source", "target", "key", "attrs"}:
+                continue
+            attrs[str(key)] = value
+        if multigraph:
+            edge_key = edge.get("key")
+            if edge_key is None:
+                edge_key = attrs.get("id")
+            graph.add_edge(source, target, key=edge_key, **attrs)
+        else:
+            graph.add_edge(source, target, **attrs)
+    return graph
+
+
+def deserialize_model_from_runtime(payload: dict[str, Any]) -> ModelRecord:
+    graph_payload = payload.get("graph")
+    if not isinstance(graph_payload, dict):
+        raise ValueError("Persisted model graph payload is missing or invalid.")
+    source_path = str(payload.get("sourcePath") or "")
+    return ModelRecord(
+        model_id=str(payload.get("modelId") or ""),
+        language=str(payload.get("language") or ""),
+        graph=deserialize_graph_from_runtime(graph_payload),
+        labels=tuple(str(label) for label in (payload.get("labels") or [])),
+        name=str(payload.get("name") or "") or None,
+        source_path=Path(source_path) if source_path else None,
+        raw_text=str(payload.get("rawText") or ""),
+        raw_xmi=str(payload.get("rawXmi") or ""),
+        metadata=dict(payload.get("metadata") or {}),
+    )
+
+
+def persist_dataset_to_runtime(dataset_id: str, dataset: Dataset) -> None:
+    dataset_id = str(dataset_id)
+    if not dataset_id:
+        return
+    with RUNTIME_LOCK:
+        ensure_runtime_store()
+        dataset_dir = RUNTIME_IR_DIR / dataset_id
+        shutil.rmtree(dataset_dir, ignore_errors=True)
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        seen_files: set[str] = set()
+        model_entries: list[dict[str, Any]] = []
+        for index, record in enumerate(dataset.records):
+            filename = runtime_model_filename(record.model_id, index, seen_files)
+            model_payload = serialize_model_for_runtime(record)
+            (dataset_dir / filename).write_text(json.dumps(model_payload, ensure_ascii=False), encoding="utf-8")
+            model_entries.append({"modelId": str(record.model_id), "file": filename, "language": str(record.language)})
+        index_payload = load_runtime_index()
+        index_payload["datasets"][dataset_id] = {
+            "datasetId": dataset_id,
+            "datasetType": str(dataset.dataset_type),
+            "createdAt": time.time(),
+            "recordCount": len(dataset.records),
+            "models": model_entries,
+        }
+        save_runtime_index(index_payload)
+
+
+def load_dataset_from_runtime(dataset_id: str) -> Dataset | None:
+    dataset_id = str(dataset_id)
+    if not dataset_id:
+        return None
+    with RUNTIME_LOCK:
+        index_payload = load_runtime_index()
+        dataset_meta = index_payload.get("datasets", {}).get(dataset_id)
+        if not isinstance(dataset_meta, dict):
+            return None
+        dataset_dir = RUNTIME_IR_DIR / dataset_id
+        if not dataset_dir.exists():
+            return None
+        records: list[ModelRecord] = []
+        for model_entry in dataset_meta.get("models") or []:
+            filename = str((model_entry or {}).get("file") or "")
+            if not filename:
+                continue
+            model_path = dataset_dir / filename
+            if not model_path.exists():
+                continue
+            model_payload = json.loads(model_path.read_text(encoding="utf-8"))
+            records.append(deserialize_model_from_runtime(model_payload))
+        if not records:
+            return None
+        return Dataset(records=records, dataset_type=str(dataset_meta.get("datasetType") or "runtime"), root=dataset_dir)
+
+
+def has_active_pipeline_run() -> bool:
+    with UPLOAD_LOCK:
+        for session in UPLOAD_SESSIONS.values():
+            if str(session.get("status") or "") in {"collecting", "processing"}:
+                return True
+        for job in UPLOAD_PARSE_JOBS.values():
+            if str(job.get("status") or "") in {"queued", "running"}:
+                return True
+    with DUPLICATE_JOBS_LOCK:
+        for job in DUPLICATE_JOBS.values():
+            if str(job.get("status") or "") in {"queued", "running"}:
+                return True
+    return False
+
+
+def remove_directory_quietly(path: Path | str | None) -> None:
+    if not path:
+        return
+    try:
+        shutil.rmtree(Path(path), ignore_errors=True)
+    except Exception:
+        LOG.exception("runtime_cleanup_failed path=%s", path)
+
+
+def reset_pipeline_state() -> None:
+    stage_dirs: list[Path] = []
+    with UPLOAD_LOCK:
+        for session in UPLOAD_SESSIONS.values():
+            stage_dir = str(session.get("stageDir") or "")
+            if stage_dir:
+                stage_dirs.append(Path(stage_dir))
+        UPLOAD_SESSIONS.clear()
+        UPLOAD_PARSE_JOBS.clear()
+    with DUPLICATE_JOBS_LOCK:
+        DUPLICATE_JOBS.clear()
+    DATASETS.clear()
+    for stage_dir in stage_dirs:
+        remove_directory_quietly(stage_dir)
+    remove_directory_quietly(RUNTIME_DIR)
+
+
 def read_json_body() -> dict[str, Any]:
     data = request.get_json(silent=True)
     if data is None:
@@ -261,9 +496,12 @@ def read_upload_request() -> dict[str, Any]:
     if request.files or request.form:
         return {
             "language": request.form.get("language", ""),
+            "format": request.form.get("format", "json"),
+            "includeAttributes": request.form.get("includeAttributes", "true"),
+            "includeOperations": request.form.get("includeOperations", "true"),
+            "includeParameters": request.form.get("includeParameters", "true"),
+            "includeModelRootNode": request.form.get("includeModelRootNode", "false"),
             "files": request.files.getlist("files"),
-            "modelLimit": request.form.get("modelLimit", ""),
-            "preprocessId": request.form.get("preprocessId", ""),
         }
     return read_json_body()
 
@@ -306,149 +544,490 @@ def pids_on_port(port: int) -> list[int]:
     return pids
 
 
-def handle_upload(body: dict[str, Any]) -> dict[str, Any]:
-    language = str(body.get("language") or "").lower()
-    files = body.get("files") or []
-    if language not in {"uml", "ecore", "archimate"}:
-        raise ValueError("language must be one of: uml, ecore, archimate")
-    LOG.info(
-        "upload_start language=%s file_count=%s preprocess_id=%s",
-        language,
-        len(files) if isinstance(files, list) else "invalid",
-        body.get("preprocessId") or "",
+def parse_form_bool(value: Any, default: bool = True) -> bool:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def representation_profile_from_body(body: dict[str, Any], language: str, data_format: str) -> RepresentationProfile:
+    if language != "uml" or data_format != "xmi":
+        return RepresentationProfile()
+    return RepresentationProfile(
+        include_attributes=parse_form_bool(body.get("includeAttributes"), True),
+        include_operations=parse_form_bool(body.get("includeOperations"), True),
+        include_parameters=parse_form_bool(body.get("includeParameters"), True),
+        include_model_root_node=parse_form_bool(body.get("includeModelRootNode"), False),
     )
-    dataset, parse_summary = dataset_from_upload_or_preprocess(language, files, body.get("preprocessId"))
-    if not dataset.records:
-        raise ValueError(
-            "Upload parsed 0 models. Check that the selected modeling language matches the file and that the file "
-            "contains JSON objects or JSONL lines with model objects."
-        )
-    total_records = len(dataset.records)
-    model_limit = normalized_model_limit(body.get("modelLimit"), total_records)
-    if model_limit < total_records:
-        dataset = Dataset(records=dataset.records[:model_limit], dataset_type=dataset.dataset_type, root=dataset.root)
-    parse_summary["totalRecords"] = total_records
-    parse_summary["usedRecords"] = len(dataset.records)
-    parse_summary["modelLimit"] = model_limit
-    dataset_id = uuid.uuid4().hex
-    DATASETS[dataset_id] = dataset
-    statistics = serialize_statistics(dataset)
-    LOG.info(
-        "upload_complete dataset_id=%s models=%s total_records=%s model_limit=%s payloads=%s skipped=%s errors=%s",
-        dataset_id,
-        len(dataset.records),
-        total_records,
-        model_limit,
-        parse_summary["payloads"],
-        parse_summary["skipped"],
-        parse_summary["errors"],
-    )
-    return {"datasetId": dataset_id, "statistics": statistics, "uploadSummary": parse_summary}
 
 
-def handle_preprocess_upload(body: dict[str, Any]) -> dict[str, Any]:
-    language = str(body.get("language") or "").lower()
-    files = body.get("files") or []
-    LOG.info("preprocess_start language=%s file_count=%s", language, len(files) if isinstance(files, list) else "invalid")
-    if language not in {"uml", "ecore", "archimate"}:
-        raise ValueError("language must be one of: uml, ecore, archimate")
-    if not isinstance(files, list) or not files:
-        raise ValueError("At least one uploaded file is required.")
+def validate_language_and_format(language: str, data_format: str) -> None:
+    if language not in SUPPORTED_LANGUAGES:
+        raise ValueError("language must be one of: uml, ecore, archimate, bpmn")
+    if data_format not in SUPPORTED_FORMATS:
+        raise ValueError("format must be one of: json, xmi, ecore, signavio")
 
-    dataset, parse_summary = parse_uploaded_dataset(language, files)
-    if not dataset.records:
-        raise ValueError(
-            "Preprocessing parsed 0 models. Check that the selected modeling language matches the file and that the "
-            "file contains JSON objects or JSONL lines with model objects."
-        )
-    total_records = len(dataset.records)
-    preprocess_id = uuid.uuid4().hex
-    parse_summary["totalRecords"] = total_records
-    parse_summary["usedRecords"] = 0
-    parse_summary["modelLimit"] = total_records
-    PREPROCESSED_UPLOADS[preprocess_id] = {
-        "language": language,
-        "dataset": dataset,
-        "summary": dict(parse_summary),
-        "createdAt": time.time(),
+    allowed_formats = {
+        "uml": {"json", "xmi"},
+        "archimate": {"json", "xmi"},
+        "ecore": {"json", "ecore"},
+        "bpmn": {"signavio"},
     }
-    LOG.info(
-        "preprocess_complete preprocess_id=%s language=%s total_records=%s payloads=%s skipped=%s errors=%s",
-        preprocess_id,
-        language,
-        total_records,
-        parse_summary["payloads"],
-        parse_summary["skipped"],
-        parse_summary["errors"],
-    )
-    return {"preprocessId": preprocess_id, "uploadSummary": parse_summary}
+    if data_format not in allowed_formats.get(language, set()):
+        raise ValueError(
+            f"format '{data_format}' is not supported for language '{language}'."
+        )
 
 
-def dataset_from_upload_or_preprocess(
-    language: str,
-    files: Any,
-    preprocess_id: Any,
-) -> tuple[Dataset, dict[str, int]]:
-    preprocess_id = str(preprocess_id or "")
-    if preprocess_id:
-        cached = PREPROCESSED_UPLOADS.get(preprocess_id)
-        if cached is None:
-            raise ValueError("Unknown preprocessId. Upload the dataset again.")
-        if cached["language"] != language:
-            raise ValueError("preprocessId language does not match the selected modeling language.")
-        return cached["dataset"], dict(cached["summary"])
+def start_upload_session(body: dict[str, Any]) -> dict[str, Any]:
+    if has_active_pipeline_run():
+        raise ValueError("A pipeline run is already active. Wait for it to complete before starting a new run.")
+    reset_pipeline_state()
+    language = str(body.get("language") or "").lower()
+    data_format = str(body.get("format") or "json").lower()
+    validate_language_and_format(language, data_format)
+    representation = representation_profile_from_body(body, language, data_format)
+    upload_id = uuid.uuid4().hex
+    stage_dir = Path(tempfile.mkdtemp(prefix="mcp4cm-upload-"))
+    session = {
+        "uploadId": upload_id,
+        "language": language,
+        "format": data_format,
+        "representationProfile": representation.as_metadata(),
+        "stageDir": str(stage_dir),
+        "files": [],
+        "totalBytes": 0,
+        "createdAt": time.time(),
+        "status": "collecting",
+        "jobId": "",
+    }
+    with UPLOAD_LOCK:
+        UPLOAD_SESSIONS[upload_id] = session
+    return {
+        "uploadId": upload_id,
+        "language": language,
+        "format": data_format,
+        "status": session["status"],
+        "fileCount": 0,
+        "totalBytes": 0,
+    }
 
+
+def upload_chunk(upload_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    files = body.get("files") or []
     if not isinstance(files, list) or not files:
-        raise ValueError("At least one uploaded file or preprocessId is required.")
-    return parse_uploaded_dataset(language, files)
+        raise ValueError("At least one file is required in an upload chunk.")
+
+    with UPLOAD_LOCK:
+        session = UPLOAD_SESSIONS.get(upload_id)
+        if session is None:
+            raise ValueError("Unknown uploadId. Start an upload session first.")
+        if session.get("status") != "collecting":
+            raise ValueError("Upload session is not accepting files.")
+        stage_dir = Path(str(session["stageDir"]))
+        staged_files = list(session["files"])
+        total_bytes = int(session.get("totalBytes", 0))
+
+    chunk_bytes = 0
+    chunk_files = 0
+    for file_item in files:
+        if not isinstance(file_item, FileStorage):
+            raise ValueError("Chunk upload requires multipart file items.")
+        relpath = sanitized_relpath(file_item.filename or "")
+        destination = unique_staged_path(stage_dir, relpath)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        file_item.save(destination)
+        file_size = destination.stat().st_size
+        staged_files.append(
+            {
+                "relativePath": relpath,
+                "storedPath": str(destination),
+                "sizeBytes": file_size,
+            }
+        )
+        chunk_bytes += file_size
+        chunk_files += 1
+
+    with UPLOAD_LOCK:
+        session = UPLOAD_SESSIONS.get(upload_id)
+        if session is None:
+            raise ValueError("Unknown uploadId. Start an upload session first.")
+        session["files"] = staged_files
+        session["totalBytes"] = total_bytes + chunk_bytes
+
+    return {
+        "uploadId": upload_id,
+        "status": "collecting",
+        "chunkFiles": chunk_files,
+        "chunkBytes": chunk_bytes,
+        "totalFiles": len(staged_files),
+        "totalBytes": total_bytes + chunk_bytes,
+    }
 
 
-def normalized_model_limit(raw_limit: Any, total_records: int) -> int:
-    if total_records <= 0:
-        return 0
-    min_limit = min(10, total_records)
-    if raw_limit in (None, ""):
-        return total_records
+def start_upload_parse(upload_id: str) -> dict[str, Any]:
+    with UPLOAD_LOCK:
+        session = UPLOAD_SESSIONS.get(upload_id)
+        if session is None:
+            raise ValueError("Unknown uploadId. Start an upload session first.")
+        if not session.get("files"):
+            raise ValueError("Upload session has no staged files.")
+        existing_job_id = str(session.get("jobId") or "")
+        if existing_job_id:
+            existing_job = UPLOAD_PARSE_JOBS.get(existing_job_id)
+            if existing_job and existing_job.get("status") in {"queued", "running"}:
+                return dict(existing_job)
+        job_id = uuid.uuid4().hex
+        job = {
+            "jobId": job_id,
+            "uploadId": upload_id,
+            "status": "queued",
+            "progress": 0,
+            "processedFiles": 0,
+            "totalFiles": len(session["files"]),
+            "stage": "queued",
+            "parseProcessedFiles": 0,
+            "parseTotalFiles": len(session["files"]),
+            "message": "Queued parse job.",
+            "error": "",
+            "datasetId": "",
+            "statistics": None,
+            "uploadSummary": None,
+            "startedAt": time.time(),
+            "finishedAt": None,
+            "elapsedMs": 0,
+        }
+        UPLOAD_PARSE_JOBS[job_id] = job
+        session["jobId"] = job_id
+        session["status"] = "processing"
+
+    thread = threading.Thread(target=run_upload_parse_job, args=(upload_id, job_id), daemon=True)
+    thread.start()
+    return dict(job)
+
+
+def get_upload_parse_job(upload_id: str, job_id: str) -> dict[str, Any]:
+    with UPLOAD_LOCK:
+        job = UPLOAD_PARSE_JOBS.get(job_id)
+        if not job or job.get("uploadId") != upload_id:
+            raise ValueError("Unknown upload parse job. Pipeline state may have been reset by a new run.")
+        return dict(job)
+
+
+def upload_job_elapsed_ms(job: dict[str, Any], *, finished_at: float | None = None) -> int:
+    started_at = float(job.get("startedAt") or time.time())
+    return round(((finished_at or time.time()) - started_at) * 1000)
+
+
+def run_upload_parse_job(upload_id: str, job_id: str) -> None:
+    def report(**patch: Any) -> None:
+        with UPLOAD_LOCK:
+            job = UPLOAD_PARSE_JOBS.get(job_id)
+            if not job:
+                return
+            patch.setdefault("elapsedMs", upload_job_elapsed_ms(job))
+            job.update(patch)
+
+    def parse_phase_progress(processed: int, total: int) -> dict[str, Any]:
+        percent = round((processed / max(1, total)) * 100)
+        return {
+            "stage": "parse",
+            "parseProcessedFiles": processed,
+            "parseTotalFiles": total,
+            "processedFiles": processed,
+            "totalFiles": total,
+            "progress": percent,
+            "message": f"Parsing files: {processed} of {total}.",
+        }
+
+    session_stage_dir: str = ""
     try:
-        requested = int(raw_limit)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("modelLimit must be an integer.") from exc
-    return max(min_limit, min(requested, total_records))
+        with UPLOAD_LOCK:
+            session = UPLOAD_SESSIONS.get(upload_id)
+            if session is None:
+                raise ValueError("Upload session disappeared.")
+            language = str(session["language"])
+            data_format = str(session["format"])
+            session_stage_dir = str(session.get("stageDir") or "")
+            profile_payload = dict(session["representationProfile"])
+            representation = RepresentationProfile(
+                include_attributes=bool(profile_payload.get("includeAttributes", True)),
+                include_operations=bool(profile_payload.get("includeOperations", True)),
+                include_parameters=bool(profile_payload.get("includeParameters", True)),
+                include_model_root_node=bool(profile_payload.get("includeModelRootNode", False)),
+            )
+            staged_files = list(session["files"])
+
+        report(
+            status="running",
+            stage="parse",
+            message="Parsing files.",
+            totalFiles=len(staged_files),
+            parseTotalFiles=len(staged_files),
+        )
+        dataset, parse_summary = parse_staged_dataset(
+            language,
+            data_format,
+            representation,
+            staged_files,
+            progress=lambda processed, total: report(
+                status="running",
+                **parse_phase_progress(processed, total),
+            ),
+        )
+        if not dataset.records:
+            raise ValueError("Parsing produced 0 models. Check parser format and file contents.")
+
+        total_records = len(dataset.records)
+        parse_summary["format"] = data_format
+        parse_summary["representationProfile"] = representation.as_metadata()
+
+        dataset_id = uuid.uuid4().hex
+        DATASETS[dataset_id] = dataset
+        persist_dataset_to_runtime(dataset_id, dataset)
+        statistics = serialize_statistics(dataset)
+
+        finished_at = time.time()
+        with UPLOAD_LOCK:
+            job = UPLOAD_PARSE_JOBS.get(job_id) or {}
+        elapsed_ms = upload_job_elapsed_ms(job, finished_at=finished_at)
+        report(
+            status="complete",
+            progress=100,
+            stage="complete",
+            processedFiles=len(staged_files),
+            totalFiles=len(staged_files),
+            parseProcessedFiles=len(staged_files),
+            parseTotalFiles=len(staged_files),
+            message=f"Processing complete. Parsed {total_records} model(s).",
+            datasetId=dataset_id,
+            statistics=statistics,
+            uploadSummary=parse_summary,
+            finishedAt=finished_at,
+            elapsedMs=elapsed_ms,
+        )
+        with UPLOAD_LOCK:
+            session = UPLOAD_SESSIONS.get(upload_id)
+            if session:
+                session["status"] = "ready"
+    except Exception as exc:
+        LOG.exception("upload_parse_job_error upload_id=%s job_id=%s", upload_id, job_id)
+        report(status="error", message=str(exc), error=str(exc), finishedAt=time.time())
+        with UPLOAD_LOCK:
+            session = UPLOAD_SESSIONS.get(upload_id)
+            if session:
+                session["status"] = "error"
+    finally:
+        remove_directory_quietly(session_stage_dir)
+        with UPLOAD_LOCK:
+            session = UPLOAD_SESSIONS.get(upload_id)
+            if session:
+                session["stageDir"] = ""
+                session["files"] = []
+                session["totalBytes"] = 0
+
+
+def parse_staged_dataset(
+    language: str,
+    data_format: str,
+    representation: RepresentationProfile,
+    staged_files: list[dict[str, Any]],
+    progress=None,
+) -> tuple[Dataset, dict[str, Any]]:
+    if data_format == "json":
+        return parse_staged_json_dataset(language, staged_files, progress=progress)
+    return parse_staged_model_files(language, data_format, representation, staged_files, progress=progress)
+
+
+def parse_staged_json_dataset(
+    language: str,
+    staged_files: list[dict[str, Any]],
+    progress=None,
+) -> tuple[Dataset, dict[str, Any]]:
+    parser = {"uml": UMLParser(), "ecore": EcoreParser(), "archimate": ArchimateParser()}[language]
+    records = []
+    summary = empty_upload_summary()
+    total_files = len(staged_files)
+    for file_index, staged in enumerate(staged_files, start=1):
+        relpath = str(staged.get("relativePath") or "")
+        source_path = Path(str(staged.get("storedPath") or ""))
+        summary["files"] += 1
+        if progress:
+            progress(file_index - 1, total_files)
+        try:
+            content = source_path.read_text(encoding="utf-8")
+            payloads = parse_json_payloads(content)
+        except Exception as exc:
+            summary["errors"] += 1
+            add_upload_warning(summary, "PARSE_ERROR", f"{relpath} failed to decode: {exc}", path=relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
+        for source_index, payload in enumerate(payloads):
+            summary["payloads"] += 1
+            for payload_index, model_payload in enumerate_model_payloads(payload):
+                if not isinstance(model_payload, dict):
+                    summary["errors"] += 1
+                    add_upload_warning(
+                        summary,
+                        "INVALID_PAYLOAD",
+                        f"{relpath}:{source_index}:{payload_index} is {type(model_payload).__name__}, expected object.",
+                        path=relpath,
+                    )
+                    continue
+                try:
+                    record = parser.parse(
+                        model_payload,
+                        model_id=model_payload.get("ids")
+                        or model_payload.get("id")
+                        or model_payload.get("archimateId")
+                        or f"{relpath}:{source_index}:{payload_index}",
+                    )
+                except Exception as exc:
+                    summary["errors"] += 1
+                    add_upload_warning(
+                        summary,
+                        "PARSE_ERROR",
+                        f"{relpath}:{source_index}:{payload_index} failed to parse: {exc}",
+                        path=relpath,
+                    )
+                    continue
+                record.source_path = Path(relpath)
+                records.append(record)
+                summary["records"] += 1
+        if progress:
+            progress(file_index, total_files)
+    return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
+
+
+def parse_staged_model_files(
+    language: str,
+    data_format: str,
+    representation: RepresentationProfile,
+    staged_files: list[dict[str, Any]],
+    progress=None,
+) -> tuple[Dataset, dict[str, Any]]:
+    parser = extended_parser_for(language, data_format, representation)
+    records = []
+    summary = empty_upload_summary()
+    total_files = len(staged_files)
+
+    for file_index, staged in enumerate(staged_files, start=1):
+        relpath = str(staged.get("relativePath") or "")
+        source_path = Path(str(staged.get("storedPath") or ""))
+        summary["files"] += 1
+        summary["payloads"] += 1
+        if progress:
+            progress(file_index - 1, total_files)
+        try:
+            record = parser.parse_file(source_path, model_id=Path(relpath).stem)
+            record.source_path = Path(relpath)
+        except Exception as exc:
+            summary["errors"] += 1
+            add_upload_warning(summary, "PARSE_ERROR", f"{relpath} failed to parse: {exc}", path=relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
+        records.append(record)
+        summary["records"] += 1
+        merge_record_warnings(summary, record)
+        if progress:
+            progress(file_index, total_files)
+
+    return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
+
+
+def sanitized_relpath(name: str) -> str:
+    candidate = Path(name or "").as_posix().strip()
+    if not candidate:
+        return f"file-{uuid.uuid4().hex}.bin"
+    parts = [part for part in Path(candidate).parts if part not in {"", ".", ".."}]
+    if not parts:
+        return f"file-{uuid.uuid4().hex}.bin"
+    return Path(*parts).as_posix()
+
+
+def unique_staged_path(stage_dir: Path, relpath: str) -> Path:
+    candidate = stage_dir / relpath
+    if not candidate.exists():
+        return candidate
+    stem = candidate.stem
+    suffix = candidate.suffix
+    parent = candidate.parent
+    counter = 1
+    while True:
+        next_candidate = parent / f"{stem}-{counter}{suffix}"
+        if not next_candidate.exists():
+            return next_candidate
+        counter += 1
 
 
 def handle_dummy(body: dict[str, Any]) -> dict[str, Any]:
     dataset = get_dataset(body)
-    language = dataset.records[0].language if dataset.records else str(dataset.dataset_type)
-    filters = build_dummy_filters(language, body.get("filterConfigs"))
-    custom = body.get("customRegex")
-    if custom and custom.get("pattern"):
-        filters.insert(
-            0,
-            regex_name_filter(
-                str(custom["pattern"]),
-                float(custom.get("threshold", 0.5)),
-                include_types=str(custom.get("target", "names")) == "names_types",
-            ),
-        )
-    rows = summarize_filters(dataset, filters=filters)
+    configs = body.get("filterConfigs")
+    evaluation = evaluate_dummy_filters(dataset, filter_configs=configs if isinstance(configs, list) else None)
+
+    filter_rows = [
+        {
+            "filterName": summary.filter_id,
+            "filteredCount": summary.filtered_count,
+            "remainingCount": summary.remaining_count,
+            "examples": [
+                {
+                    "modelId": finding.model_id,
+                    "reason": finding.reason,
+                    "score": finding.score,
+                    "evidence": list(finding.evidence),
+                }
+                for finding in evaluation.findings
+                if finding.filter_id == summary.filter_id and finding.decision == "removed"
+            ][:10],
+        }
+        for summary in evaluation.filter_summaries
+    ]
+
     return {
-        "rows": [
+        "runSummary": {
+            "totalModels": evaluation.run_summary.total_models,
+            "removedModels": evaluation.run_summary.removed_models,
+            "remainingModels": evaluation.run_summary.remaining_models,
+            "removalRate": evaluation.run_summary.removal_rate,
+        },
+        "filterSummaries": [
             {
-                "filterName": row.filter_name,
-                "filteredCount": row.filtered_count,
-                "remainingCount": row.remaining_count,
-                "examples": [
-                    {
-                        "modelId": finding.model_id,
-                        "reason": finding.reason,
-                        "score": finding.score,
-                        "evidence": list(finding.evidence),
-                    }
-                    for finding in row.findings[:10]
-                ],
+                "filterId": summary.filter_id,
+                "filteredCount": summary.filtered_count,
+                "remainingCount": summary.remaining_count,
+                "triggeredModelIds": list(summary.triggered_model_ids),
             }
-            for row in rows
-        ]
+            for summary in evaluation.filter_summaries
+        ],
+        "modelOutcomes": [
+            {
+                "modelId": outcome.model_id,
+                "removed": outcome.removed,
+                "primaryRemovalReason": outcome.primary_removal_reason,
+                "allTriggeredFilters": list(outcome.all_triggered_filters),
+            }
+            for outcome in evaluation.model_outcomes
+        ],
+        "findings": [
+            {
+                "modelId": finding.model_id,
+                "filterId": finding.filter_id,
+                "reason": finding.reason,
+                "score": finding.score,
+                "threshold": finding.threshold,
+                "decision": finding.decision,
+                "evidence": list(finding.evidence),
+                "evidenceNodes": list(finding.evidence_nodes),
+                "metrics": finding.metrics or {},
+            }
+            for finding in evaluation.findings
+        ],
+        "rows": filter_rows,
     }
 
 
@@ -492,7 +1071,7 @@ def get_duplicate_job(job_id: str) -> dict[str, Any]:
     with DUPLICATE_JOBS_LOCK:
         job = DUPLICATE_JOBS.get(job_id)
         if not job:
-            raise ValueError("Unknown duplicate detection job.")
+            raise ValueError("Unknown duplicate detection job. Pipeline state may have been reset by a new run.")
         return dict(job)
 
 
@@ -754,120 +1333,191 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     }
 
 
-def build_dummy_filters(language: str, configs: Any) -> list:
-    active_configs = configs if isinstance(configs, list) else default_dummy_filter_configs(language)
-    filters = []
-    for config in active_configs:
-        if not isinstance(config, dict) or not config.get("enabled", True):
+def merge_record_warnings(summary: dict[str, Any], record) -> None:
+    metadata = record.metadata if isinstance(record.metadata, dict) else {}
+    warning_total = int(metadata.get("parse_warnings_total", 0) or 0)
+    if warning_total <= 0:
+        return
+    warning_types = metadata.get("parse_warnings_by_type") or {}
+    warning_messages_by_type = metadata.get("parse_warning_messages_by_type") or {}
+    warning_messages = metadata.get("parse_warning_messages") or metadata.get("parse_warning_messages_sample") or []
+    source_path = str(record.source_path or "")
+    model_id = str(record.model_id or "")
+    warning_entries_added = 0
+    typed_warning_total = 0
+    typed_warning_names: list[str] = []
+    for warning_type, count in warning_types.items():
+        warning_type = str(warning_type)
+        warning_count = int(count or 0)
+        if warning_count <= 0:
             continue
-        filter_fn = build_dummy_filter(config)
-        if filter_fn is not None:
-            filters.append(filter_fn)
-    return filters
-
-
-def build_dummy_filter(config: dict[str, Any]):
-    filter_id = str(config.get("id") or "")
-    threshold = float(config.get("threshold", 0.5))
-    if filter_id == "empty_model":
-        return empty_model_filter()
-    if filter_id == "too_few_names":
-        return too_few_named_elements_filter(min_names=int(config.get("minNames", 2)))
-    if filter_id == "dummy_words":
-        return dummy_word_filter(threshold=threshold)
-    if filter_id == "generic_sequential":
-        return generic_sequential_names_filter(threshold=threshold)
-    if filter_id == "short_names":
-        return short_name_ratio_filter(max_length=int(config.get("maxLength", 2)), threshold=threshold)
-    if filter_id == "uml_empty_class_name":
-        return uml_empty_class_name_filter()
-    if filter_id == "uml_empty_name":
-        return uml_empty_name_filter()
-    if filter_id == "uml_median_name_length":
-        return uml_median_name_length_filter(min_median_length=int(config.get("minMedianLength", 4)))
-    if filter_id == "uml_short_name_or_control_flow":
-        return uml_short_name_or_control_flow_filter(
-            max_length=int(config.get("maxLength", 2)),
-            high_short_threshold=threshold,
-            low_short_threshold=float(config.get("lowThreshold", 0.25)),
-            control_flow_threshold=float(config.get("controlFlowThreshold", 0.4)),
+        typed_warning_total += warning_count
+        typed_warning_names.append(warning_type)
+        summary["warningsByType"][warning_type] = summary["warningsByType"].get(warning_type, 0) + warning_count
+        register_warning_file(summary, source_path, warning_type, warning_count, model_id=model_id)
+        type_messages = warning_messages_by_type.get(warning_type) or []
+        for message in type_messages:
+            append_warning_entry(summary, warning_type, str(message), path=source_path, model_id=model_id)
+            warning_entries_added += 1
+    summary["warnings"] += warning_total
+    fallback_type = typed_warning_names[0] if typed_warning_names else "PARSE_WARNING"
+    if warning_entries_added == 0:
+        for message in warning_messages:
+            append_warning_entry(summary, fallback_type, str(message), path=source_path, model_id=model_id)
+            warning_entries_added += 1
+    if warning_entries_added < warning_total:
+        for _ in range(warning_total - warning_entries_added):
+            append_warning_entry(
+                summary,
+                fallback_type,
+                "Warning emitted without a detailed parser message.",
+                path=source_path,
+                model_id=model_id,
+            )
+    if typed_warning_total <= 0:
+        summary["warningsByType"]["PARSE_WARNING"] = summary["warningsByType"].get("PARSE_WARNING", 0) + warning_total
+        register_warning_file(
+            summary,
+            source_path,
+            "PARSE_WARNING",
+            warning_total,
+            model_id=model_id,
         )
-    if filter_id == "uml_dummy_class":
-        return uml_dummy_class_filter(threshold=threshold)
-    if filter_id == "uml_generic_class_name":
-        return uml_generic_class_name_filter(threshold_count=int(config.get("thresholdCount", 2)))
-    if filter_id == "uml_dummy_name":
-        return uml_dummy_name_filter(threshold=threshold)
-    if filter_id == "uml_two_character_dummy_name":
-        return uml_two_character_dummy_name_filter(threshold=threshold)
-    if filter_id == "uml_dummy_keyword":
-        return uml_dummy_keyword_filter(threshold=threshold)
-    if filter_id == "uml_sequential":
-        return uml_sequential_numbered_filter(threshold=threshold)
-    if filter_id == "uml_vocabulary":
-        return uml_vocabulary_uniqueness_filter(min_unique_words=int(config.get("minUniqueWords", 3)))
-    if filter_id == "ecore_type_name":
-        return ecore_type_name_filter(threshold=threshold)
-    if filter_id == "ecore_numbered":
-        return ecore_generic_numbered_filter(threshold=threshold)
-    if filter_id == "ecore_dummy_keyword":
-        return ecore_dummy_keyword_filter(threshold=threshold)
-    if filter_id == "ecore_vocabulary":
-        return ecore_vocabulary_uniqueness_filter(min_unique_words=int(config.get("minUniqueWords", 3)))
-    if filter_id == "archimate_new_model":
-        return archimate_new_model_filter()
-    if filter_id == "archimate_type_name":
-        return archimate_type_name_filter(threshold=threshold)
-    if filter_id == "archimate_numbered":
-        return archimate_generic_numbered_filter(threshold=threshold)
-    if filter_id == "archimate_dummy_keyword":
-        return archimate_dummy_keyword_filter(threshold=threshold)
-    if filter_id == "archimate_crud_code":
-        return archimate_crud_or_code_filter(threshold=threshold)
-    if filter_id == "archimate_vocabulary":
-        return archimate_vocabulary_uniqueness_filter(min_unique_words=int(config.get("minUniqueWords", 3)))
-    return None
 
 
-def parse_uploaded_dataset(language: str, files: list[dict[str, Any] | FileStorage]) -> tuple[Dataset, dict[str, int]]:
-    parser = {"uml": UMLParser(), "ecore": EcoreParser(), "archimate": ArchimateParser()}[language]
-    records = []
-    summary = {"files": 0, "payloads": 0, "records": 0, "skipped": 0, "errors": 0}
-    for file_item in files:
-        name, payloads = uploaded_payloads(file_item)
-        summary["files"] += 1
-        LOG.info("parse_file_start language=%s filename=%s", language, name)
-        file_records_before = len(records)
-        for source_index, payload in payloads:
-            summary["payloads"] += 1
-            for payload_index, model_payload in enumerate_model_payloads(payload):
-                if not isinstance(model_payload, dict):
-                    summary["skipped"] += 1
-                    LOG.warning(
-                        "parse_skip filename=%s source_index=%s payload_index=%s type=%s",
-                        name,
-                        source_index,
-                        payload_index,
-                        type(model_payload).__name__,
-                    )
-                    continue
-                try:
-                    record = parser.parse(
-                        model_payload,
-                        model_id=model_payload.get("ids")
-                        or model_payload.get("id")
-                        or model_payload.get("archimateId")
-                        or f"{name}:{source_index}:{payload_index}",
-                    )
-                except Exception:
-                    summary["errors"] += 1
-                    LOG.exception("parse_error filename=%s source_index=%s payload_index=%s", name, source_index, payload_index)
-                    continue
-                record.source_path = Path(name)
-                records.append(record)
-                summary["records"] += 1
-        LOG.info("parse_file_end language=%s filename=%s records=%s", language, name, len(records) - file_records_before)
-    return Dataset(records=records, dataset_type=language), summary
+def add_upload_warning(
+    summary: dict[str, Any],
+    warning_type: str,
+    message: str,
+    *,
+    path: str = "",
+    model_id: str = "",
+) -> None:
+    summary["warnings"] += 1
+    summary["warningsByType"][warning_type] = summary["warningsByType"].get(warning_type, 0) + 1
+    append_warning_entry(summary, warning_type, message, path=path, model_id=model_id)
+    if path:
+        register_warning_file(summary, path, warning_type, 1, model_id=model_id)
+
+
+def empty_upload_summary() -> dict[str, Any]:
+    return {
+        "files": 0,
+        "payloads": 0,
+        "records": 0,
+        "errors": 0,
+        "warnings": 0,
+        "warningsByType": {},
+        "warningsList": [],
+        "warningFiles": [],
+        "parsedModels": [],
+        "_warningFileIndex": {},
+    }
+
+
+def append_warning_entry(
+    summary: dict[str, Any],
+    warning_type: str,
+    message: str,
+    *,
+    path: str = "",
+    model_id: str = "",
+) -> None:
+    entry = {
+        "type": str(warning_type),
+        "message": str(message),
+        "path": str(path or ""),
+    }
+    if model_id:
+        entry["modelId"] = str(model_id)
+    summary["warningsList"].append(entry)
+
+
+def register_warning_file(
+    summary: dict[str, Any],
+    path: str,
+    warning_type: str,
+    count: int,
+    *,
+    model_id: str = "",
+) -> None:
+    if not path:
+        return
+    warning_file_index = summary.setdefault("_warningFileIndex", {})
+    existing_index = warning_file_index.get(path)
+    if existing_index is None:
+        entry = {
+            "path": path,
+            "warnings": 0,
+            "types": {},
+            "modelId": str(model_id or ""),
+            "hasDetails": True,
+        }
+        summary["warningFiles"].append(entry)
+        existing_index = len(summary["warningFiles"]) - 1
+        warning_file_index[path] = existing_index
+    entry = summary["warningFiles"][existing_index]
+    if model_id:
+        existing_model_id = str(entry.get("modelId") or "")
+        if existing_model_id and existing_model_id != model_id:
+            entry["modelId"] = ""
+        elif not existing_model_id:
+            entry["modelId"] = str(model_id)
+    entry["warnings"] = int(entry.get("warnings", 0)) + int(count)
+    types = entry.setdefault("types", {})
+    types[warning_type] = int(types.get(warning_type, 0)) + int(count)
+
+
+def build_parsed_models_summary(summary: dict[str, Any], records: list[ModelRecord]) -> list[dict[str, Any]]:
+    warnings_by_model: dict[str, dict[str, Any]] = {}
+    for warning in summary.get("warningsList") or []:
+        if not isinstance(warning, dict):
+            continue
+        model_id = str(warning.get("modelId") or "")
+        if not model_id:
+            continue
+        warning_type = str(warning.get("type") or "PARSE_WARNING")
+        row = warnings_by_model.setdefault(model_id, {"warnings": 0, "types": {}})
+        row["warnings"] += 1
+        row["types"][warning_type] = int(row["types"].get(warning_type, 0)) + 1
+
+    parsed_models: list[dict[str, Any]] = []
+    for record in records:
+        model_id = str(record.model_id or "")
+        warning_info = warnings_by_model.get(model_id, {"warnings": 0, "types": {}})
+        parsed_models.append(
+            {
+                "modelId": model_id,
+                "name": str(record.name or ""),
+                "path": str(record.source_path or ""),
+                "language": str(record.language or ""),
+                "warnings": int(warning_info.get("warnings", 0)),
+                "types": dict(warning_info.get("types", {})),
+            }
+        )
+    return parsed_models
+
+
+def finalize_upload_summary(summary: dict[str, Any], records: list[ModelRecord] | None = None) -> dict[str, Any]:
+    if records is not None:
+        summary["parsedModels"] = build_parsed_models_summary(summary, records)
+    else:
+        summary.setdefault("parsedModels", [])
+    summary.pop("_warningFileIndex", None)
+    return summary
+
+
+def extended_parser_for(language: str, data_format: str, representation: RepresentationProfile):
+    mapping = {
+        ("uml", "xmi"): UMLXMIModelParser,
+        ("archimate", "xmi"): ArchimateArchiModelParser,
+        ("ecore", "ecore"): EcoreXMIModelParser,
+        ("bpmn", "signavio"): BPMNSignavioModelParser,
+    }
+    parser_cls = mapping.get((language, data_format))
+    if parser_cls is None:
+        raise ValueError(f"Unsupported language/format combination: {language}/{data_format}")
+    return parser_cls(representation)
 
 
 def parse_json_payloads(content: str) -> list[Any]:
@@ -891,60 +1541,18 @@ def enumerate_model_payloads(payload: Any) -> Iterable[tuple[int, Any]]:
     yield 0, payload
 
 
-def uploaded_payloads(file_item: dict[str, Any] | FileStorage) -> tuple[str, Iterable[tuple[int, Any]]]:
-    if isinstance(file_item, FileStorage):
-        name = file_item.filename or "upload.json"
-        return name, parse_file_storage_payloads(file_item)
-
-    name = str(file_item.get("name") or "upload.json")
-    content = str(file_item.get("content") or "")
-    return name, enumerate(parse_json_payloads(content))
-
-
-def parse_file_storage_payloads(file_item: FileStorage) -> Iterable[tuple[int, Any]]:
-    filename = (file_item.filename or "").lower()
-    if filename.endswith((".jsonl", ".ndjson")):
-        yield from parse_jsonl_stream(file_item)
-        return
-
-    stream = file_item.stream
-    stream.seek(0)
-    try:
-        payload = json.load(TextIOWrapper(stream, encoding="utf-8"))
-    except json.JSONDecodeError:
-        stream.seek(0)
-        yield from parse_jsonl_stream(file_item)
-        return
-
-    items = payload if isinstance(payload, list) else [payload]
-    for index, item in enumerate(items):
-        yield index, item
-
-
-def parse_jsonl_stream(file_item: FileStorage) -> Iterable[tuple[int, Any]]:
-    file_item.stream.seek(0)
-    text_stream = TextIOWrapper(file_item.stream, encoding="utf-8")
-    parsed_index = 0
-    for line in text_stream:
-        line = line.strip()
-        if line:
-            yield parsed_index, json.loads(line)
-            parsed_index += 1
-
-
 def serialize_statistics(dataset: Dataset) -> dict[str, Any]:
     return {
         "summary": dataset_summary(dataset),
         "topTypes": top_items(type_counts(dataset), 15),
         "topNames": top_items(name_counts(dataset), 15),
-        "topWords": top_items(word_counts(dataset), 15),
         "sampleModels": [
             {
                 "id": record.model_id,
                 "language": record.language,
                 "nodes": record.node_count,
                 "edges": record.edge_count,
-                "names": len(record.names),
+                "names": len(node_names(record)),
             }
             for record in dataset.records[:8]
         ],
@@ -957,10 +1565,114 @@ def top_items(counter, limit: int) -> list[dict[str, Any]]:
 
 def get_dataset(body: dict[str, Any]) -> Dataset:
     dataset_id = str(body.get("datasetId") or "")
-    try:
+    if dataset_id in DATASETS:
         return DATASETS[dataset_id]
-    except KeyError as exc:
-        raise ValueError("Unknown datasetId. Upload a dataset first.") from exc
+    runtime_dataset = load_dataset_from_runtime(dataset_id)
+    if runtime_dataset is not None:
+        DATASETS[dataset_id] = runtime_dataset
+        return runtime_dataset
+    raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+
+
+def get_dataset_by_id(dataset_id: str) -> Dataset:
+    dataset_id = str(dataset_id)
+    if dataset_id in DATASETS:
+        return DATASETS[dataset_id]
+    runtime_dataset = load_dataset_from_runtime(dataset_id)
+    if runtime_dataset is not None:
+        DATASETS[dataset_id] = runtime_dataset
+        return runtime_dataset
+    raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+
+
+def parse_positive_int_param(raw_value: Any, field_name: str) -> int | None:
+    if raw_value in (None, ""):
+        return None
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer.") from exc
+    if value <= 0:
+        raise ValueError(f"{field_name} must be greater than 0.")
+    return value
+
+
+def inspect_dataset_model(
+    *,
+    dataset_id: str,
+    model_id: str,
+    node_limit: int | None = None,
+    edge_limit: int | None = None,
+    include_attrs: bool = True,
+) -> dict[str, Any]:
+    dataset = get_dataset_by_id(str(dataset_id))
+    model_id = str(model_id or "")
+    for record in dataset.records:
+        if str(record.model_id) != model_id:
+            continue
+
+        nodes: list[dict[str, Any]] = []
+        for index, (node_id, attrs) in enumerate(record.graph.nodes(data=True)):
+            if node_limit is not None and index >= node_limit:
+                break
+            node_entry: dict[str, Any] = {"id": str(node_id)}
+            if include_attrs:
+                node_entry["attrs"] = json_safe(attrs)
+            nodes.append(node_entry)
+
+        edges: list[dict[str, Any]] = []
+        if record.graph.is_multigraph():
+            iterable = record.graph.edges(keys=True, data=True)
+            for index, (source, target, key, attrs) in enumerate(iterable):
+                if edge_limit is not None and index >= edge_limit:
+                    break
+                edge_entry: dict[str, Any] = {"source": str(source), "target": str(target), "key": str(key)}
+                if include_attrs:
+                    edge_entry["attrs"] = json_safe(attrs)
+                edges.append(edge_entry)
+        else:
+            iterable = record.graph.edges(data=True)
+            for index, (source, target, attrs) in enumerate(iterable):
+                if edge_limit is not None and index >= edge_limit:
+                    break
+                edge_entry = {"source": str(source), "target": str(target)}
+                if include_attrs:
+                    edge_entry["attrs"] = json_safe(attrs)
+                edges.append(edge_entry)
+
+        return {
+            "model": {
+                "id": str(record.model_id),
+                "language": str(record.language),
+                "name": str(record.name or ""),
+                "sourcePath": str(record.source_path or ""),
+                "nodeCount": int(record.node_count),
+                "edgeCount": int(record.edge_count),
+                "metadata": json_safe(record.metadata),
+            },
+            "nodes": nodes,
+            "edges": edges,
+            "truncated": {
+                "nodes": node_limit is not None and len(nodes) < int(record.node_count),
+                "edges": edge_limit is not None and len(edges) < int(record.edge_count),
+            },
+        }
+    raise ValueError("Unknown modelId for the selected dataset.")
+
+
+def json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [json_safe(item) for item in value]
+    if hasattr(value, "tolist"):
+        try:
+            return json_safe(value.tolist())
+        except Exception:  # pragma: no cover - best effort only
+            return str(value)
+    return str(value)
 
 
 def pair_key(left_id: str, right_id: str) -> tuple[str, str]:

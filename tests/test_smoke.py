@@ -1,20 +1,9 @@
 from mcp4cm.core import Dataset
 from mcp4cm.dummy import (
-    archimate_filters,
-    archimate_generic_numbered_filter,
-    archimate_new_model_filter,
+    default_filter_configs,
     detect_dummy_models,
-    ecore_filters,
+    evaluate_dummy_filters,
     summarize_filters_by_language,
-    summarize_filters,
-    uml_dummy_class_filter,
-    uml_dummy_name_filter,
-    uml_generic_class_name_filter,
-    uml_median_name_length_filter,
-    uml_short_name_or_control_flow_filter,
-    uml_two_character_dummy_name_filter,
-    uml_vocabulary_uniqueness_filter,
-    uml_filters,
 )
 from mcp4cm.duplicates import (
     detect_duplicates_by_hash,
@@ -27,8 +16,33 @@ from mcp4cm.duplicates import (
     vote_duplicate_pairs,
 )
 from mcp4cm.loading import load_eamodelset
+from mcp4cm.extended_ir.types import Edge, IR, Node
+from mcp4cm.extended_parsing.types import ParserRunStats, WarningType
+from mcp4cm.extended_parsing.uml.uml_parser import ParseOptions, UMLXMIParser
+from mcp4cm.parsers.extended import RepresentationProfile, UMLXMIModelParser, drop_ir_edges_with_missing_nodes
 from mcp4cm.parsers.archimate import ArchimateParser
 from mcp4cm.parsers.modelset import EcoreParser, UMLParser
+
+
+def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warning():
+    ir = IR(
+        id="m1",
+        language="UML",
+        nodes=[Node(id="n1", type="Class", name="A"), Node(id="n2", type="Class", name="B")],
+        edges=[
+            Edge(id="e-ok", sourceId="n1", targetId="n2", type="Association"),
+            Edge(id="e-missing-source", sourceId="x", targetId="n2", type="Association"),
+            Edge(id="e-missing-target", sourceId="n1", targetId="y", type="Association"),
+        ],
+    )
+    stats = ParserRunStats()
+
+    dropped = drop_ir_edges_with_missing_nodes(ir, stats)
+
+    assert dropped == 2
+    assert [edge.id for edge in ir.edges] == ["e-ok"]
+    assert stats.warnings_by_type[WarningType.UNRESOLVED_REFERENCE] == 2
+    assert stats.elements_skipped == 2
 
 
 def test_archimate_parser_smoke():
@@ -250,8 +264,9 @@ def test_dummy_detection_smoke():
         },
         model_id="dummy",
     )
-    findings = detect_dummy_models(Dataset([record], "archimate"))
+    findings = detect_dummy_models(Dataset([record], "archimate"), filter_configs=default_filter_configs())
     assert findings
+    assert findings[0].filter_id == "min_size"
 
 
 def uml_record(names, *, model_id="uml", node_type="Class"):
@@ -271,186 +286,55 @@ def uml_record(names, *, model_id="uml", node_type="Class"):
     )
 
 
-def test_uml_notebook_dummy_name_filter_flags_any_att_name():
-    record = uml_record(["Order", "Customer", "att1", "Invoice", "Payment"], node_type="Property")
-
-    finding = uml_dummy_name_filter()(record)
-
-    assert finding
-    assert finding.reason == "uml_att_dummy_names"
-
-
-def test_uml_notebook_dummy_class_filter_uses_thirteen_percent_cutoff():
-    record = uml_record(["Class1", "Order", "Customer", "Invoice", "Payment", "Account"], node_type="Class")
-
-    finding = uml_dummy_class_filter()(record)
-
-    assert finding
-    assert finding.reason == "uml_dummy_classes"
-
-
-def test_uml_notebook_generic_my_class_filter_requires_more_than_two_classes():
-    record = uml_record(["My Class", "My Class1", "My Class2", "Order"], node_type="Class")
-
-    finding = uml_generic_class_name_filter()(record)
-
-    assert finding
-    assert finding.reason == "uml_generic_my_class_names"
-
-
-def test_uml_notebook_short_name_filters():
-    short_record = uml_record(["a", "b", "Order", "Customer"])
-    control_flow_record = uml_record(["a", "control flow", "control flow", "Order"])
-    median_record = uml_record(["a", "bb", "ccc", "Order"])
-
-    assert uml_short_name_or_control_flow_filter()(short_record).reason == "uml_many_short_names"
-    assert uml_short_name_or_control_flow_filter()(control_flow_record).reason == "uml_short_names_with_control_flow"
-    assert uml_median_name_length_filter()(median_record).reason == "uml_median_name_length_too_short"
-
-
-def test_uml_notebook_two_character_dummy_name_ratio_filter():
-    record = uml_record(["a1", "b 2", "x y", "Order", "Customer"])
-
-    finding = uml_two_character_dummy_name_filter()(record)
-
-    assert finding
-    assert finding.reason == "uml_two_character_dummy_names"
-
-
-def test_uml_notebook_vocabulary_filter_is_inclusive():
-    record = uml_record(["Order", "Order 1", "Order 2", "Order 3"])
-
-    finding = uml_vocabulary_uniqueness_filter()(record)
-
-    assert finding
-    assert finding.reason == "uml_low_vocabulary_uniqueness"
-
-
-def test_archimate_filters_detect_type_name_templates():
-    parser = ArchimateParser()
-    record = parser.parse(
+def test_dummy_cleansing_v2_filter_chain_and_traceability():
+    record = UMLParser().parse(
         {
-            "archimateId": "archimate-template",
-            "name": "Template",
-            "elements": [
-                {"id": "a", "name": "Business Process", "type": "BusinessProcess"},
-                {"id": "b", "name": "Application Component", "type": "ApplicationComponent"},
-                {"id": "c", "name": "Data Object", "type": "DataObject"},
-                {"id": "d", "name": "Business Actor", "type": "BusinessActor"},
-                {"id": "e", "name": "Node", "type": "Node"},
-            ],
-            "relationships": [],
-        }
-    )
-
-    findings = detect_dummy_models(Dataset([record], "archimate"), filters=archimate_filters())
-
-    assert findings
-    assert findings[0].reason == "archimate_type_names"
-
-
-def test_archimate_filter_summary_counts_cumulatively():
-    parser = ArchimateParser()
-    new_model = parser.parse(
-        {
-            "archimateId": "new-model",
-            "name": "(new model)",
-            "elements": [{"id": str(index), "name": f"Order {index}", "type": "BusinessObject"} for index in range(5)],
-            "relationships": [],
-        }
-    )
-    numbered = parser.parse(
-        {
-            "archimateId": "numbered",
-            "name": "Numbered",
-            "elements": [{"id": str(index), "name": f"Entity {index}", "type": "BusinessObject"} for index in range(5)],
-            "relationships": [],
-        }
-    )
-
-    summaries = summarize_filters(
-        Dataset([new_model, numbered], "archimate"),
-        filters=[archimate_new_model_filter(), archimate_generic_numbered_filter()],
-    )
-
-    assert [(row.filter_name, row.filtered_count, row.remaining_count) for row in summaries] == [
-        ("archimate_new_model_filter", 1, 1),
-        ("archimate_generic_numbered_filter", 1, 0),
-    ]
-
-
-def test_uml_dummy_patterns_detect_placeholder_classes():
-    raw = {
-        "ids": "uml-dummy",
-        "model_type": "uml",
-        "txt": "class: my class 1\nclass: my class 2",
-        "graph": {
-            "directed": True,
-            "multigraph": False,
-            "nodes": [
-                {"id": 1, "name": "class a", "eClass": "Class"},
-                {"id": 2, "name": "class 1", "eClass": "Class"},
-                {"id": 3, "name": "my class", "eClass": "Class"},
-                {"id": 4, "name": "Order", "eClass": "Class"},
-                {"id": 5, "name": "Customer", "eClass": "Class"},
-            ],
-            "links": [],
+            "ids": "uml-dummy",
+            "graph": {
+                "directed": True,
+                "nodes": [
+                    {"id": "1", "name": "Order", "type": "Class"},
+                    {"id": "2", "name": "Order", "type": "Class"},
+                    {"id": "3", "name": "Order", "type": "Class"},
+                    {"id": "4", "name": "Order", "type": "Class"},
+                    {"id": "5", "name": "Customer", "type": "Class"},
+                    {"id": "6", "name": "Invoice", "type": "Class"},
+                ],
+                "edges": [
+                    {"source": "1", "target": "2", "type": "Association"},
+                    {"source": "2", "target": "3", "type": "Association"},
+                    {"source": "3", "target": "4", "type": "Association"},
+                    {"source": "4", "target": "5", "type": "Association"},
+                ],
+            },
         },
-    }
-    record = UMLParser().parse(raw)
-    findings = detect_dummy_models(Dataset([record], "uml"))
-    assert findings[0].reason in {"uml_dummy_classes", "uml_dummy_names"}
+        model_id="uml-dummy",
+    )
+    result = evaluate_dummy_filters(Dataset([record], "uml"), filter_configs=default_filter_configs())
+
+    assert result.run_summary.total_models == 1
+    assert result.run_summary.removed_models == 1
+    assert result.model_outcomes[0].primary_removal_reason == "name_repetition_ratio"
+    assert any(finding.decision == "removed" for finding in result.findings)
 
 
-def test_uml_filters_can_be_passed_explicitly():
-    raw = {
-        "ids": "uml-control-flow",
-        "model_type": "uml",
-        "txt": "",
-        "graph": {
-            "directed": True,
-            "multigraph": False,
-            "nodes": [
-                {"id": 1, "name": "control flow", "eClass": "ControlFlow"},
-                {"id": 2, "name": "control-flow", "eClass": "ControlFlow"},
-                {"id": 3, "name": "control flow", "eClass": "ControlFlow"},
-                {"id": 4, "name": "control flow", "eClass": "ControlFlow"},
-                {"id": 5, "name": "control flow", "eClass": "ControlFlow"},
-            ],
-            "links": [],
-        },
-    }
-    record = UMLParser().parse(raw)
-    findings = detect_dummy_models(Dataset([record], "uml"), filters=uml_filters())
-    assert findings
-    assert findings[0].reason == "uml_dummy_keywords"
+def test_dummy_cleansing_v2_regex_rule():
+    record = uml_record(["Order", "Customer", "TestUser", "Payment", "Invoice"], model_id="regex-model")
+    configs = default_filter_configs()
+    for config in configs:
+        if config["id"] == "regex_rule":
+            config["enabled"] = True
+            config["pattern"] = "^test"
+            config["targetField"] = "name"
+            config["scope"] = "all_named_nodes"
+            config["minMatches"] = 1
+    result = evaluate_dummy_filters(Dataset([record], "uml"), filter_configs=configs)
+    regex_findings = [finding for finding in result.findings if finding.filter_id == "regex_rule"]
+    assert regex_findings
+    assert regex_findings[0].decision == "removed"
 
 
-def test_ecore_filters_detect_numbered_placeholders():
-    raw = {
-        "ids": "ecore-dummy",
-        "model_type": "ecore",
-        "txt": "",
-        "graph": {
-            "directed": True,
-            "multigraph": False,
-            "nodes": [
-                {"id": 1, "name": "Entity 1", "eClass": "EClass"},
-                {"id": 2, "name": "Entity 2", "eClass": "EClass"},
-                {"id": 3, "name": "Entity 3", "eClass": "EClass"},
-                {"id": 4, "name": "Entity 4", "eClass": "EClass"},
-                {"id": 5, "name": "Order", "eClass": "EClass"},
-            ],
-            "links": [],
-        },
-    }
-    record = EcoreParser().parse(raw)
-    findings = detect_dummy_models(Dataset([record], "ecore"), filters=ecore_filters())
-    assert findings
-    assert findings[0].reason == "ecore_generic_numbered_names"
-
-
-def test_filter_summary_groups_mixed_modelset_by_language():
+def test_dummy_cleansing_v2_filter_summary_groups_mixed_modelset_by_language():
     uml = UMLParser().parse(
         {
             "ids": "uml-dummy",
@@ -520,3 +404,289 @@ def test_language_filter_accepts_multiple_values(tmp_path):
     dataset = load_eamodelset(tmp_path, language={"en", "es"})
 
     assert dataset.ids() == ["english", "spanish"]
+
+
+def test_uml_parser_embeds_multiplicity_without_literal_value_nodes(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Class" xmi:id="A" name="A"/>
+    <packagedElement xsi:type="uml:Class" xmi:id="B" name="B"/>
+    <packagedElement xsi:type="uml:Association" xmi:id="Assoc1" memberEnd="endA endB">
+      <ownedEnd xmi:id="endA" name="a" type="A">
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="lvA" value="0"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="uvA" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="endB" name="b" type="B">
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="lvB" value="1"/>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="uvB" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "model.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+
+    node_types = {node.type for node in ir.nodes}
+    assert "LiteralInteger" not in node_types
+    assert "LiteralUnlimitedNatural" not in node_types
+
+    assoc_edge = next(edge for edge in ir.edges if edge.id == "Assoc1")
+    assert assoc_edge.data["end1"]["lower"] == "0"
+    assert assoc_edge.data["end1"]["upper"] == "*"
+    assert assoc_edge.data["end2"]["lower"] == "1"
+    assert assoc_edge.data["end2"]["upper"] == "1"
+
+
+def test_uml_parser_embeds_guard_and_weight_without_value_spec_nodes(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Activity" xmi:id="act1" name="Flow">
+      <ownedNode xsi:type="uml:InitialNode" xmi:id="n1" name="Start"/>
+      <ownedNode xsi:type="uml:ActivityFinalNode" xmi:id="n2" name="End"/>
+      <edge xsi:type="uml:ControlFlow" xmi:id="e1" source="n1" target="n2" activity="act1">
+        <guard xsi:type="uml:LiteralString" xmi:id="g1" value="ok"/>
+        <weight xsi:type="uml:LiteralInteger" xmi:id="w1" value="3"/>
+      </edge>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "activity.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+
+    node_types = {node.type for node in ir.nodes}
+    assert "LiteralString" not in node_types
+    assert "LiteralInteger" not in node_types
+
+    control_flow = next(edge for edge in ir.edges if edge.id == "e1")
+    assert control_flow.type == "ControlFlow"
+    assert control_flow.data["guard"] == {"id": "g1", "type": "uml:LiteralString", "value": "ok"}
+    assert control_flow.data["weight"] == {"id": "w1", "type": "uml:LiteralInteger", "value": "3"}
+
+
+def test_uml_parser_embeds_transition_owned_rule_specification_without_literal_nodes(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:StateMachine" xmi:id="sm1" name="SM">
+      <region xmi:id="r1" stateMachine="sm1">
+        <subvertex xsi:type="uml:State" xmi:id="s1" name="S1"/>
+        <subvertex xsi:type="uml:State" xmi:id="s2" name="S2"/>
+        <transition xmi:id="t1" source="s1" target="s2" container="r1" guard="rule1">
+          <ownedRule xmi:id="rule1" context="t1">
+            <specification xsi:type="uml:LiteralString" xmi:id="spec1" value="ok"/>
+          </ownedRule>
+        </transition>
+      </region>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "transition.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+    node_types = {node.type for node in ir.nodes}
+    assert "LiteralString" not in node_types
+
+    transition = next(edge for edge in ir.edges if edge.id == "t1")
+    assert transition.type == "Transition"
+    assert transition.data["guard"] == "rule1"
+    assert transition.data["ownedRuleRefs"] == ["rule1"]
+    assert transition.data["ownedRules"] == [
+        {"id": "rule1", "context": "t1", "specification": {"id": "spec1", "type": "uml:LiteralString", "value": "ok"}}
+    ]
+    assert transition.data["guardRule"] == transition.data["ownedRules"][0]
+
+
+def test_uml_parser_embeds_instance_slot_values_without_value_spec_nodes(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Class" xmi:id="C1" name="Person">
+      <ownedAttribute xmi:id="A1" name="name" visibility="public"/>
+    </packagedElement>
+    <packagedElement xsi:type="uml:InstanceSpecification" xmi:id="I1" name="john" classifier="C1">
+      <slot xmi:id="SLOT1" definingFeature="A1" owningInstance="I1">
+        <value xsi:type="uml:Expression" xmi:id="V1" symbol="John Doe"/>
+      </slot>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "instance.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+    node_types = {node.type for node in ir.nodes}
+    assert "Expression" not in node_types
+    assert "InstanceValue" not in node_types
+
+    instance = next(node for node in ir.nodes if node.id == "I1")
+    assert instance.type == "InstanceSpecification"
+    assert instance.data["classifierRefs"] == ["C1"]
+    assert instance.data["slotRefs"] == ["SLOT1"]
+    assert instance.data["slots"] == [
+        {
+            "id": "SLOT1",
+            "definingFeature": "A1",
+            "owningInstance": "I1",
+            "values": [{"id": "V1", "type": "uml:Expression", "symbol": "John Doe"}],
+            "value": {"id": "V1", "type": "uml:Expression", "symbol": "John Doe"},
+        }
+    ]
+
+
+def test_uml_parser_embeds_message_arguments_without_literal_nodes(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Interaction" xmi:id="int1" name="I">
+      <lifeline xmi:id="l1" name="A"/>
+      <lifeline xmi:id="l2" name="B"/>
+      <fragment xsi:type="uml:MessageOccurrenceSpecification" xmi:id="send1" covered="l1"/>
+      <fragment xsi:type="uml:MessageOccurrenceSpecification" xmi:id="recv1" covered="l2"/>
+      <message xmi:id="m1" name="login" interaction="int1" sendEvent="send1" receiveEvent="recv1">
+        <argument xsi:type="uml:LiteralString" xmi:id="arg1" value="user"/>
+        <argument xsi:type="uml:LiteralString" xmi:id="arg2" value="secret"/>
+      </message>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "message.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+    node_types = {node.type for node in ir.nodes}
+    assert "LiteralString" not in node_types
+
+    message = next(edge for edge in ir.edges if edge.id == "m1")
+    assert message.type == "Message"
+    assert message.data["arguments"] == [
+        {"id": "arg1", "type": "uml:LiteralString", "value": "user"},
+        {"id": "arg2", "type": "uml:LiteralString", "value": "secret"},
+    ]
+
+
+def test_uml_parser_adds_model_and_xml_ownership_edges(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Package" xmi:id="pkg1" name="Pkg">
+      <packagedElement xsi:type="uml:Class" xmi:id="C1" name="InnerClass"/>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "ownership.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser(options=ParseOptions(include_model_root_node=True)).parse(str(model_path))
+    edges = {edge.id: edge for edge in ir.edges}
+    nodes = {node.id: node for node in ir.nodes}
+
+    assert "model1" in nodes
+    assert nodes["model1"].type == "Model"
+
+    assert "model1__model_contains__pkg1" in edges
+    assert edges["model1__model_contains__pkg1"].type == "contains"
+    assert edges["model1__model_contains__pkg1"].data["derivedFrom"] == "modelOwnership"
+
+    assert "pkg1__owns__C1" in edges
+    assert edges["pkg1__owns__C1"].type == "contains"
+    assert edges["pkg1__owns__C1"].data["derivedFrom"] == "xmlOwnership"
+
+
+def test_uml_parser_without_model_root_node_skips_model_contains_edges(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Package" xmi:id="pkg1" name="Pkg">
+      <packagedElement xsi:type="uml:Class" xmi:id="C1" name="InnerClass"/>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "ownership-no-root.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser(options=ParseOptions(include_model_root_node=False)).parse(str(model_path))
+    edge_ids = {edge.id for edge in ir.edges}
+    node_ids = {node.id for node in ir.nodes}
+
+    assert "model1" not in node_ids
+    assert "model1__model_contains__pkg1" not in edge_ids
+
+
+def test_uml_parser_materializes_reference_edges_from_node_data(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:StateMachine" xmi:id="sm1" name="SM">
+      <region xmi:id="r1" stateMachine="sm1">
+        <subvertex xsi:type="uml:State" xmi:id="s1" name="S1" container="r1"/>
+      </region>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "references.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, _stats = UMLXMIParser().parse(str(model_path))
+    edges = {edge.id: edge for edge in ir.edges}
+
+    assert "r1__ref__stateMachine__sm1" in edges
+    assert edges["r1__ref__stateMachine__sm1"].type == "references"
+    assert edges["r1__ref__stateMachine__sm1"].data["referenceKey"] == "stateMachine"
+
+
+def test_uml_extended_parser_keeps_raw_record_name_model_placeholder(tmp_path):
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="model">
+    <packagedElement xsi:type="uml:Class" xmi:id="C1" name="Class1"/>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "record-name-normalization.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    record = UMLXMIModelParser(RepresentationProfile(include_model_root_node=False)).parse_file(model_path)
+
+    assert record.name == "model"
