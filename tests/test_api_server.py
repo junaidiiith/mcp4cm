@@ -725,14 +725,14 @@ def test_flask_duplicates_returns_model_counts_for_pie_charts():
 
     assert job["status"] == "complete"
     data = job["result"]
-    assert data["modelCounts"]["hash_names"] | {"elapsedMs": 0} == {
+    assert data["modelCounts"]["hash"] | {"elapsedMs": 0} == {
         "duplicateModels": 2,
         "uniqueModels": 1,
         "totalModels": 3,
         "pairCount": 1,
         "elapsedMs": 0,
     }
-    assert data["modelCounts"]["hash_names"]["elapsedMs"] >= 0
+    assert data["modelCounts"]["hash"]["elapsedMs"] >= 0
     assert data["elapsedMs"] >= 0
 
 
@@ -765,6 +765,11 @@ def test_flask_duplicate_pairs_counts_candidate_pairs_not_only_vote_approved_pai
 
     assert data["duplicatePairs"] == 1
     assert data["votedDuplicatePairs"] == 0
+    assert data["candidatePairs"] == 1
+    assert data["approvedPairs"] == 0
+    assert data["totalDecisions"] == 1
+    assert data["returnedDecisions"] == 1
+    assert data["truncated"] is False
     assert data["decisions"][0]["isDuplicate"] is False
 
 
@@ -804,8 +809,8 @@ def test_flask_duplicate_detection_job_reports_progress_and_result():
 
     assert data["status"] == "complete"
     assert data["progress"] == 100
-    assert data["completedTechniques"] == ["hash_names"]
+    assert data["completedTechniques"] == ["hash"]
     assert data["result"]["duplicatePairs"] == 1
     assert data["elapsedMs"] >= 0
     assert data["result"]["elapsedMs"] >= 0
-    assert data["result"]["modelCounts"]["hash_names"]["elapsedMs"] >= 0
+    assert data["result"]["modelCounts"]["hash"]["elapsedMs"] >= 0

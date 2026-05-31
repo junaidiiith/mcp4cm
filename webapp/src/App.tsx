@@ -18,6 +18,18 @@ import CytoscapeComponent from "react-cytoscapejs";
 import coseBilkent from "cytoscape-cose-bilkent";
 import "./styles.css";
 import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "./components/ui/sidebar";
+import {
   clonePreset,
   defaultFormatForLanguage,
   defaultThresholds,
@@ -30,6 +42,8 @@ import {
 import { getModelInspect, pollDuplicateJob, pollUploadParseJob, postForm, postJson } from "./api";
 import { backendTechniquesFor, formatDuration, round, techniqueLabel } from "./utils";
 import type {
+  DuplicateProgressState,
+  DuplicateResult,
   DummyResponse,
   FilterConfig,
   Language,
@@ -58,8 +72,10 @@ export default function App() {
   const [uploadedFiles, setUploadedFiles] = useState(0);
   const [dummyResponse, setDummyResponse] = useState<DummyResponse | null>(null);
   const [selectedOutcomeModelId, setSelectedOutcomeModelId] = useState<string | null>(null);
-  const [duplicateResult, setDuplicateResult] = useState<any>(null);
-  const [duplicateProgress, setDuplicateProgress] = useState<any>(null);
+  const [duplicateResult, setDuplicateResult] = useState<DuplicateResult | null>(null);
+  const [duplicateProgress, setDuplicateProgress] = useState<DuplicateProgressState | null>(null);
+  const [pairInspectModelId, setPairInspectModelId] = useState<string | null>(null);
+  const [pairInspectBoth, setPairInspectBoth] = useState<{ leftId: string; rightId: string } | null>(null);
   const [selected, setSelected] = useState<string[]>(["hash", "tfidf"]);
   const [mandatory, setMandatory] = useState<string[]>(["hash"]);
   const [minVotes, setMinVotes] = useState(2);
@@ -76,9 +92,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [selectedModel, setSelectedModel] = useState<ParsedModelSummary | null>(null);
   const [inspectorTab, setInspectorTab] = useState<"warnings" | "model">("warnings");
-  const [inspectModel, setInspectModel] = useState<ModelInspectPayload | null>(null);
-  const [inspectLoading, setInspectLoading] = useState(false);
-  const [inspectError, setInspectError] = useState("");
+  const selectedInspectModelId = selectedModel?.modelId || null;
+  const selectedModelInspect = useModelInspect(datasetId, selectedInspectModelId);
+  const pairModelInspect = useModelInspect(datasetId, pairInspectModelId);
+  const leftPairModelInspect = useModelInspect(datasetId, pairInspectBoth?.leftId || null);
+  const rightPairModelInspect = useModelInspect(datasetId, pairInspectBoth?.rightId || null);
 
   const canRun = Boolean(datasetId);
   const selectedTechniques = useMemo(() => new Set(selected), [selected]);
@@ -124,6 +142,8 @@ export default function App() {
     setSelectedOutcomeModelId(null);
     setDuplicateResult(null);
     setDuplicateProgress(null);
+    setPairInspectModelId(null);
+    setPairInspectBoth(null);
     closeModelInspector();
     try {
       const session = await postJson("/api/uploads/start", uploadSessionPayload());
@@ -174,6 +194,8 @@ export default function App() {
     setBusy("duplicates");
     setDuplicateResult(null);
     setDuplicateProgress(null);
+    setPairInspectModelId(null);
+    setPairInspectBoth(null);
     try {
       if (!selected.length) {
         throw new Error("Select at least one duplicate technique.");
@@ -184,17 +206,26 @@ export default function App() {
         .filter((item) => selected.includes(item))
         .flatMap((item) => backendTechniquesFor(item, thresholds))
         .filter((item) => selectedBackendSet.has(item));
+      const thresholdPayload = {
+        ...thresholds,
+        ngramRange: [thresholds.ngramRangeMin, thresholds.ngramRangeMax],
+      };
       const payload = {
         datasetId,
         techniques: selectedBackendTechniques,
         selectedTechniques: selectedBackendTechniques,
         mandatoryTechniques: activeMandatory,
         minVotes,
-        thresholds,
+        resultLimit: thresholds.resultLimit,
+        tfidfTokenMode: thresholds.tfidfTokenMode,
+        tfidfSimilarityThreshold: thresholds.tfidfSimilarityThreshold,
+        thresholds: thresholdPayload,
       };
       const job = await postJson("/api/duplicates/jobs", payload);
       setDuplicateProgress(job);
-      const result = await pollDuplicateJob(job.jobId);
+      const result = await pollDuplicateJob(job.jobId, (nextJob) => {
+        setDuplicateProgress(nextJob);
+      });
       setDuplicateProgress(result);
       setDuplicateResult(result.result);
     } catch (err: any) {
@@ -211,49 +242,7 @@ export default function App() {
 
   function closeModelInspector() {
     setSelectedModel(null);
-    setInspectModel(null);
-    setInspectError("");
-    setInspectLoading(false);
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadInspectModel() {
-      if (!selectedModel) {
-        setInspectModel(null);
-        setInspectError("");
-        setInspectLoading(false);
-        return;
-      }
-      if (!datasetId || !selectedModel.modelId) {
-        setInspectModel(null);
-        setInspectError(!datasetId ? "Process selected models to inspect parsed graph details." : "No model id linked for this model.");
-        setInspectLoading(false);
-        return;
-      }
-      setInspectLoading(true);
-      setInspectError("");
-      try {
-        const response = await getModelInspect(datasetId, selectedModel.modelId, { nodeLimit: 400, edgeLimit: 800, includeAttrs: true });
-        if (!cancelled) {
-          setInspectModel(response);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setInspectModel(null);
-          setInspectError(err?.message || "Failed to load parsed model details.");
-        }
-      } finally {
-        if (!cancelled) {
-          setInspectLoading(false);
-        }
-      }
-    }
-    loadInspectModel();
-    return () => {
-      cancelled = true;
-    };
-  }, [datasetId, selectedModel?.modelId, selectedModel?.path]);
 
   function toggleSelection(id: string) {
     setSelected((current) => {
@@ -284,6 +273,8 @@ export default function App() {
     setUploadParseJob(null);
     setUploadedFiles(0);
     closeModelInspector();
+    setPairInspectModelId(null);
+    setPairInspectBoth(null);
     if (nextLanguage !== "uml") {
       setRepresentation({
         includeAttributes: true,
@@ -305,6 +296,8 @@ export default function App() {
     setDummyResponse(null);
     setSelectedOutcomeModelId(null);
     closeModelInspector();
+    setPairInspectModelId(null);
+    setPairInspectBoth(null);
     if (!(language === "uml" && nextFormat === "xmi")) {
       setRepresentation({
         includeAttributes: true,
@@ -326,31 +319,17 @@ export default function App() {
   }
 
   return (
-    <main>
-      <aside className="sidebar">
-        <div className="brand">
-          <img className="brandMark" src="/mcp4cm-icon.svg" alt="" />
-          <div>
-            <strong>MCP4CM</strong>
-            <span>Model Cleansing Pipeline</span>
-          </div>
-        </div>
-        <nav>
-          <a href="#upload"><FileUp size={18} />Upload</a>
-          <a href="#stats"><BarChart3 size={18} />Statistics</a>
-          <a href="#dummy"><Filter size={18} />Dummy Filters</a>
-          <a href="#duplicates"><GitCompare size={18} />Duplicates</a>
-        </nav>
-      </aside>
-
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <h1>Model Dataset Cleansing</h1>
-            <p>Upload UML, Ecore, or ArchiMate model datasets, inspect quality, and decide duplicates with transparent evidence.</p>
-          </div>
-          <Status datasetId={datasetId} busy={busy} />
-        </header>
+    <SidebarProvider className="appShell">
+      <AppSidebar />
+      <SidebarInset>
+        <section className="workspace">
+          <header className="topbar">
+            <div>
+              <h1>Model Dataset Cleansing</h1>
+              <p>Upload Conceptual Model Datasets, inspect quality, cleanse dummies, and detect duplicates.</p>
+            </div>
+            <Status datasetId={datasetId} busy={busy} />
+          </header>
 
         {error && <div className="error">{error}</div>}
 
@@ -394,7 +373,6 @@ export default function App() {
             </label>
             {representationEnabled && (
               <div className="representationPanel">
-                <p>Enable to materialize feature nodes and parent-link edges in the parsed graph.</p>
                 <div className="representationChecks">
                   <label className="inlineCheck">
                     <input
@@ -450,7 +428,6 @@ export default function App() {
                 {datasetId ? "Reparse Dataset" : "Parse Dataset"}
               </button>
             </div>
-          <p className="uploadHint">Select files, tune parser parameters, then parse. You can reparse with new parameters at any time.</p>
           </div>
           {(busy === "parse" || uploadParseJob) && (
             <UploadParseProgress
@@ -485,7 +462,6 @@ export default function App() {
           <div className="subsectionHeader">
             <div>
               <h3>Built-in Filters</h3>
-              <p>Enable canonical V2 filters and tune formulas before running the cleansing pass.</p>
             </div>
             <div className="subsectionActions">
               <button type="button" className="tableInfoButton" onClick={() => setShowDummyInfo(true)}>
@@ -543,6 +519,7 @@ export default function App() {
 
           <div className="runConfig">
             <label>Min votes<input type="number" min="1" value={minVotes} onChange={(e) => setMinVotes(Number(e.target.value))} /></label>
+            <label>Result limit<input type="number" min="1" step="50" value={thresholds.resultLimit} onChange={(event) => setThresholds({ ...thresholds, resultLimit: Number(event.target.value) })} /></label>
           </div>
 
           <div className="actionBar">
@@ -552,9 +529,20 @@ export default function App() {
             </button>
           </div>
           {duplicateProgress && <DuplicateProgress progress={duplicateProgress} />}
-          <DuplicateResults result={duplicateResult} />
+          <DuplicateResults
+            result={duplicateResult}
+            onInspectModel={(modelId) => {
+              setPairInspectBoth(null);
+              setPairInspectModelId(modelId);
+            }}
+            onInspectBoth={(leftId, rightId) => {
+              setPairInspectModelId(null);
+              setPairInspectBoth({ leftId, rightId });
+            }}
+          />
         </section>
-      </section>
+        </section>
+      </SidebarInset>
       {selectedModel && (
         <WarningInspectorDrawer
           model={selectedModel}
@@ -562,17 +550,149 @@ export default function App() {
           tab={inspectorTab}
           onTabChange={setInspectorTab}
           onClose={closeModelInspector}
-          inspectLoading={inspectLoading}
-          inspectError={inspectError}
-          inspectModel={inspectModel}
+          inspectLoading={selectedModelInspect.loading}
+          inspectError={selectedModelInspect.error}
+          inspectModel={selectedModelInspect.payload}
         />
       )}
-    </main>
+      {pairInspectModelId && (
+        <ModelGraphDrawer
+          title="Duplicate Pair Model Inspect"
+          modelId={pairInspectModelId}
+          onClose={() => setPairInspectModelId(null)}
+          inspectLoading={pairModelInspect.loading}
+          inspectError={pairModelInspect.error}
+          inspectModel={pairModelInspect.payload}
+        />
+      )}
+      {pairInspectBoth && (
+        <PairCompareModal
+          leftId={pairInspectBoth.leftId}
+          rightId={pairInspectBoth.rightId}
+          onClose={() => setPairInspectBoth(null)}
+          leftInspectLoading={leftPairModelInspect.loading}
+          leftInspectError={leftPairModelInspect.error}
+          leftInspectModel={leftPairModelInspect.payload}
+          rightInspectLoading={rightPairModelInspect.loading}
+          rightInspectError={rightPairModelInspect.error}
+          rightInspectModel={rightPairModelInspect.payload}
+        />
+      )}
+    </SidebarProvider>
+  );
+}
+
+function AppSidebar() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const onNavigate = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  return (
+    <Sidebar className="appSidebar" collapsible="icon">
+      <SidebarHeader>
+        <div className="sidebarHeaderTop">
+          <SidebarTrigger className="sidebarTriggerInSidebar" />
+        </div>
+        <div className="brand">
+          <img className="brandMark" src="/mcp4cm-icon.svg" alt="" />
+          <div className="brandText">
+            <strong>MCP4CM</strong>
+            <span>Model Cleansing Pipeline</span>
+          </div>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Upload">
+              <a href="#upload" onClick={onNavigate}>
+                <FileUp size={18} />
+                <span className="sidebarLinkLabel">Upload</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Statistics">
+              <a href="#stats" onClick={onNavigate}>
+                <BarChart3 size={18} />
+                <span className="sidebarLinkLabel">Statistics</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Dummy Filters">
+              <a href="#dummy" onClick={onNavigate}>
+                <Filter size={18} />
+                <span className="sidebarLinkLabel">Dummy Filters</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Duplicates">
+              <a href="#duplicates" onClick={onNavigate}>
+                <GitCompare size={18} />
+                <span className="sidebarLinkLabel">Duplicates</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarContent>
+    </Sidebar>
   );
 }
 
 function SectionTitle({ icon, title }) {
   return <h2>{icon}{title}</h2>;
+}
+
+function useModelInspect(datasetId: string, modelId: string | null) {
+  const [payload, setPayload] = useState<ModelInspectPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!modelId) {
+        setPayload(null);
+        setError("");
+        setLoading(false);
+        return;
+      }
+      if (!datasetId) {
+        setPayload(null);
+        setError("Process selected models to inspect parsed graph details.");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const response = await getModelInspect(datasetId, modelId, { nodeLimit: 400, edgeLimit: 800, includeAttrs: true });
+        if (!cancelled) {
+          setPayload(response);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setPayload(null);
+          setError(err?.message || "Failed to load parsed model details.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [datasetId, modelId]);
+
+  return { payload, loading, error };
 }
 
 function DummyCleansingInfoModal({ onClose }: { onClose: () => void }) {
@@ -935,25 +1055,41 @@ function TechniqueConfig({ technique, thresholds, onChange }) {
 
   if (technique === "hash") {
     return (
-      <div className="configGrid compact">
+      <div className="configGrid">
         <label className="inlineCheck">
           <input type="checkbox" checked={thresholds.hashIncludeTypes} onChange={(event) => patch({ hashIncludeTypes: event.target.checked })} />
           Types
+        </label>
+        <label>Min named nodes<input type="number" min="0" step="1" value={thresholds.minNamedNodes} onChange={(event) => patch({ minNamedNodes: Number(event.target.value) })} /></label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.deduplicateNameTokens} onChange={(event) => patch({ deduplicateNameTokens: event.target.checked })} />
+          Deduplicate names
         </label>
       </div>
     );
   }
 
   if (technique === "tfidf") {
-    const thresholdKey = thresholds.tfidfIncludeTypes ? "tfidfNamesTypes" : "tfidfNames";
     return (
       <div className="configGrid">
-        <label className="inlineCheck">
-          <input type="checkbox" checked={thresholds.tfidfIncludeTypes} onChange={(event) => patch({ tfidfIncludeTypes: event.target.checked })} />
-          Types
+        <label>Token mode
+          <select value={thresholds.tfidfTokenMode} onChange={(event) => patch({ tfidfTokenMode: event.target.value })}>
+            <option value="names">names</option>
+            <option value="names_types_bag">names_types_bag</option>
+            <option value="typed_name_pairs">typed_name_pairs</option>
+          </select>
         </label>
-        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds[thresholdKey]} onChange={(event) => patch({ [thresholdKey]: Number(event.target.value) })} /></label>
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.tfidfSimilarityThreshold} onChange={(event) => patch({ tfidfSimilarityThreshold: Number(event.target.value) })} /></label>
         <label>Max features<input type="number" min="1000" step="1000" value={thresholds.tfidfMaxFeatures} onChange={(event) => patch({ tfidfMaxFeatures: Number(event.target.value) })} /></label>
+        <label>Min DF<input type="number" min="0.1" step="0.1" value={thresholds.minDf} onChange={(event) => patch({ minDf: Number(event.target.value) })} /></label>
+        <label>N-gram min<input type="number" min="1" step="1" value={thresholds.ngramRangeMin} onChange={(event) => patch({ ngramRangeMin: Number(event.target.value) })} /></label>
+        <label>N-gram max<input type="number" min={thresholds.ngramRangeMin} step="1" value={thresholds.ngramRangeMax} onChange={(event) => patch({ ngramRangeMax: Number(event.target.value) })} /></label>
+        <label>Stopwords
+          <select value={thresholds.stopwordsMode} onChange={(event) => patch({ stopwordsMode: event.target.value })}>
+            <option value="none">none</option>
+            <option value="english">english</option>
+          </select>
+        </label>
       </div>
     );
   }
@@ -969,6 +1105,14 @@ function TechniqueConfig({ technique, thresholds, onChange }) {
         <label>Degree histogram<input type="number" min="0" step="0.01" value={weights.degreeHistogram} onChange={(event) => patchWeights({ degreeHistogram: Number(event.target.value) })} /></label>
         <label>Size<input type="number" min="0" step="0.01" value={weights.sizeSimilarity} onChange={(event) => patchWeights({ sizeSimilarity: Number(event.target.value) })} /></label>
         <label>Density<input type="number" min="0" step="0.01" value={weights.densitySimilarity} onChange={(event) => patchWeights({ densitySimilarity: Number(event.target.value) })} /></label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.useDirectedMetrics} onChange={(event) => patch({ useDirectedMetrics: event.target.checked })} />
+          Directed metrics
+        </label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.normalizeParallelEdges} onChange={(event) => patch({ normalizeParallelEdges: event.target.checked })} />
+          Normalize parallel edges
+        </label>
       </div>
     );
   }
@@ -976,7 +1120,7 @@ function TechniqueConfig({ technique, thresholds, onChange }) {
   if (technique === "graph_embedding") {
     return (
       <div className="configGrid">
-        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.graphEmbedding} onChange={(event) => patch({ graphEmbedding: Number(event.target.value) })} /></label>
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.graphEmbeddingThreshold} onChange={(event) => patch({ graphEmbeddingThreshold: Number(event.target.value), graphEmbedding: Number(event.target.value) })} /></label>
         <label>Dimensions<input type="number" min="8" step="8" value={thresholds.graphEmbeddingDimensions} onChange={(event) => patch({ graphEmbeddingDimensions: Number(event.target.value) })} /></label>
         <label>Walk length<input type="number" min="1" step="1" value={thresholds.graphEmbeddingWalkLength} onChange={(event) => patch({ graphEmbeddingWalkLength: Number(event.target.value) })} /></label>
         <label>Walks<input type="number" min="1" step="1" value={thresholds.graphEmbeddingNumWalks} onChange={(event) => patch({ graphEmbeddingNumWalks: Number(event.target.value) })} /></label>
@@ -990,6 +1134,13 @@ function TechniqueConfig({ technique, thresholds, onChange }) {
     return (
       <div className="configGrid">
         <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.bertSemantic} onChange={(event) => patch({ bertSemantic: Number(event.target.value) })} /></label>
+        <label>Text mode
+          <select value={thresholds.semanticTextMode} onChange={(event) => patch({ semanticTextMode: event.target.value })}>
+            <option value="names">names</option>
+            <option value="names_types_bag">names_types_bag</option>
+            <option value="typed_name_pairs">typed_name_pairs</option>
+          </select>
+        </label>
         <label className="wideField">Model<input value={thresholds.bertModelName} onChange={(event) => patch({ bertModelName: event.target.value })} /></label>
         <label>Batch size<input type="number" min="1" step="1" value={thresholds.bertBatchSize} onChange={(event) => patch({ bertBatchSize: Number(event.target.value) })} /></label>
         <label>Max length<input type="number" min="16" max="512" step="16" value={thresholds.bertMaxLength} onChange={(event) => patch({ bertMaxLength: Number(event.target.value) })} /></label>
@@ -1004,6 +1155,14 @@ function TechniqueConfig({ technique, thresholds, onChange }) {
         <label className="inlineCheck">
           <input type="checkbox" checked={thresholds.matchEdgeTypes} onChange={(event) => patch({ matchEdgeTypes: event.target.checked })} />
           Match edge types
+        </label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.ignoreDirection} onChange={(event) => patch({ ignoreDirection: event.target.checked })} />
+          Ignore direction
+        </label>
+        <label className="inlineCheck">
+          <input type="checkbox" checked={thresholds.matchParallelEdgeMultiplicity} onChange={(event) => patch({ matchParallelEdgeMultiplicity: event.target.checked })} />
+          Match parallel multiplicity
         </label>
       </div>
     );
@@ -1143,6 +1302,135 @@ function WarningInspectorDrawer({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ModelGraphDrawer({
+  title,
+  modelId,
+  onClose,
+  inspectLoading,
+  inspectError,
+  inspectModel,
+}: {
+  title: string;
+  modelId: string;
+  onClose: () => void;
+  inspectLoading: boolean;
+  inspectError: string;
+  inspectModel: ModelInspectPayload | null;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="inspectorOverlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="inspectorDrawer" onClick={(event) => event.stopPropagation()}>
+        <div className="inspectorHeader">
+          <div>
+            <h3>{title}</h3>
+            <p>{modelId}</p>
+          </div>
+          <button type="button" className="closeButton" onClick={onClose} aria-label="Close model inspector">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="inspectorBody">
+          {inspectLoading ? (
+            <div className="inspectState"><Loader2 className="spin" size={16} />Loading parsed model...</div>
+          ) : inspectError ? (
+            <div className="inspectState error"><AlertTriangle size={16} />{inspectError}</div>
+          ) : inspectModel ? (
+            <ModelGraphPreview payload={inspectModel} />
+          ) : (
+            <div className="inspectState">No parsed model data available.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PairCompareModal({
+  leftId,
+  rightId,
+  onClose,
+  leftInspectLoading,
+  leftInspectError,
+  leftInspectModel,
+  rightInspectLoading,
+  rightInspectError,
+  rightInspectModel,
+}: {
+  leftId: string;
+  rightId: string;
+  onClose: () => void;
+  leftInspectLoading: boolean;
+  leftInspectError: string;
+  leftInspectModel: ModelInspectPayload | null;
+  rightInspectLoading: boolean;
+  rightInspectError: string;
+  rightInspectModel: ModelInspectPayload | null;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="pairCompareOverlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="pairCompareModal" onClick={(event) => event.stopPropagation()}>
+        <div className="pairCompareHeader">
+          <div>
+            <h3>Duplicate Pair Compare</h3>
+            <p>{leftId} {"<->"} {rightId}</p>
+          </div>
+          <button type="button" className="closeButton" onClick={onClose} aria-label="Close pair compare">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="pairCompareGrid">
+          <div className="pairComparePane">
+            <div className="pairComparePaneHeader">
+              <h4>Left</h4>
+              <p>{leftId}</p>
+            </div>
+            {leftInspectLoading ? (
+              <div className="inspectState"><Loader2 className="spin" size={16} />Loading parsed model...</div>
+            ) : leftInspectError ? (
+              <div className="inspectState error"><AlertTriangle size={16} />{leftInspectError}</div>
+            ) : leftInspectModel ? (
+              <ModelGraphPreview payload={leftInspectModel} />
+            ) : (
+              <div className="inspectState">No parsed model data available.</div>
+            )}
+          </div>
+          <div className="pairComparePane">
+            <div className="pairComparePaneHeader">
+              <h4>Right</h4>
+              <p>{rightId}</p>
+            </div>
+            {rightInspectLoading ? (
+              <div className="inspectState"><Loader2 className="spin" size={16} />Loading parsed model...</div>
+            ) : rightInspectError ? (
+              <div className="inspectState error"><AlertTriangle size={16} />{rightInspectError}</div>
+            ) : rightInspectModel ? (
+              <ModelGraphPreview payload={rightInspectModel} />
+            ) : (
+              <div className="inspectState">No parsed model data available.</div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1558,60 +1846,95 @@ function csvCell(value: string) {
   return `\"${escaped}\"`;
 }
 
-function DuplicateProgress({ progress }) {
-  const completed = new Set(progress.completedTechniques || []);
+function DuplicateProgress({ progress }: { progress: DuplicateProgressState }) {
+  const overallProgress = Math.max(0, Math.min(100, Number(progress.progress || 0)));
+  const completed = (progress.completedTechniques || []).length;
+  const total = progress.totalTechniques || 0;
+  const message = progress.message || (progress.status === "complete" ? "Duplicate detection complete." : "Running duplicate detection.");
   return (
     <div className="progressPanel">
       <div className="progressHeader">
         <div>
-          <h3>{progress.currentTechnique ? `Running ${techniqueLabel(progress.currentTechnique)}` : progress.message}</h3>
-          <p>{progress.totalModels} models, {completed.size} of {progress.totalTechniques} techniques complete, {formatDuration(progress.elapsedMs)} elapsed</p>
-          {progress.message && progress.currentTechnique && <p>{progress.message}</p>}
-          {progress.totalItems > 0 && (
-            <p>{progress.processedItems} of {progress.totalItems} items processed in this algorithm</p>
-          )}
+          <h3>{message}</h3>
+          <p>{progress.totalModels || 0} models, {completed} of {total} techniques complete, {formatDuration(progress.elapsedMs || 0)} elapsed</p>
+          {progress.currentTechnique && <p>Current technique: {techniqueLabel(progress.currentTechnique)}</p>}
         </div>
-        <strong>{progress.progress}%</strong>
+        <strong>{overallProgress}%</strong>
       </div>
       <div className="progressTrack">
-        <div className="progressFill" style={{ width: `${progress.progress}%` }} />
-      </div>
-      {progress.currentTechnique && (
-        <div className="subProgress">
-          <span>{techniqueLabel(progress.currentTechnique)} progress</span>
-          <strong>{progress.techniqueProgress || 0}%</strong>
-          <div className="progressTrack">
-            <div className="progressFill secondary" style={{ width: `${progress.techniqueProgress || 0}%` }} />
-          </div>
-        </div>
-      )}
-      <div className="techniqueProgressGrid">
-        {(progress.selectedTechniques || []).map((technique) => (
-          <div className={`techniqueProgress ${completed.has(technique) ? "done" : progress.currentTechnique === technique ? "active" : ""}`} key={technique}>
-            {completed.has(technique) ? <Check size={15} /> : progress.currentTechnique === technique ? <Loader2 className="spin" size={15} /> : <span />}
-            {techniqueLabel(technique)}
-          </div>
-        ))}
+        <div className="progressFill" style={{ width: `${overallProgress}%` }} />
       </div>
     </div>
   );
 }
 
-function DuplicateResults({ result }) {
+function DuplicateResults({
+  result,
+  onInspectModel,
+  onInspectBoth,
+}: {
+  result: DuplicateResult | null;
+  onInspectModel: (modelId: string) => void;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+}) {
   if (!result) return <EmptyState text="Run duplicate detection to see technique votes and candidate pairs." />;
+  const candidatePairs = result.candidatePairs ?? result.duplicatePairs;
+  const approvedPairs = result.approvedPairs ?? result.votedDuplicatePairs ?? 0;
+  const totalDecisions = result.totalDecisions ?? result.decisions.length;
+  const returnedDecisions = result.returnedDecisions ?? result.decisions.length;
   return (
     <div className="results">
       <div className="metricGrid small">
-        <Metric label="Duplicate pairs" value={result.duplicatePairs} />
-        {"votedDuplicatePairs" in result && <Metric label="Vote-approved pairs" value={result.votedDuplicatePairs} />}
+        <Metric label="Candidate pairs" value={candidatePairs} />
+        <Metric label="Vote-approved pairs" value={approvedPairs} />
         <Metric label="Runtime" value={formatDuration(result.elapsedMs)} />
         {Object.entries(result.techniqueCounts).map(([key, value]) => <Metric key={key} label={key} value={value} />)}
       </div>
+      {result.truncated && (
+        <div className="error">
+          Showing {returnedDecisions} of {totalDecisions} decisions due to result limit ({result.truncationLimit}).
+        </div>
+      )}
       <DuplicateModelCharts modelCounts={result.modelCounts || {}} />
-      <table>
-        <thead><tr><th>Left</th><th>Right</th><th>Duplicate</th><th>Votes</th><th>Techniques</th></tr></thead>
-        <tbody>{result.decisions.map((row) => <tr key={`${row.leftId}-${row.rightId}`}><td>{row.leftId}</td><td>{row.rightId}</td><td>{row.isDuplicate ? "Yes" : "No"}</td><td>{row.voteCount}</td><td>{row.techniques.join(", ")}</td></tr>)}</tbody>
-      </table>
+      <div className="duplicateDecisionTable">
+        <table>
+          <thead><tr><th>Left</th><th>Right</th><th>Compare</th><th>Approved</th><th>Votes</th><th>Techniques</th><th>Scores</th></tr></thead>
+          <tbody>
+            {result.decisions.map((row) => (
+              <tr key={`${row.leftId}-${row.rightId}`}>
+                <td>
+                  <div className="decisionCell">
+                    <span>{row.leftId}</span>
+                    <button type="button" className="tableInfoButton" onClick={() => onInspectModel(row.leftId)}>Inspect Left</button>
+                  </div>
+                </td>
+                <td>
+                  <div className="decisionCell">
+                    <span>{row.rightId}</span>
+                    <button type="button" className="tableInfoButton" onClick={() => onInspectModel(row.rightId)}>Inspect Right</button>
+                  </div>
+                </td>
+                <td>
+                  <button type="button" className="tableInfoButton" onClick={() => onInspectBoth(row.leftId, row.rightId)}>Inspect Both</button>
+                </td>
+                <td>{row.isDuplicate ? "Yes" : "No"}</td>
+                <td>{row.voteCount}{row.requiredVotes ? ` / ${row.requiredVotes}` : ""}</td>
+                <td>{row.techniques.join(", ") || "-"}</td>
+                <td>
+                  <div className="scoreChips">
+                    {Object.entries(row.scores || {}).map(([technique, score]) => (
+                      <span key={technique} className="scoreChip">
+                        <b>{techniqueLabel(technique)}</b>: {round(score)}
+                      </span>
+                    ))}
+                    {!Object.keys(row.scores || {}).length && <span>-</span>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

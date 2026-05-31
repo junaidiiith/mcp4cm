@@ -18,24 +18,36 @@ export interface GraphWeights {
 
 export interface Thresholds {
   hashIncludeTypes: boolean;
-  tfidfIncludeTypes: boolean;
-  tfidfNames: number;
-  tfidfNamesTypes: number;
+  minNamedNodes: number;
+  deduplicateNameTokens: boolean;
+  tfidfTokenMode: "names" | "names_types_bag" | "typed_name_pairs";
+  tfidfSimilarityThreshold: number;
   tfidfMaxFeatures: number;
+  minDf: number;
+  ngramRangeMin: number;
+  ngramRangeMax: number;
+  stopwordsMode: "none" | "english";
+  resultLimit: number;
   graphSimilarity: number;
   graphWeights: GraphWeights;
+  useDirectedMetrics: boolean;
+  normalizeParallelEdges: boolean;
   graphEmbedding: number;
+  graphEmbeddingThreshold: number;
   graphEmbeddingDimensions: number;
   graphEmbeddingWalkLength: number;
   graphEmbeddingNumWalks: number;
   graphEmbeddingWorkers: number;
   graphEmbeddingSeed: number;
   bertSemantic: number;
+  semanticTextMode: "names" | "names_types_bag" | "typed_name_pairs";
   bertModelName: string;
   bertBatchSize: number;
   bertMaxLength: number;
   isomorphismMode: string;
   matchEdgeTypes: boolean;
+  ignoreDirection: boolean;
+  matchParallelEdgeMultiplicity: boolean;
 }
 
 export interface UploadSummary {
@@ -159,11 +171,28 @@ export interface DuplicateProgressState {
 
 export interface DuplicateResult {
   duplicatePairs: number;
+  candidatePairs?: number;
+  approvedPairs?: number;
   votedDuplicatePairs?: number;
+  totalDecisions?: number;
+  returnedDecisions?: number;
+  truncated?: boolean;
+  truncationLimit?: number;
   elapsedMs: number;
+  techniqueStatus?: Record<string, { status: string; reason?: string; pairCount?: number; elapsedMs?: number }>;
+  configEcho?: Record<string, unknown>;
   techniqueCounts: Record<string, number>;
   modelCounts: Record<string, { duplicateModels: number; uniqueModels: number; totalModels: number; pairCount: number; elapsedMs: number }>;
-  decisions: Array<{ leftId: string; rightId: string; isDuplicate: boolean; voteCount: number; techniques: string[] }>;
+  decisions: Array<{
+    leftId: string;
+    rightId: string;
+    isDuplicate: boolean;
+    voteCount: number;
+    requiredVotes?: number;
+    techniques: string[];
+    scores?: Record<string, number>;
+    metrics?: Record<string, Record<string, number>>;
+  }>;
 }
 
 export interface DummyRow {

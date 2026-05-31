@@ -3,8 +3,8 @@ import type { FilterConfig, FormatOption, Language, TechniqueOption, Thresholds,
 export const API_URL = import.meta.env.VITE_MCP4CM_API_URL || (import.meta.env.DEV ? "http://127.0.0.1:8765" : "");
 
 export const techniques: TechniqueOption[] = [
-  { id: "hash", label: "Hash", detail: "Exact match on sorted node names" },
-  { id: "tfidf", label: "TF-IDF", detail: "Near duplicate text similarity on model tokens" },
+  { id: "hash", label: "Hash", detail: "Exact match on normalized model names (optional type-aware mode)" },
+  { id: "tfidf", label: "TF-IDF", detail: "Near-duplicate text similarity with configurable tokenization" },
   { id: "graph_similarity", label: "Graph metrics", detail: "Jaccard, degree, size, and density similarity" },
   { id: "graph_embedding", label: "Graph embeddings", detail: "Node2Vec graph embedding cosine similarity" },
   { id: "bert_semantic", label: "BERT semantic", detail: "bert-base-uncased semantic similarity on model names and types" },
@@ -86,10 +86,16 @@ export const formatOptionsByLanguage: Record<Language, FormatOption[]> = {
 
 export const defaultThresholds: Thresholds = {
   hashIncludeTypes: false,
-  tfidfIncludeTypes: false,
-  tfidfNames: 0.9,
-  tfidfNamesTypes: 0.9,
+  minNamedNodes: 0,
+  deduplicateNameTokens: false,
+  tfidfTokenMode: "names",
+  tfidfSimilarityThreshold: 0.9,
   tfidfMaxFeatures: 50000,
+  minDf: 1,
+  ngramRangeMin: 1,
+  ngramRangeMax: 1,
+  stopwordsMode: "none",
+  resultLimit: 500,
   graphSimilarity: 0.85,
   graphWeights: {
     nodeNameJaccard: 0.25,
@@ -99,18 +105,24 @@ export const defaultThresholds: Thresholds = {
     sizeSimilarity: 0.15,
     densitySimilarity: 0.1,
   },
+  useDirectedMetrics: false,
+  normalizeParallelEdges: false,
   graphEmbedding: 0.9,
+  graphEmbeddingThreshold: 0.9,
   graphEmbeddingDimensions: 64,
   graphEmbeddingWalkLength: 10,
   graphEmbeddingNumWalks: 20,
   graphEmbeddingWorkers: 1,
   graphEmbeddingSeed: 42,
   bertSemantic: 0.9,
+  semanticTextMode: "names_types_bag",
   bertModelName: "bert-base-uncased",
   bertBatchSize: 8,
   bertMaxLength: 256,
   isomorphismMode: "names",
   matchEdgeTypes: true,
+  ignoreDirection: false,
+  matchParallelEdgeMultiplicity: true,
 };
 
 export function clonePreset(language: Language): FilterConfig[] {
@@ -118,5 +130,8 @@ export function clonePreset(language: Language): FilterConfig[] {
 }
 
 export function defaultFormatForLanguage(language: Language): UploadFormat {
-  return formatOptionsByLanguage[language][0].value;
+  // Prefer directory-oriented source formats when available (e.g. UML XMI datasets).
+  const options = formatOptionsByLanguage[language];
+  const preferred = options.find((option) => option.directoryPreferred);
+  return (preferred || options[0]).value;
 }

@@ -1,4 +1,5 @@
 import { API_URL } from "./config";
+import type { DuplicateProgressState, UploadParseJob } from "./types";
 
 export async function postJson(path: string, payload: unknown) {
   const response = await fetch(`${API_URL}${path}`, {
@@ -22,10 +23,14 @@ export async function getJson(path: string) {
   return readJsonResponse(response);
 }
 
-export async function pollDuplicateJob(jobId: string) {
+export async function pollDuplicateJob(
+  jobId: string,
+  onUpdate?: (job: DuplicateProgressState) => void,
+) {
   for (;;) {
     await delay(700);
-    const job = await getJson(`/api/duplicates/jobs/${jobId}`);
+    const job = await getJson(`/api/duplicates/jobs/${jobId}`) as DuplicateProgressState;
+    if (onUpdate) onUpdate(job);
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Duplicate detection failed");
   }
@@ -34,11 +39,11 @@ export async function pollDuplicateJob(jobId: string) {
 export async function pollUploadParseJob(
   uploadId: string,
   jobId: string,
-  onUpdate?: (job: any) => void,
+  onUpdate?: (job: UploadParseJob) => void,
 ) {
   for (;;) {
     await delay(700);
-    const job = await getJson(`/api/uploads/${uploadId}/jobs/${jobId}`);
+    const job = await getJson(`/api/uploads/${uploadId}/jobs/${jobId}`) as UploadParseJob;
     if (onUpdate) onUpdate(job);
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Upload parsing failed");

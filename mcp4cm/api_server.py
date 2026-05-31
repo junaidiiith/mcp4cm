@@ -28,13 +28,11 @@ from mcp4cm.dummy import (
 )
 from mcp4cm.duplicates import (
     bert_semantic_similarity_pairs,
-    detect_duplicates_by_node_name_hash,
-    detect_duplicates_by_node_name_type_hash,
+    detect_duplicates_by_name_hash,
     graph_embedding_pairs,
     graph_isomorphism_pairs,
     graph_similarity_pairs,
-    tfidf_duplicate_by_names,
-    tfidf_duplicate_by_names_and_types,
+    tfidf_duplicate_pairs,
 )
 from mcp4cm.parsers.archimate import ArchimateParser
 from mcp4cm.parsers.extended import (
@@ -1117,16 +1115,25 @@ def duplicate_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> i
 def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     dataset = get_dataset(body)
     selected_order = selected_duplicate_techniques(body)
-    selected = set(selected_order)
-    mandatory = set(body.get("mandatoryTechniques") or [])
-    min_votes = int(body.get("minVotes", 2))
-    thresholds = body.get("thresholds") or {}
-    if not selected:
+    if not selected_order:
         raise_no_duplicate_technique_error(body)
 
-    votes: dict[tuple[str, str], dict[str, float]] = {}
+    thresholds = body.get("thresholds") or {}
+    min_votes = int(body.get("minVotes", 2))
+    mandatory = {
+        normalize_duplicate_technique(value)
+        for value in (body.get("mandatoryTechniques") or [])
+        if normalize_duplicate_technique(value) in DUPLICATE_TECHNIQUE_ORDER
+    }
+    min_votes = max(min_votes, len(mandatory), 1)
+
+    result_limit = max(1, int(body.get("resultLimit", thresholds.get("resultLimit", 500))))
+    projected_dataset = dataset
+
+    evidence: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
     technique_counts: dict[str, int] = {}
     model_counts: dict[str, dict[str, int]] = {}
+    technique_status: dict[str, dict[str, Any]] = {}
     completed: list[str] = []
     total_steps = len(selected_order)
     last_logged_algorithm_percent: dict[str, int] = {}
@@ -1140,7 +1147,7 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
             "duplicate_algorithm_start technique=%s label=%s models=%s step=%s/%s",
             technique,
             label,
-            len(dataset),
+            len(projected_dataset),
             len(completed) + 1,
             total_steps,
         )
@@ -1153,7 +1160,7 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                 techniqueProgress=0,
                 processedItems=0,
                 totalItems=0,
-                message=f"Running {duplicate_technique_label(technique)} over {len(dataset)} models.",
+                message=f"Running {label} over {len(projected_dataset)} models.",
             )
 
     def report_algorithm_progress(technique: str):
@@ -1188,147 +1195,223 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
 
         return report
 
-    def report_step_done(technique: str, pair_count: int) -> None:
+    def report_step_done(technique: str, pair_count: int, status: str, reason: str = "") -> None:
         completed.append(technique)
         elapsed_ms = round((time.perf_counter() - algorithm_started_at.get(technique, time.perf_counter())) * 1000)
         if technique in model_counts:
             model_counts[technique]["elapsedMs"] = elapsed_ms
+        else:
+            model_counts[technique] = {
+                "duplicateModels": 0,
+                "uniqueModels": len(projected_dataset),
+                "totalModels": len(projected_dataset),
+                "pairCount": 0,
+                "elapsedMs": elapsed_ms,
+            }
+        technique_status[technique] = {
+            "status": status,
+            "reason": reason,
+            "pairCount": pair_count,
+            "elapsedMs": elapsed_ms,
+        }
         counts = model_counts.get(technique, {})
         LOG.info(
-            "duplicate_algorithm_complete technique=%s label=%s pairs=%s duplicate_models=%s unique_models=%s completed=%s/%s elapsed_ms=%s",
+            "duplicate_algorithm_complete technique=%s label=%s status=%s pairs=%s duplicate_models=%s unique_models=%s completed=%s/%s elapsed_ms=%s reason=%s",
             technique,
             duplicate_technique_label(technique),
+            status,
             pair_count,
             counts.get("duplicateModels", 0),
-            counts.get("uniqueModels", len(dataset)),
+            counts.get("uniqueModels", len(projected_dataset)),
             len(completed),
             total_steps,
             elapsed_ms,
+            reason,
         )
         if progress:
+            label = duplicate_technique_label(technique)
+            suffix = f" ({status})" if status != "ok" else ""
             progress(
                 status="running",
                 currentTechnique="",
                 completedTechniques=list(completed),
                 progress=round((len(completed) / total_steps) * 100) if total_steps else 100,
                 techniqueProgress=100,
-                message=f"Completed {duplicate_technique_label(technique)}: {pair_count} duplicate pair(s).",
+                message=f"Completed {label}{suffix}: {pair_count} candidate pair(s).",
             )
 
-    if "hash_names" in selected:
-        report_step_start("hash_names")
-        pairs = group_pairs(detect_duplicates_by_node_name_hash(dataset, progress=report_algorithm_progress("hash_names")))
-        add_votes(votes, pairs, "hash_names", 1.0)
-        add_technique_model_counts(model_counts, technique_counts, dataset, "hash_names", pairs)
-        report_step_done("hash_names", len(pairs))
-    if "hash_names_types" in selected:
-        report_step_start("hash_names_types")
-        pairs = group_pairs(detect_duplicates_by_node_name_type_hash(dataset, progress=report_algorithm_progress("hash_names_types")))
-        add_votes(votes, pairs, "hash_names_types", 1.0)
-        add_technique_model_counts(model_counts, technique_counts, dataset, "hash_names_types", pairs)
-        report_step_done("hash_names_types", len(pairs))
-    if "tfidf_names" in selected:
-        report_step_start("tfidf_names")
-        pairs = tfidf_duplicate_by_names(
-            dataset,
-            threshold=float(thresholds.get("tfidfNames", 0.9)),
-            max_features=int(thresholds.get("tfidfMaxFeatures", 50_000)),
-            progress=report_algorithm_progress("tfidf_names"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "tfidf_names")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "tfidf_names", technique_pairs)
-        report_step_done("tfidf_names", len(technique_pairs))
-    if "tfidf_names_types" in selected:
-        report_step_start("tfidf_names_types")
-        pairs = tfidf_duplicate_by_names_and_types(
-            dataset,
-            threshold=float(thresholds.get("tfidfNamesTypes", 0.9)),
-            max_features=int(thresholds.get("tfidfMaxFeatures", 50_000)),
-            progress=report_algorithm_progress("tfidf_names_types"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "tfidf_names_types")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "tfidf_names_types", technique_pairs)
-        report_step_done("tfidf_names_types", len(technique_pairs))
-    if "graph_similarity" in selected:
-        report_step_start("graph_similarity")
-        pairs = graph_similarity_pairs(
-            dataset,
-            threshold=float(thresholds.get("graphSimilarity", 0.85)),
-            weights=graph_similarity_weights(thresholds),
-            progress=report_algorithm_progress("graph_similarity"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "graph_similarity")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "graph_similarity", technique_pairs)
-        report_step_done("graph_similarity", len(technique_pairs))
-    if "graph_embedding" in selected:
-        report_step_start("graph_embedding")
-        pairs = graph_embedding_pairs(
-            dataset,
-            threshold=float(thresholds.get("graphEmbedding", 0.9)),
-            dimensions=int(thresholds.get("graphEmbeddingDimensions", 64)),
-            walk_length=int(thresholds.get("graphEmbeddingWalkLength", 10)),
-            num_walks=int(thresholds.get("graphEmbeddingNumWalks", 20)),
-            workers=int(thresholds.get("graphEmbeddingWorkers", 1)),
-            seed=int(thresholds.get("graphEmbeddingSeed", 42)),
-            progress=report_algorithm_progress("graph_embedding"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "graph_embedding")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "graph_embedding", technique_pairs)
-        report_step_done("graph_embedding", len(technique_pairs))
-    if "bert_semantic" in selected:
-        report_step_start("bert_semantic")
-        pairs = bert_semantic_similarity_pairs(
-            dataset,
-            threshold=float(thresholds.get("bertSemantic", 0.9)),
-            model_name=str(thresholds.get("bertModelName", "bert-base-uncased")),
-            batch_size=int(thresholds.get("bertBatchSize", 8)),
-            max_length=int(thresholds.get("bertMaxLength", 256)),
-            progress=report_algorithm_progress("bert_semantic"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "bert_semantic")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "bert_semantic", technique_pairs)
-        report_step_done("bert_semantic", len(technique_pairs))
-    if "graph_isomorphism" in selected:
-        report_step_start("graph_isomorphism")
-        pairs = graph_isomorphism_pairs(
-            dataset,
-            mode=str(thresholds.get("isomorphismMode", "names")),
-            match_edge_types=bool(thresholds.get("matchEdgeTypes", True)),
-            progress=report_algorithm_progress("graph_isomorphism"),
-        )
-        technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-        add_votes(votes, technique_pairs, "graph_isomorphism")
-        add_technique_model_counts(model_counts, technique_counts, dataset, "graph_isomorphism", technique_pairs)
-        report_step_done("graph_isomorphism", len(technique_pairs))
+    def add_pair_evidence(
+        technique: str,
+        pairs: list[tuple[str, str, float]],
+        *,
+        metrics_by_pair: dict[tuple[str, str], dict[str, float]] | None = None,
+    ) -> None:
+        for left_id, right_id, score in pairs:
+            key = pair_key(left_id, right_id)
+            entry = evidence.setdefault(key, {"scores": {}, "metrics": {}})
+            entry["scores"][technique] = float(score)
+            if metrics_by_pair and key in metrics_by_pair:
+                entry["metrics"][technique] = metrics_by_pair[key]
+
+    for technique in selected_order:
+        report_step_start(technique)
+        try:
+            if technique == "hash":
+                groups = detect_duplicates_by_name_hash(
+                    projected_dataset,
+                    include_types=parse_form_bool(thresholds.get("hashIncludeTypes"), False),
+                    min_named_nodes=int(thresholds.get("minNamedNodes", 0)),
+                    deduplicate_name_tokens=parse_form_bool(thresholds.get("deduplicateNameTokens"), False),
+                    progress=report_algorithm_progress(technique),
+                )
+                technique_pairs = group_pairs(groups)
+                add_pair_evidence(technique, technique_pairs)
+            elif technique == "tfidf":
+                token_mode = parse_tfidf_token_mode(body, thresholds)
+                threshold = float(
+                    body.get(
+                        "tfidfSimilarityThreshold",
+                        thresholds.get("tfidfSimilarityThreshold", thresholds.get("tfidfNames", 0.9)),
+                    )
+                )
+                stopwords_mode = parse_stopwords_mode(thresholds.get("stopwordsMode", "none"))
+                pairs = tfidf_duplicate_pairs(
+                    projected_dataset,
+                    token_mode=token_mode,
+                    threshold=threshold,
+                    max_features=int(thresholds.get("tfidfMaxFeatures", 50_000)),
+                    min_df=parse_min_df(thresholds.get("minDf", 1)),
+                    ngram_range=parse_ngram_range(thresholds.get("ngramRange", [1, 1])),
+                    stopwords_mode=stopwords_mode,
+                    progress=report_algorithm_progress(technique),
+                    technique=technique,
+                )
+                technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
+                add_pair_evidence(technique, technique_pairs)
+            elif technique == "graph_similarity":
+                pairs = graph_similarity_pairs(
+                    projected_dataset,
+                    threshold=float(thresholds.get("graphSimilarity", 0.85)),
+                    weights=graph_similarity_weights(thresholds),
+                    use_directed_metrics=parse_form_bool(thresholds.get("useDirectedMetrics"), False),
+                    normalize_parallel_edges=parse_form_bool(thresholds.get("normalizeParallelEdges"), False),
+                    progress=report_algorithm_progress(technique),
+                )
+                technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
+                metrics_by_pair = {
+                    pair_key(pair.left_id, pair.right_id): dict(pair.metrics)
+                    for pair in pairs
+                }
+                add_pair_evidence(technique, technique_pairs, metrics_by_pair=metrics_by_pair)
+            elif technique == "graph_embedding":
+                pairs = graph_embedding_pairs(
+                    projected_dataset,
+                    threshold=float(thresholds.get("graphEmbeddingThreshold", thresholds.get("graphEmbedding", 0.9))),
+                    dimensions=int(thresholds.get("graphEmbeddingDimensions", 64)),
+                    walk_length=int(thresholds.get("graphEmbeddingWalkLength", 10)),
+                    num_walks=int(thresholds.get("graphEmbeddingNumWalks", 20)),
+                    workers=int(thresholds.get("graphEmbeddingWorkers", 1)),
+                    seed=int(thresholds.get("graphEmbeddingSeed", 42)),
+                    progress=report_algorithm_progress(technique),
+                )
+                technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
+                add_pair_evidence(technique, technique_pairs)
+            elif technique == "bert_semantic":
+                pairs = bert_semantic_similarity_pairs(
+                    projected_dataset,
+                    threshold=float(thresholds.get("bertSemantic", 0.9)),
+                    model_name=str(thresholds.get("bertModelName", "bert-base-uncased")),
+                    batch_size=int(thresholds.get("bertBatchSize", 8)),
+                    max_length=int(thresholds.get("bertMaxLength", 256)),
+                    semantic_text_mode=parse_semantic_text_mode(thresholds.get("semanticTextMode", "names_types_bag")),
+                    progress=report_algorithm_progress(technique),
+                )
+                technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
+                add_pair_evidence(technique, technique_pairs)
+            elif technique == "graph_isomorphism":
+                pairs = graph_isomorphism_pairs(
+                    projected_dataset,
+                    mode=parse_isomorphism_mode(thresholds.get("isomorphismMode", "names")),
+                    match_edge_types=parse_form_bool(thresholds.get("matchEdgeTypes"), True),
+                    ignore_direction=parse_form_bool(thresholds.get("ignoreDirection"), False),
+                    match_parallel_edge_multiplicity=parse_form_bool(thresholds.get("matchParallelEdgeMultiplicity"), True),
+                    progress=report_algorithm_progress(technique),
+                )
+                technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
+                add_pair_evidence(technique, technique_pairs)
+            else:
+                raise ValueError(f"Unsupported technique in execution pipeline: {technique}")
+
+            add_technique_model_counts(model_counts, technique_counts, projected_dataset, technique, technique_pairs)
+            report_step_done(technique, len(technique_pairs), "ok")
+        except ImportError as exc:
+            add_technique_model_counts(model_counts, technique_counts, projected_dataset, technique, [])
+            report_step_done(technique, 0, "skipped", str(exc))
+        except Exception as exc:
+            LOG.exception("duplicate_algorithm_failed technique=%s", technique)
+            add_technique_model_counts(model_counts, technique_counts, projected_dataset, technique, [])
+            report_step_done(technique, 0, "error", str(exc))
 
     decisions = []
-    for (left_id, right_id), scores in sorted(votes.items()):
-        present = set(scores)
-        required = mandatory or set()
-        is_duplicate = required.issubset(present) and len(present) >= min_votes
+    for (left_id, right_id), pair_evidence in sorted(evidence.items()):
+        score_map = dict(pair_evidence.get("scores", {}))
+        present = set(score_map)
+        is_duplicate = mandatory.issubset(present) and len(present) >= min_votes
         decisions.append(
             {
                 "leftId": left_id,
                 "rightId": right_id,
                 "isDuplicate": is_duplicate,
                 "voteCount": len(present),
+                "requiredVotes": min_votes,
                 "techniques": sorted(present),
-                "scores": scores,
+                "scores": score_map,
+                "metrics": dict(pair_evidence.get("metrics", {})),
             }
         )
+
     decisions.sort(key=lambda item: (item["isDuplicate"], item["voteCount"]), reverse=True)
-    voted_duplicate_pairs = sum(1 for decision in decisions if decision["isDuplicate"])
+    approved_pairs = sum(1 for decision in decisions if decision["isDuplicate"])
+    total_decisions = len(decisions)
+    returned_decisions = min(result_limit, total_decisions)
+    truncated = returned_decisions < total_decisions
+
+    tfidf_threshold = float(
+        body.get(
+            "tfidfSimilarityThreshold",
+            thresholds.get("tfidfSimilarityThreshold", thresholds.get("tfidfNames", 0.9)),
+        )
+    )
+    config_echo = {
+        "selectedTechniques": list(selected_order),
+        "mandatoryTechniques": sorted(mandatory),
+        "minVotes": min_votes,
+        "resultLimit": result_limit,
+        "hashIncludeTypes": parse_form_bool(thresholds.get("hashIncludeTypes"), False),
+        "minNamedNodes": int(thresholds.get("minNamedNodes", 0)),
+        "deduplicateNameTokens": parse_form_bool(thresholds.get("deduplicateNameTokens"), False),
+        "tfidfTokenMode": parse_tfidf_token_mode(body, thresholds),
+        "tfidfSimilarityThreshold": tfidf_threshold,
+        "tfidfMaxFeatures": int(thresholds.get("tfidfMaxFeatures", 50_000)),
+        "minDf": parse_min_df(thresholds.get("minDf", 1)),
+        "ngramRange": list(parse_ngram_range(thresholds.get("ngramRange", [1, 1]))),
+        "stopwordsMode": parse_stopwords_mode(thresholds.get("stopwordsMode", "none")),
+    }
+
     return {
         "techniqueCounts": technique_counts,
         "modelCounts": model_counts,
-        "duplicatePairs": len(decisions),
-        "votedDuplicatePairs": voted_duplicate_pairs,
-        "decisions": decisions[:500],
+        "duplicatePairs": total_decisions,
+        "votedDuplicatePairs": approved_pairs,
+        "candidatePairs": total_decisions,
+        "approvedPairs": approved_pairs,
+        "totalDecisions": total_decisions,
+        "returnedDecisions": returned_decisions,
+        "truncated": truncated,
+        "truncationLimit": result_limit,
+        "decisions": decisions[:result_limit],
+        "techniqueStatus": technique_status,
+        "configEcho": config_echo,
         "elapsedMs": round((time.perf_counter() - duplicate_started_at) * 1000),
     }
 
@@ -1711,7 +1794,7 @@ def graph_similarity_weights(thresholds: dict[str, Any]) -> dict[str, float] | N
     weights = thresholds.get("graphWeights")
     if not isinstance(weights, dict):
         return None
-    return {
+    parsed = {
         "node_name_jaccard": float(weights.get("nodeNameJaccard", 0.25)),
         "node_type_jaccard": float(weights.get("nodeTypeJaccard", 0.20)),
         "edge_type_jaccard": float(weights.get("edgeTypeJaccard", 0.15)),
@@ -1719,13 +1802,16 @@ def graph_similarity_weights(thresholds: dict[str, Any]) -> dict[str, float] | N
         "size_similarity": float(weights.get("sizeSimilarity", 0.15)),
         "density_similarity": float(weights.get("densitySimilarity", 0.10)),
     }
+    if "inDegreeHistogram" in weights:
+        parsed["in_degree_histogram_similarity"] = float(weights.get("inDegreeHistogram", 0.0))
+    if "outDegreeHistogram" in weights:
+        parsed["out_degree_histogram_similarity"] = float(weights.get("outDegreeHistogram", 0.0))
+    return parsed
 
 
 DUPLICATE_TECHNIQUE_ORDER = (
-    "hash_names",
-    "hash_names_types",
-    "tfidf_names",
-    "tfidf_names_types",
+    "hash",
+    "tfidf",
     "graph_similarity",
     "graph_embedding",
     "bert_semantic",
@@ -1733,10 +1819,8 @@ DUPLICATE_TECHNIQUE_ORDER = (
 )
 
 DUPLICATE_TECHNIQUE_LABELS = {
-    "hash_names": "Hash: Names",
-    "hash_names_types": "Hash: Names + Types",
-    "tfidf_names": "TF-IDF: Names",
-    "tfidf_names_types": "TF-IDF: Names + Types",
+    "hash": "Hash",
+    "tfidf": "TF-IDF",
     "graph_similarity": "Graph Metrics",
     "graph_embedding": "Graph Embeddings",
     "bert_semantic": "BERT Semantic",
@@ -1756,16 +1840,18 @@ def duplicate_technique_label(technique: str) -> str:
 
 
 DUPLICATE_TECHNIQUE_ALIASES = {
-    "hash_names": "hash_names",
-    "hash_name": "hash_names",
-    "hash_names_types": "hash_names_types",
-    "hash_names_and_types": "hash_names_types",
-    "tfidf_names": "tfidf_names",
-    "tf_idf_names": "tfidf_names",
-    "tfidf_names_types": "tfidf_names_types",
-    "tfidf_names_and_types": "tfidf_names_types",
-    "tf_idf_names_types": "tfidf_names_types",
-    "tf_idf_names_and_types": "tfidf_names_types",
+    "hash": "hash",
+    "hash_names": "hash",
+    "hash_name": "hash",
+    "hash_names_types": "hash",
+    "hash_names_and_types": "hash",
+    "tfidf": "tfidf",
+    "tfidf_names": "tfidf",
+    "tf_idf_names": "tfidf",
+    "tfidf_names_types": "tfidf",
+    "tfidf_names_and_types": "tfidf",
+    "tf_idf_names_types": "tfidf",
+    "tf_idf_names_and_types": "tfidf",
     "graph_similarity": "graph_similarity",
     "graph_metrics": "graph_similarity",
     "graph_embedding": "graph_embedding",
@@ -1808,6 +1894,86 @@ def raw_duplicate_techniques(body: dict[str, Any]) -> list[Any]:
                 values.append(item)
         return values
     return [raw]
+
+
+def parse_tfidf_token_mode(body: dict[str, Any], thresholds: dict[str, Any]) -> str:
+    raw = body.get("tfidfTokenMode", thresholds.get("tfidfTokenMode"))
+    if raw is None:
+        include_types = parse_form_bool(thresholds.get("tfidfIncludeTypes"), False)
+        return "names_types_bag" if include_types else "names"
+    normalized = str(raw).strip().lower()
+    aliases = {
+        "names": "names",
+        "name": "names",
+        "names_types_bag": "names_types_bag",
+        "names+types": "names_types_bag",
+        "names_types": "names_types_bag",
+        "typed_name_pairs": "typed_name_pairs",
+        "typed_pairs": "typed_name_pairs",
+    }
+    if normalized not in aliases:
+        raise ValueError("tfidfTokenMode must be one of: names, names_types_bag, typed_name_pairs.")
+    return aliases[normalized]
+
+
+def parse_semantic_text_mode(value: Any) -> str:
+    normalized = str(value or "names_types_bag").strip().lower()
+    aliases = {
+        "names": "names",
+        "names_types_bag": "names_types_bag",
+        "names_types": "names_types_bag",
+        "typed_name_pairs": "typed_name_pairs",
+    }
+    if normalized not in aliases:
+        raise ValueError("semanticTextMode must be one of: names, names_types_bag, typed_name_pairs.")
+    return aliases[normalized]
+
+
+def parse_stopwords_mode(value: Any) -> str:
+    normalized = str(value or "none").strip().lower()
+    aliases = {
+        "none": "none",
+        "non": "none",
+        "english": "english",
+    }
+    if normalized not in aliases:
+        raise ValueError("stopwordsMode must be one of: none, english.")
+    return aliases[normalized]
+
+
+def parse_ngram_range(value: Any) -> tuple[int, int]:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        first, second = int(value[0]), int(value[1])
+    elif isinstance(value, str) and "," in value:
+        parts = [item.strip() for item in value.split(",")]
+        if len(parts) != 2:
+            raise ValueError("ngramRange must contain exactly two numbers.")
+        first, second = int(parts[0]), int(parts[1])
+    else:
+        first, second = 1, 1
+    if first < 1 or second < first:
+        raise ValueError("ngramRange must satisfy 1 <= min <= max.")
+    return first, second
+
+
+def parse_min_df(value: Any) -> int | float:
+    if value is None:
+        return 1
+    if isinstance(value, (int, float)):
+        parsed = value
+    else:
+        raw = str(value).strip()
+        parsed = float(raw) if "." in raw else int(raw)
+    if isinstance(parsed, (int, float)) and parsed > 0:
+        return parsed
+    raise ValueError("minDf must be greater than 0.")
+
+
+def parse_isomorphism_mode(value: Any) -> str:
+    normalized = str(value or "names").strip().lower()
+    if normalized not in {"structure", "names", "names_types"}:
+        raise ValueError("isomorphismMode must be one of: structure, names, names_types.")
+    return normalized
 
 
 def unsupported_duplicate_techniques(body: dict[str, Any]) -> list[str]:

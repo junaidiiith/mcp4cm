@@ -3,17 +3,14 @@ import type { Thresholds } from "./types";
 
 export function techniqueLabel(id: string) {
   const labels: Record<string, string> = {
-    hash_names: "Hash: names",
-    hash_names_types: "Hash: names + types",
-    tfidf_names: "TF-IDF: names",
-    tfidf_names_types: "TF-IDF: names + types",
+    hash: "Hash",
+    tfidf: "TF-IDF",
   };
   return techniques.find((technique) => technique.id === id)?.label || labels[id] || id;
 }
 
 export function backendTechniquesFor(id: string, thresholds: Thresholds) {
-  if (id === "hash") return [thresholds.hashIncludeTypes ? "hash_names_types" : "hash_names"];
-  if (id === "tfidf") return [thresholds.tfidfIncludeTypes ? "tfidf_names_types" : "tfidf_names"];
+  void thresholds;
   return [id];
 }
 
