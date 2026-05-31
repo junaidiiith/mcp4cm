@@ -80,60 +80,66 @@ Each dataset contains `ModelRecord` objects with a normalized `networkx` graph p
 ## Statistics
 
 ```python
-from mcp4cm.statistics import dataset_summary, type_counts, word_counts
+from mcp4cm.statistics import dataset_summary, name_counts, type_counts
 
 summary = dataset_summary(uml)
 types = type_counts(archimate)
-words = word_counts(ecore)
+names = name_counts(ecore)
 ```
 
 ## Dummy Detection
 
 ```python
-from mcp4cm.dummy import detect_dummy_models, dummy_word_filter, uml_filters
+from mcp4cm.dummy import default_filter_configs, detect_dummy_models
 
-# Uses language-aware defaults. UML records get the UML-specific pattern set.
+# Uses built-in defaults.
 findings = detect_dummy_models(uml)
 
-# You can also pass the UML preset explicitly.
-uml_findings = detect_dummy_models(uml, filters=uml_filters())
-custom = detect_dummy_models(uml, filters=[dummy_word_filter({"test", "dummy", "example"})])
+# You can pass customized configs with `filter_configs=...`.
+configs = default_filter_configs()
+for config in configs:
+    if config["id"] == "placeholder_name_ratio":
+        config["threshold"] = 0.25
+    if config["id"] == "regex_rule":
+        config["enabled"] = True
+        config["pattern"] = r"^(test|dummy|sample)$"
+        config["targetField"] = "name"
+        config["scope"] = "all_named_nodes"
+        config["minMatches"] = 1
+
+custom_findings = detect_dummy_models(uml, filter_configs=configs)
 ```
 
 Show how many models each dummy filter removes:
 
 ```python
 from mcp4cm import DatasetType, load_dataset
-from mcp4cm.dummy import (
-    archimate_filters,
-    ecore_filters,
-    summarize_filters,
-    summarize_filters_by_language,
-    uml_filters,
-)
+from mcp4cm.dummy import default_filter_configs, summarize_filters, summarize_filters_by_language
 
 uml = load_dataset(DatasetType.MODELSET_UML, "data/modelset")
 ecore = load_dataset(DatasetType.MODELSET_ECORE, "data/modelset")
 archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset", language="en")
 
+configs = default_filter_configs()
+
 print("UML")
-for row in summarize_filters(uml, filters=uml_filters()):
-    print(row.filter_name, row.filtered_count, row.remaining_count)
+for row in summarize_filters(uml, filter_configs=configs):
+    print(row.filter_id, row.filtered_count, row.remaining_count)
 
 print("Ecore")
-for row in summarize_filters(ecore, filters=ecore_filters()):
-    print(row.filter_name, row.filtered_count, row.remaining_count)
+for row in summarize_filters(ecore, filter_configs=configs):
+    print(row.filter_id, row.filtered_count, row.remaining_count)
 
 print("ArchiMate")
-for row in summarize_filters(archimate, filters=archimate_filters()):
-    print(row.filter_name, row.filtered_count, row.remaining_count)
+for row in summarize_filters(archimate, filter_configs=configs):
+    print(row.filter_id, row.filtered_count, row.remaining_count)
 
-# Combined MODELSET: apply UML filters to UML records and Ecore filters to Ecore records.
+# Combined MODELSET: summarize per language using default filter configs.
 modelset = load_dataset(DatasetType.MODELSET, "data/modelset")
 for language, rows in summarize_filters_by_language(modelset).items():
     print(language)
     for row in rows:
-        print(row.filter_name, row.filtered_count, row.remaining_count)
+        print(row.filter_id, row.filtered_count, row.remaining_count)
 ```
 
 ## Duplicate Detection
