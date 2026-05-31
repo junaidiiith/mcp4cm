@@ -1,5 +1,6 @@
 export type Language = "uml" | "ecore" | "archimate" | "bpmn";
 export type UploadFormat = "json" | "xmi" | "ecore" | "signavio";
+export type BusyState = "" | "parse" | "dummy" | "duplicates";
 
 export interface TechniqueOption {
   id: string;
@@ -243,7 +244,68 @@ export interface DummyResponse {
   rows?: DummyRow[];
 }
 
-export type FilterConfig = Record<string, any>;
+interface BaseFilterConfig {
+  enabled: boolean;
+}
+
+export interface EmptyGraphFilterConfig extends BaseFilterConfig {
+  id: "empty_graph";
+}
+
+export interface MinSizeFilterConfig extends BaseFilterConfig {
+  id: "min_size";
+  minNodes: number;
+  minEdges: number;
+}
+
+export interface TooFewNamedElementsFilterConfig extends BaseFilterConfig {
+  id: "too_few_named_elements";
+  minNames: number;
+}
+
+export interface ShortMedianNameLengthFilterConfig extends BaseFilterConfig {
+  id: "short_median_name_length";
+  minMedianLength: number;
+}
+
+export interface PlaceholderNameRatioFilterConfig extends BaseFilterConfig {
+  id: "placeholder_name_ratio";
+  threshold: number;
+}
+
+export interface LowVocabularyFilterConfig extends BaseFilterConfig {
+  id: "low_vocabulary";
+  minUniqueWords: number;
+}
+
+export interface TypeLikeNameRatioFilterConfig extends BaseFilterConfig {
+  id: "type_like_name_ratio";
+  threshold: number;
+}
+
+export interface NameRepetitionRatioFilterConfig extends BaseFilterConfig {
+  id: "name_repetition_ratio";
+  threshold: number;
+}
+
+export interface RegexRuleFilterConfig extends BaseFilterConfig {
+  id: "regex_rule";
+  pattern: string;
+  targetField: "name" | "name+type" | "type";
+  scope: "eligible_only" | "all_named_nodes";
+  minMatches: number;
+}
+
+export type FilterConfig =
+  | EmptyGraphFilterConfig
+  | MinSizeFilterConfig
+  | TooFewNamedElementsFilterConfig
+  | ShortMedianNameLengthFilterConfig
+  | PlaceholderNameRatioFilterConfig
+  | LowVocabularyFilterConfig
+  | TypeLikeNameRatioFilterConfig
+  | NameRepetitionRatioFilterConfig
+  | RegexRuleFilterConfig;
 
 export interface FormatOption {
   value: UploadFormat;

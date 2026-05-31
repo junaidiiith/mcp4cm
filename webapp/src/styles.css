@@ -1,11 +1,45 @@
+@import "tailwindcss";
+@import "@fontsource/sora/latin-600.css";
+@import "@fontsource/sora/latin-700.css";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+
 :root {
-  color: #1f2933;
-  background: #f4f7fb;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --background: #f3f7fc;
+  --foreground: #17202a;
+  --card: #ffffff;
+  --card-foreground: #17202a;
+  --surface-2: #eaf1f9;
+  --muted-foreground: #5a6874;
+  --border: #d2dce9;
+  --input: #c5d2e0;
+  --ring: #0f766e;
+  --primary: #0f766e;
+  --primary-strong: #0b5d57;
+  --primary-foreground: #f7fffd;
+  --destructive: #b42318;
+  --warning: #c27d12;
+  --shadow-soft: 0 1px 2px rgba(13, 26, 34, .06);
+  --shadow-strong: 0 24px 52px rgba(13, 26, 34, .2);
+
+  color: var(--foreground);
+  background: radial-gradient(1200px 420px at 50% -20%, #dde9f9, transparent 65%), var(--background);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; }
+body {
+  margin: 0;
+  color: var(--foreground);
+  background: transparent;
+}
+.font-heading { font-family: "Sora", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+code, pre, .warningPath, .inspectorHeader p, .pairCompareHeader p, .pairComparePaneHeader p {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
 .uiSidebarProvider {
   --sidebar-width: 17.5rem;
   --sidebar-width-mobile: 18rem;
@@ -159,7 +193,7 @@ h1 { margin: 0 0 6px; font-size: 28px; }
 p { margin: 0; color: #60717f; }
 .status, button, .primary { display: inline-flex; align-items: center; gap: 8px; }
 .status { background: #e8f4ef; color: #146c43; padding: 8px 12px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
-.panel { background: white; border: 1px solid #dbe4ec; border-radius: 8px; padding: 22px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16, 24, 40, .05); }
+.panel { background: white; border: 1px solid #dbe4ec; border-radius: 8px; padding: 0px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16, 24, 40, .05); }
 h2 { margin: 0 0 18px; font-size: 19px; display: flex; gap: 10px; align-items: center; }
 h3 { margin: 0 0 10px; font-size: 15px; }
 .subsectionHeader {
@@ -995,12 +1029,187 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   font-size: 11px;
   color: #6c7e8d;
 }
-.empty { border: 1px dashed #cbd6df; border-radius: 8px; padding: 22px; color: #60717f; display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.empty {
+  border: 1px dashed var(--input);
+  border-radius: 10px;
+  padding: 22px;
+  color: var(--muted-foreground);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  background: color-mix(in srgb, var(--background) 80%, white);
+}
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+.animate-accordion-down { animation: accordion-down .18s ease-out; }
+.animate-accordion-up { animation: accordion-up .18s ease-out; }
+
+.appShell {
+  background: radial-gradient(980px 320px at 50% -10%, #d9e6f8, transparent 60%), var(--background);
+}
+.uiSidebar {
+  background: linear-gradient(180deg, #152128 0%, #1f3038 100%);
+  border-right-color: rgba(255, 255, 255, .1);
+}
+.brand strong {
+  font-family: "Sora", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  letter-spacing: -.01em;
+}
+.workspaceShell {
+  display: block;
+  padding: 22px;
+  max-width: 1560px;
+  margin: 0 auto;
+}
+.workspace {
+  width: 100%;
+  max-width: unset;
+  padding: 0;
+}
+.topbar {
+  margin-bottom: 16px;
+}
+.topbar h1 {
+  margin: 0 0 6px;
+  font-family: "Sora", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  letter-spacing: -.02em;
+  font-size: clamp(1.65rem, 2.3vw, 2.2rem);
+}
+.topbarState {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.panel {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 16px;
+}
+.panelHeader {
+  display: flex;
+  /* align-items: center;*/
+  justify-content: flex-start;
+  gap: 14px;
+  padding-bottom: 10px;
+  margin-bottom: 1em;
+}
+.panelHeader h2 {
+  margin: 0;
+  font-family: "Sora", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  letter-spacing: -.01em;
+}
+.stepGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.stepCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card) 88%, var(--surface-2));
+  padding: 14px;
+}
+.stepCard h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dummyAccordion {
+  display: grid;
+  gap: 10px;
+}
+.dummyGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.dummyGroupCount {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+.filterConfigCard {
+  border-radius: 10px;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--card) 96%, #f5f9ff);
+}
+.filterConfigCard.disabled {
+  background: color-mix(in srgb, var(--card) 70%, #eaf1fb);
+}
+.formulaDetail {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+.formulaDetail summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.formulaDetail code {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eef3fb;
+  border: 1px solid #d5dfec;
+}
+.resultsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sidebarMenuButton a {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.accordionTriggerButton {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 0;
+}
+.accordionTriggerButton:hover {
+  border: 0 !important;
+}
+.pairCompareModal {
+  width: min(1700px, 96vw);
+  max-height: min(94vh, 1100px);
+}
+.inspectorDrawer {
+  max-width: min(1080px, 96vw);
+}
+.infoModal {
+  width: min(860px, 96vw);
+}
 
 @media (max-width: 980px) {
-  .workspace { padding: 18px; }
+  .workspaceShell {
+    padding: 16px;
+  }
+  .workspace { padding: 0; }
+  .stepGrid { grid-template-columns: 1fr; }
   .metricGrid, .listGrid, .techGrid { grid-template-columns: 1fr; }
   .summaryCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .warningFilters { grid-template-columns: 1fr; }
