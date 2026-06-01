@@ -1,0 +1,284 @@
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="_HpWoEJVTEeqqGZh46IEtXQ" name="model">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="_HpWoEZVTEeqqGZh46IEtXQ" source="genmymodel">
+        <details xmi:id="_HpWoEpVTEeqqGZh46IEtXQ" key="uuid" value="_bklPoEp4Eemxb9vmnJ3nLQ"/>
+        <details xmi:id="_HpWoE5VTEeqqGZh46IEtXQ" key="author" value="letzgus.m"/>
+      </eAnnotations>
+    </xmi:Extension>
+    <packageImport xmi:id="_HpWoFJVTEeqqGZh46IEtXQ" importingNamespace="_HpWoEJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoFZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoFpVTEeqqGZh46IEtXQ" key="uuid" value="_bklPoUp4Eemxb9vmnJ3nLQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Component" xmi:id="_HpWoF5VTEeqqGZh46IEtXQ" name="Gefahrenmeldeanlage">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoGJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoGZVTEeqqGZh46IEtXQ" key="uuid" value="_8J420C4JEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedComment xmi:id="_HpWoGpVTEeqqGZh46IEtXQ" annotatedElement="_HpWoMpVTEeqqGZh46IEtXQ" body="condition: (wenn Einbruch und Uhrzeit zwischen 18Uhr und 23Uhr)  extension point:  optisches Signal">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoG5VTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoHJVTEeqqGZh46IEtXQ" key="uuid" value="_sL-MIS4KEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </ownedComment>
+      <ownedComment xmi:id="_HpWoHZVTEeqqGZh46IEtXQ" annotatedElement="_HpWoLJVTEeqqGZh46IEtXQ" body="condition: (wenn Einbruch und Uhrzeit zwischen 18Uhr und 23Uhr oder Brand)  extension point: akustisches Signal">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoHpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoH5VTEeqqGZh46IEtXQ" key="uuid" value="_3zBncS4NEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </ownedComment>
+      <ownedComment xmi:id="_HpWoIJVTEeqqGZh46IEtXQ" annotatedElement="_HpWoJpVTEeqqGZh46IEtXQ" body="condition: (wenn Einbruch)  extension point: stummer Alarm">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoIZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoIpVTEeqqGZh46IEtXQ" key="uuid" value="_JiCm4S4OEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </ownedComment>
+      <ownedUseCase xmi:id="_HpWoI5VTEeqqGZh46IEtXQ" name="stummer Alarm auslösen">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoJJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoJZVTEeqqGZh46IEtXQ" key="uuid" value="_HZtlQC4KEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_HpWoJpVTEeqqGZh46IEtXQ" extendedCase="_HpWoNZVTEeqqGZh46IEtXQ" extensionLocation="_HpWoPpVTEeqqGZh46IEtXQ" extension="_HpWoI5VTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoJ5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoKJVTEeqqGZh46IEtXQ" key="uuid" value="_2DarAC4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_HpWoKZVTEeqqGZh46IEtXQ" name="akustisches Signal auslösen">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoKpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoK5VTEeqqGZh46IEtXQ" key="uuid" value="_Is32QC4KEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_HpWoLJVTEeqqGZh46IEtXQ" extendedCase="_HpWoNZVTEeqqGZh46IEtXQ" extension="_HpWoKZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoLZVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoLpVTEeqqGZh46IEtXQ" key="uuid" value="_d_YDMC4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_HpWoL5VTEeqqGZh46IEtXQ" name="optisches Signal auslösen">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoMJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoMZVTEeqqGZh46IEtXQ" key="uuid" value="_Lr6aQC4KEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_HpWoMpVTEeqqGZh46IEtXQ" extendedCase="_HpWoNZVTEeqqGZh46IEtXQ" extensionLocation="_HpWoOJVTEeqqGZh46IEtXQ" extension="_HpWoL5VTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoM5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoNJVTEeqqGZh46IEtXQ" key="uuid" value="_YQ7SoC4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_HpWoNZVTEeqqGZh46IEtXQ" name="Alarm">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoNpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoN5VTEeqqGZh46IEtXQ" key="uuid" value="_NN1DgS4LEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_HpWoOJVTEeqqGZh46IEtXQ" name="akustisches Signal" useCase="_HpWoNZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoOZVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoOpVTEeqqGZh46IEtXQ" key="uuid" value="_OdetgC4LEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_HpWoO5VTEeqqGZh46IEtXQ" name="stummer Alarm" useCase="_HpWoNZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoPJVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoPZVTEeqqGZh46IEtXQ" key="uuid" value="_P7oGgS4LEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_HpWoPpVTEeqqGZh46IEtXQ" name="optisches Signal" useCase="_HpWoNZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoP5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoQJVTEeqqGZh46IEtXQ" key="uuid" value="_SUv6AC4LEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+      </ownedUseCase>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_HpWoQZVTEeqqGZh46IEtXQ" name="Brand">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoQpVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoQ5VTEeqqGZh46IEtXQ" key="uuid" value="_-wH5QS4JEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_HpWoRJVTEeqqGZh46IEtXQ" name="Einbruch">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoRZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoRpVTEeqqGZh46IEtXQ" key="uuid" value="_ALXvQS4KEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_HpWoR5VTEeqqGZh46IEtXQ" name="Administrator">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoSJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoSZVTEeqqGZh46IEtXQ" key="uuid" value="_gcBzMC4KEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_HpWoSpVTEeqqGZh46IEtXQ" name="Administrator_Gefahrenmeldeanlage" memberEnd="_HpWoTZVTEeqqGZh46IEtXQ _HpWoVpVTEeqqGZh46IEtXQ" navigableOwnedEnd="_HpWoTZVTEeqqGZh46IEtXQ _HpWoVpVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoS5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoTJVTEeqqGZh46IEtXQ" key="uuid" value="_UEfj5S4MEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_HpWoTZVTEeqqGZh46IEtXQ" name="gefahrenmeldeanlage" type="_HpWoF5VTEeqqGZh46IEtXQ" owningAssociation="_HpWoSpVTEeqqGZh46IEtXQ" association="_HpWoSpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoTpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoT5VTEeqqGZh46IEtXQ" key="uuid" value="_UEfj4i4MEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoUJVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoUZVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoUpVTEeqqGZh46IEtXQ" key="uuid" value="_UEfj4y4MEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoU5VTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoVJVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoVZVTEeqqGZh46IEtXQ" key="uuid" value="_UEfj5C4MEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_HpWoVpVTEeqqGZh46IEtXQ" name="administrator" type="_HpWoR5VTEeqqGZh46IEtXQ" owningAssociation="_HpWoSpVTEeqqGZh46IEtXQ" association="_HpWoSpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoV5VTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoWJVTEeqqGZh46IEtXQ" key="uuid" value="_UEe80S4MEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoWZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoWpVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoW5VTEeqqGZh46IEtXQ" key="uuid" value="_UEfj4C4MEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoXJVTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoXZVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoXpVTEeqqGZh46IEtXQ" key="uuid" value="_UEfj4S4MEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_HpWoX5VTEeqqGZh46IEtXQ" name="Brand_Alarm" memberEnd="_HpWoYpVTEeqqGZh46IEtXQ _HpWoa5VTEeqqGZh46IEtXQ" navigableOwnedEnd="_HpWoYpVTEeqqGZh46IEtXQ _HpWoa5VTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWoYJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWoYZVTEeqqGZh46IEtXQ" key="uuid" value="_vC-HFS4NEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_HpWoYpVTEeqqGZh46IEtXQ" name="alarm" type="_HpWoNZVTEeqqGZh46IEtXQ" owningAssociation="_HpWoX5VTEeqqGZh46IEtXQ" association="_HpWoX5VTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoY5VTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoZJVTEeqqGZh46IEtXQ" key="uuid" value="_vC-HEi4NEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoZZVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoZpVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoZ5VTEeqqGZh46IEtXQ" key="uuid" value="_vC-HEy4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoaJVTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoaZVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoapVTEeqqGZh46IEtXQ" key="uuid" value="_vC-HFC4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_HpWoa5VTEeqqGZh46IEtXQ" name="brand" type="_HpWoQZVTEeqqGZh46IEtXQ" owningAssociation="_HpWoX5VTEeqqGZh46IEtXQ" association="_HpWoX5VTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWobJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWobZVTEeqqGZh46IEtXQ" key="uuid" value="_vC9gAi4NEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWobpVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWob5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWocJVTEeqqGZh46IEtXQ" key="uuid" value="_vC-HEC4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWocZVTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWocpVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoc5VTEeqqGZh46IEtXQ" key="uuid" value="_vC-HES4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_HpWodJVTEeqqGZh46IEtXQ" name="Einbruch_Alarm" memberEnd="_HpWod5VTEeqqGZh46IEtXQ _HpWogJVTEeqqGZh46IEtXQ" navigableOwnedEnd="_HpWod5VTEeqqGZh46IEtXQ _HpWogJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_HpWodZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_HpWodpVTEeqqGZh46IEtXQ" key="uuid" value="_vdXkEy4NEDeCD-VVPomhtQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_HpWod5VTEeqqGZh46IEtXQ" name="alarm" type="_HpWoNZVTEeqqGZh46IEtXQ" owningAssociation="_HpWodJVTEeqqGZh46IEtXQ" association="_HpWodJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWoeJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWoeZVTEeqqGZh46IEtXQ" key="uuid" value="_vdXkEC4NEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWoepVTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoe5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWofJVTEeqqGZh46IEtXQ" key="uuid" value="_vdXkES4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWofZVTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWofpVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWof5VTEeqqGZh46IEtXQ" key="uuid" value="_vdXkEi4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_HpWogJVTEeqqGZh46IEtXQ" name="einbruch" type="_HpWoRJVTEeqqGZh46IEtXQ" owningAssociation="_HpWodJVTEeqqGZh46IEtXQ" association="_HpWodJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_HpWogZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_HpWogpVTEeqqGZh46IEtXQ" key="uuid" value="_vdW9AS4NEDeCD-VVPomhtQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_HpWog5VTEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWohJVTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWohZVTEeqqGZh46IEtXQ" key="uuid" value="_vdW9Ai4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_HpWohpVTEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_HpWoh5VTEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_HpWoiJVTEeqqGZh46IEtXQ" key="uuid" value="_vdW9Ay4NEDeCD-VVPomhtQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

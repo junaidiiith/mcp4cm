@@ -1,0 +1,718 @@
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="_52TDsJVZEeqqGZh46IEtXQ" name="model">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="_52TDsZVZEeqqGZh46IEtXQ" source="genmymodel">
+        <details xmi:id="_52TDspVZEeqqGZh46IEtXQ" key="uuid" value="_3KYo8KNXEemlGeJsLESUmg"/>
+        <details xmi:id="_52TDs5VZEeqqGZh46IEtXQ" key="author" value="pallavisubedi"/>
+      </eAnnotations>
+    </xmi:Extension>
+    <packageImport xmi:id="_52TDtJVZEeqqGZh46IEtXQ" importingNamespace="_52TDsJVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TDtZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TDtpVZEeqqGZh46IEtXQ" key="uuid" value="_3KYo8aNXEemlGeJsLESUmg"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_52TDt5VZEeqqGZh46IEtXQ" name="CUSTOMER">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TDuJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TDuZVZEeqqGZh46IEtXQ" key="uuid" value="_7JByAIWFEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_52TDupVZEeqqGZh46IEtXQ" name="ATM/ BANK">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TDu5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TDvJVZEeqqGZh46IEtXQ" key="uuid" value="_8ihUgIWFEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TqwJVZEeqqGZh46IEtXQ" name="INSERT CARD">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TqwZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TqwpVZEeqqGZh46IEtXQ" key="uuid" value="_FthrgYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52Tqw5VZEeqqGZh46IEtXQ" name="CUSTOMER_INSERT CARD" memberEnd="_52TqxpVZEeqqGZh46IEtXQ _52Tqz5VZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TqxpVZEeqqGZh46IEtXQ _52Tqz5VZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TqxJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TqxZVZEeqqGZh46IEtXQ" key="uuid" value="_HZGcgoWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TqxpVZEeqqGZh46IEtXQ" name="iNSERT CARD" type="_52TqwJVZEeqqGZh46IEtXQ" owningAssociation="_52Tqw5VZEeqqGZh46IEtXQ" association="_52Tqw5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tqx5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TqyJVZEeqqGZh46IEtXQ" key="uuid" value="_HZF1cYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TqyZVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TqypVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tqy5VZEeqqGZh46IEtXQ" key="uuid" value="_HZGcgIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TqzJVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TqzZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TqzpVZEeqqGZh46IEtXQ" key="uuid" value="_HZGcgYWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52Tqz5VZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52Tqw5VZEeqqGZh46IEtXQ" association="_52Tqw5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tq0JVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tq0ZVZEeqqGZh46IEtXQ" key="uuid" value="_HY95oIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq0pVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq05VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq1JVZEeqqGZh46IEtXQ" key="uuid" value="_HZFOYIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq1ZVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq1pVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq15VZEeqqGZh46IEtXQ" key="uuid" value="_HZF1cIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52Tq2JVZEeqqGZh46IEtXQ" name="INSERT CARD_ATM/ BANK" memberEnd="_52Tq25VZEeqqGZh46IEtXQ _52Tq5JVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52Tq25VZEeqqGZh46IEtXQ _52Tq5JVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Tq2ZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52Tq2pVZEeqqGZh46IEtXQ" key="uuid" value="_IJTKY4WGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52Tq25VZEeqqGZh46IEtXQ" name="aTM/ BANK" type="_52TDupVZEeqqGZh46IEtXQ" owningAssociation="_52Tq2JVZEeqqGZh46IEtXQ" association="_52Tq2JVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tq3JVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tq3ZVZEeqqGZh46IEtXQ" key="uuid" value="_IJTKYIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq3pVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq35VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq4JVZEeqqGZh46IEtXQ" key="uuid" value="_IJTKYYWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq4ZVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq4pVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq45VZEeqqGZh46IEtXQ" key="uuid" value="_IJTKYoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52Tq5JVZEeqqGZh46IEtXQ" name="iNSERT CARD" type="_52TqwJVZEeqqGZh46IEtXQ" owningAssociation="_52Tq2JVZEeqqGZh46IEtXQ" association="_52Tq2JVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tq5ZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tq5pVZEeqqGZh46IEtXQ" key="uuid" value="_IJSjUIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq55VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq6JVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq6ZVZEeqqGZh46IEtXQ" key="uuid" value="_IJSjUYWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq6pVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq65VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq7JVZEeqqGZh46IEtXQ" key="uuid" value="_IJSjUoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52Tq7ZVZEeqqGZh46IEtXQ" name="INSERT PIN">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Tq7pVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52Tq75VZEeqqGZh46IEtXQ" key="uuid" value="_KCguwYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52Tq8JVZEeqqGZh46IEtXQ" name="CUSTOMER_INSERT PIN" memberEnd="_52Tq85VZEeqqGZh46IEtXQ _52Tq_JVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52Tq85VZEeqqGZh46IEtXQ _52Tq_JVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Tq8ZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52Tq8pVZEeqqGZh46IEtXQ" key="uuid" value="_MLZt4oWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52Tq85VZEeqqGZh46IEtXQ" name="iNSERT PIN" type="_52Tq7ZVZEeqqGZh46IEtXQ" owningAssociation="_52Tq8JVZEeqqGZh46IEtXQ" association="_52Tq8JVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tq9JVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tq9ZVZEeqqGZh46IEtXQ" key="uuid" value="_MLZG04WGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq9pVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq95VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq-JVZEeqqGZh46IEtXQ" key="uuid" value="_MLZt4IWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq-ZVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tq-pVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tq-5VZEeqqGZh46IEtXQ" key="uuid" value="_MLZt4YWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52Tq_JVZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52Tq8JVZEeqqGZh46IEtXQ" association="_52Tq8JVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tq_ZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tq_pVZEeqqGZh46IEtXQ" key="uuid" value="_MLZG0IWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tq_5VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrAJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrAZVZEeqqGZh46IEtXQ" key="uuid" value="_MLZG0YWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrApVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrA5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrBJVZEeqqGZh46IEtXQ" key="uuid" value="_MLZG0oWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52TrBZVZEeqqGZh46IEtXQ" name="INSERT PIN_ATM/ BANK" memberEnd="_52TrCJVZEeqqGZh46IEtXQ _52TrEZVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TrCJVZEeqqGZh46IEtXQ _52TrEZVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrBpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrB5VZEeqqGZh46IEtXQ" key="uuid" value="_NDTmRIWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TrCJVZEeqqGZh46IEtXQ" name="aTM/ BANK" type="_52TDupVZEeqqGZh46IEtXQ" owningAssociation="_52TrBZVZEeqqGZh46IEtXQ" association="_52TrBZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrCZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrCpVZEeqqGZh46IEtXQ" key="uuid" value="_NDTmQYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrC5VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrDJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrDZVZEeqqGZh46IEtXQ" key="uuid" value="_NDTmQoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrDpVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrD5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrEJVZEeqqGZh46IEtXQ" key="uuid" value="_NDTmQ4WGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52TrEZVZEeqqGZh46IEtXQ" name="iNSERT PIN" type="_52Tq7ZVZEeqqGZh46IEtXQ" owningAssociation="_52TrBZVZEeqqGZh46IEtXQ" association="_52TrBZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrEpVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrE5VZEeqqGZh46IEtXQ" key="uuid" value="_NDS_MYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrFJVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrFZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrFpVZEeqqGZh46IEtXQ" key="uuid" value="_NDS_MoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrF5VZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrGJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrGZVZEeqqGZh46IEtXQ" key="uuid" value="_NDTmQIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrGpVZEeqqGZh46IEtXQ" name="DISPLAY ATM MENU">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrG5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrHJVZEeqqGZh46IEtXQ" key="uuid" value="_N6MK8YWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52TrHZVZEeqqGZh46IEtXQ" name="CUSTOMER_DISPLAY ATM MENU" memberEnd="_52TrIJVZEeqqGZh46IEtXQ _52TrKZVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TrIJVZEeqqGZh46IEtXQ _52TrKZVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrHpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrH5VZEeqqGZh46IEtXQ" key="uuid" value="_RHmiIoWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TrIJVZEeqqGZh46IEtXQ" name="dISPLAY ATM MENU" type="_52TrGpVZEeqqGZh46IEtXQ" owningAssociation="_52TrHZVZEeqqGZh46IEtXQ" association="_52TrHZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrIZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrIpVZEeqqGZh46IEtXQ" key="uuid" value="_RHl7E4WGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrI5VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrJJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrJZVZEeqqGZh46IEtXQ" key="uuid" value="_RHmiIIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrJpVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrJ5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrKJVZEeqqGZh46IEtXQ" key="uuid" value="_RHmiIYWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52TrKZVZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52TrHZVZEeqqGZh46IEtXQ" association="_52TrHZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrKpVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrK5VZEeqqGZh46IEtXQ" key="uuid" value="_RHl7EIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrLJVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrLZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrLpVZEeqqGZh46IEtXQ" key="uuid" value="_RHl7EYWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrL5VZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrMJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrMZVZEeqqGZh46IEtXQ" key="uuid" value="_RHl7EoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52TrMpVZEeqqGZh46IEtXQ" name="DISPLAY ATM MENU_ATM/ BANK" memberEnd="_52TrNZVZEeqqGZh46IEtXQ _52TrPpVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TrNZVZEeqqGZh46IEtXQ _52TrPpVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrM5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrNJVZEeqqGZh46IEtXQ" key="uuid" value="_R8aqQYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TrNZVZEeqqGZh46IEtXQ" name="aTM/ BANK" type="_52TDupVZEeqqGZh46IEtXQ" owningAssociation="_52TrMpVZEeqqGZh46IEtXQ" association="_52TrMpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrNpVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrN5VZEeqqGZh46IEtXQ" key="uuid" value="_R8aDMYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrOJVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrOZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrOpVZEeqqGZh46IEtXQ" key="uuid" value="_R8aDMoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrO5VZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrPJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrPZVZEeqqGZh46IEtXQ" key="uuid" value="_R8aqQIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52TrPpVZEeqqGZh46IEtXQ" name="dISPLAY ATM MENU" type="_52TrGpVZEeqqGZh46IEtXQ" owningAssociation="_52TrMpVZEeqqGZh46IEtXQ" association="_52TrMpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrP5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrQJVZEeqqGZh46IEtXQ" key="uuid" value="_R8ZcIYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrQZVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrQpVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrQ5VZEeqqGZh46IEtXQ" key="uuid" value="_R8ZcIoWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrRJVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrRZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrRpVZEeqqGZh46IEtXQ" key="uuid" value="_R8aDMIWGEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrR5VZEeqqGZh46IEtXQ" name="WITHDRAW CASH">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrSJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrSZVZEeqqGZh46IEtXQ" key="uuid" value="_aQc9AYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TrSpVZEeqqGZh46IEtXQ" general="_52TrGpVZEeqqGZh46IEtXQ" specific="_52TrR5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrS5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrTJVZEeqqGZh46IEtXQ" key="uuid" value="_oFtcoIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrTZVZEeqqGZh46IEtXQ" name="FUND TRANSFER">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrTpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrT5VZEeqqGZh46IEtXQ" key="uuid" value="_bxRPgYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TrUJVZEeqqGZh46IEtXQ" general="_52TrGpVZEeqqGZh46IEtXQ" specific="_52TrTZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrUZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrUpVZEeqqGZh46IEtXQ" key="uuid" value="_svN-YIWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrU5VZEeqqGZh46IEtXQ" name="CHANGE PIN">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrVJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrVZVZEeqqGZh46IEtXQ" key="uuid" value="_c9YdUIWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TrVpVZEeqqGZh46IEtXQ" general="_52TrGpVZEeqqGZh46IEtXQ" specific="_52TrU5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrV5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrWJVZEeqqGZh46IEtXQ" key="uuid" value="_uT7SYYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrWZVZEeqqGZh46IEtXQ" name="DEPOSIT MONEY">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrWpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrW5VZEeqqGZh46IEtXQ" key="uuid" value="_eeE0AYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TrXJVZEeqqGZh46IEtXQ" general="_52TrGpVZEeqqGZh46IEtXQ" specific="_52TrWZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrXZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrXpVZEeqqGZh46IEtXQ" key="uuid" value="_wryhoYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrX5VZEeqqGZh46IEtXQ" name="CHECK BALANCE">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrYJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrYZVZEeqqGZh46IEtXQ" key="uuid" value="_gEq-YYWGEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TrYpVZEeqqGZh46IEtXQ" general="_52TrGpVZEeqqGZh46IEtXQ" specific="_52TrX5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrY5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrZJVZEeqqGZh46IEtXQ" key="uuid" value="_x5HQYYWGEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrZZVZEeqqGZh46IEtXQ" name="WITHDRAW CASH">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrZpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrZ5VZEeqqGZh46IEtXQ" key="uuid" value="_BrPFUYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TraJVZEeqqGZh46IEtXQ" name="SELECT ACCOUNT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TraZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrapVZEeqqGZh46IEtXQ" key="uuid" value="_Jc2AcIWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52Tra5VZEeqqGZh46IEtXQ" name="CUSTOMER_SELECT ACCOUNT" memberEnd="_52TrbpVZEeqqGZh46IEtXQ _52Trd5VZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TrbpVZEeqqGZh46IEtXQ _52Trd5VZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrbJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrbZVZEeqqGZh46IEtXQ" key="uuid" value="_OCn4xIWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TrbpVZEeqqGZh46IEtXQ" name="sELECT ACCOUNT" type="_52TraJVZEeqqGZh46IEtXQ" owningAssociation="_52Tra5VZEeqqGZh46IEtXQ" association="_52Tra5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Trb5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrcJVZEeqqGZh46IEtXQ" key="uuid" value="_OCn4wYWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrcZVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrcpVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Trc5VZEeqqGZh46IEtXQ" key="uuid" value="_OCn4woWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrdJVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrdZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrdpVZEeqqGZh46IEtXQ" key="uuid" value="_OCn4w4WHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52Trd5VZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52Tra5VZEeqqGZh46IEtXQ" association="_52Tra5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TreJVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TreZVZEeqqGZh46IEtXQ" key="uuid" value="_OCnRsIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrepVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tre5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrfJVZEeqqGZh46IEtXQ" key="uuid" value="_OCnRsYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrfZVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrfpVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Trf5VZEeqqGZh46IEtXQ" key="uuid" value="_OCn4wIWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrgJVZEeqqGZh46IEtXQ" name="SAVINGS ACCOUNT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrgZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrgpVZEeqqGZh46IEtXQ" key="uuid" value="_QEJroYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52Trg5VZEeqqGZh46IEtXQ" general="_52TraJVZEeqqGZh46IEtXQ" specific="_52TrgJVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrhJVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrhZVZEeqqGZh46IEtXQ" key="uuid" value="_U-JgcYWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrhpVZEeqqGZh46IEtXQ" name="CHECKING ACCOUNT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Trh5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TriJVZEeqqGZh46IEtXQ" key="uuid" value="_SCdLYYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_52TriZVZEeqqGZh46IEtXQ" general="_52TraJVZEeqqGZh46IEtXQ" specific="_52TrhpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TripVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tri5VZEeqqGZh46IEtXQ" key="uuid" value="_WRYp8YWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrjJVZEeqqGZh46IEtXQ" name="SELECT AMOUNT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrjZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrjpVZEeqqGZh46IEtXQ" key="uuid" value="_Yc6tYYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_52Trj5VZEeqqGZh46IEtXQ" addition="_52Trp5VZEeqqGZh46IEtXQ" includingCase="_52TrjJVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrkJVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrkZVZEeqqGZh46IEtXQ" key="uuid" value="_fQLw8IWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52TrkpVZEeqqGZh46IEtXQ" name="SELECT AMOUNT_ATM/ BANK" memberEnd="_52TrlZVZEeqqGZh46IEtXQ _52TrnpVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52TrlZVZEeqqGZh46IEtXQ _52TrnpVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Trk5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrlJVZEeqqGZh46IEtXQ" key="uuid" value="_afykFIWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52TrlZVZEeqqGZh46IEtXQ" name="aTM/ BANK" type="_52TDupVZEeqqGZh46IEtXQ" owningAssociation="_52TrkpVZEeqqGZh46IEtXQ" association="_52TrkpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrlpVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Trl5VZEeqqGZh46IEtXQ" key="uuid" value="_afykEYWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrmJVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrmZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrmpVZEeqqGZh46IEtXQ" key="uuid" value="_afykEoWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Trm5VZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrnJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrnZVZEeqqGZh46IEtXQ" key="uuid" value="_afykE4WHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52TrnpVZEeqqGZh46IEtXQ" name="sELECT AMOUNT" type="_52TrjJVZEeqqGZh46IEtXQ" owningAssociation="_52TrkpVZEeqqGZh46IEtXQ" association="_52TrkpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Trn5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TroJVZEeqqGZh46IEtXQ" key="uuid" value="_afx9AIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TroZVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TropVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tro5VZEeqqGZh46IEtXQ" key="uuid" value="_afx9AYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrpJVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrpZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrppVZEeqqGZh46IEtXQ" key="uuid" value="_afykEIWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52Trp5VZEeqqGZh46IEtXQ" name="CHECK AVAILABLE BALANCE">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrqJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrqZVZEeqqGZh46IEtXQ" key="uuid" value="_c2IwYYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrqpVZEeqqGZh46IEtXQ" name="COLLECT CASH">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Trq5VZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrrJVZEeqqGZh46IEtXQ" key="uuid" value="_iKdJsYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <extensionPoint xmi:id="_52TrrZVZEeqqGZh46IEtXQ" name="ExtPoint" useCase="_52TrqpVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrrpVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Trr5VZEeqqGZh46IEtXQ" key="uuid" value="_tBvcUIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extensionPoint>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52TrsJVZEeqqGZh46IEtXQ" name="CUSTOMER_COLLECT CASH" memberEnd="_52Trs5VZEeqqGZh46IEtXQ _52TrvJVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52Trs5VZEeqqGZh46IEtXQ _52TrvJVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrsZVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrspVZEeqqGZh46IEtXQ" key="uuid" value="_ll4uw4WHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52Trs5VZEeqqGZh46IEtXQ" name="cOLLECT CASH" type="_52TrqpVZEeqqGZh46IEtXQ" owningAssociation="_52TrsJVZEeqqGZh46IEtXQ" association="_52TrsJVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrtJVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrtZVZEeqqGZh46IEtXQ" key="uuid" value="_ll4uwIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52TrtpVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Trt5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TruJVZEeqqGZh46IEtXQ" key="uuid" value="_ll4uwYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TruZVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrupVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tru5VZEeqqGZh46IEtXQ" key="uuid" value="_ll4uwoWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52TrvJVZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52TrsJVZEeqqGZh46IEtXQ" association="_52TrsJVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TrvZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrvpVZEeqqGZh46IEtXQ" key="uuid" value="_ll4HsIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Trv5VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52TrwJVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrwZVZEeqqGZh46IEtXQ" key="uuid" value="_ll4HsYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52TrwpVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Trw5VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52TrxJVZEeqqGZh46IEtXQ" key="uuid" value="_ll4HsoWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52TrxZVZEeqqGZh46IEtXQ" name="SEND SMS/EMAIL RECEIPT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrxpVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52Trx5VZEeqqGZh46IEtXQ" key="uuid" value="_mU1fcIWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <extend xmi:id="_52TryJVZEeqqGZh46IEtXQ" extendedCase="_52TrqpVZEeqqGZh46IEtXQ" extensionLocation="_52TrrZVZEeqqGZh46IEtXQ" extension="_52TrxZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52TryZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52TrypVZEeqqGZh46IEtXQ" key="uuid" value="_tBvcUYWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extend>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_52Try5VZEeqqGZh46IEtXQ" name="PRINT RECEIPT">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52TrzJVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52TrzZVZEeqqGZh46IEtXQ" key="uuid" value="_p53FYYWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <extend xmi:id="_52TrzpVZEeqqGZh46IEtXQ" extendedCase="_52TrqpVZEeqqGZh46IEtXQ" extensionLocation="_52TrrZVZEeqqGZh46IEtXQ" extension="_52Try5VZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Trz5VZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tr0JVZEeqqGZh46IEtXQ" key="uuid" value="_vQRwcIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extend>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_52Tr0ZVZEeqqGZh46IEtXQ" name="CUSTOMER_SELECT AMOUNT" memberEnd="_52Tr1JVZEeqqGZh46IEtXQ _52Tr3ZVZEeqqGZh46IEtXQ" navigableOwnedEnd="_52Tr1JVZEeqqGZh46IEtXQ _52Tr3ZVZEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_52Tr0pVZEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_52Tr05VZEeqqGZh46IEtXQ" key="uuid" value="_0zfhYoWHEDetPf0Z7x4xng"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_52Tr1JVZEeqqGZh46IEtXQ" name="sELECT AMOUNT" type="_52TrjJVZEeqqGZh46IEtXQ" owningAssociation="_52Tr0ZVZEeqqGZh46IEtXQ" association="_52Tr0ZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tr1ZVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tr1pVZEeqqGZh46IEtXQ" key="uuid" value="_0ze6UoWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tr15VZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tr2JVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tr2ZVZEeqqGZh46IEtXQ" key="uuid" value="_0zfhYIWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tr2pVZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tr25VZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tr3JVZEeqqGZh46IEtXQ" key="uuid" value="_0zfhYYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+      <ownedEnd xmi:id="_52Tr3ZVZEeqqGZh46IEtXQ" name="cUSTOMER" type="_52TDt5VZEeqqGZh46IEtXQ" owningAssociation="_52Tr0ZVZEeqqGZh46IEtXQ" association="_52Tr0ZVZEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_52Tr3pVZEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_52Tr35VZEeqqGZh46IEtXQ" key="uuid" value="_0zeTQIWHEDetPf0Z7x4xng"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_52Tr4JVZEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tr4ZVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tr4pVZEeqqGZh46IEtXQ" key="uuid" value="_0ze6UIWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </lowerValue>
+        <upperValue xsi:type="uml:LiteralInteger" xmi:id="_52Tr45VZEeqqGZh46IEtXQ" value="1">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_52Tr5JVZEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_52Tr5ZVZEeqqGZh46IEtXQ" key="uuid" value="_0ze6UYWHEDetPf0Z7x4xng"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </upperValue>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

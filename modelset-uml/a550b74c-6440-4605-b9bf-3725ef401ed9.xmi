@@ -1,0 +1,821 @@
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="_bimzAJVqEeqqGZh46IEtXQ" name="model">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="_bimzAZVqEeqqGZh46IEtXQ" source="genmymodel">
+        <details xmi:id="_bimzApVqEeqqGZh46IEtXQ" key="uuid" value="a550b74c-6440-4605-b9bf-3725ef401ed9"/>
+        <details xmi:id="_bimzA5VqEeqqGZh46IEtXQ" key="author" value="josh96brown"/>
+      </eAnnotations>
+    </xmi:Extension>
+    <packageImport xmi:id="_bimzBJVqEeqqGZh46IEtXQ" importingNamespace="_bimzAJVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzBZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzBpVqEeqqGZh46IEtXQ" key="uuid" value="_R5u_Ea6cEee6S77dw3LIvQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Component" xmi:id="_bimzB5VqEeqqGZh46IEtXQ" name="Home Security System">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzCJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzCZVqEeqqGZh46IEtXQ" key="uuid" value="_Tggm8JDMEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedUseCase xmi:id="_bimzCpVqEeqqGZh46IEtXQ" name="Enable System Sensors">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzC5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzDJVqEeqqGZh46IEtXQ" key="uuid" value="_afvC4JDMEDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <include xmi:id="_bimzDZVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzCpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzDpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzD5VqEeqqGZh46IEtXQ" key="uuid" value="_PYaW4JDREDW47t2oTzRe4A"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_bimzEJVqEeqqGZh46IEtXQ" name="Smoke detected three times">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzEZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzEpVqEeqqGZh46IEtXQ" key="uuid" value="_wqRZQJG6EDWPKdFDxh6PXQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_bimzE5VqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzEJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzFJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzFZVqEeqqGZh46IEtXQ" key="uuid" value="_WGTPwZ1JEDWWkIDvqRg71w"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_bimzFpVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzEJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzF5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzGJVqEeqqGZh46IEtXQ" key="uuid" value="_wqSAUJG6EDWPKdFDxh6PXQ"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+        <include xmi:id="_bimzGZVqEeqqGZh46IEtXQ" addition="_bimzOpVqEeqqGZh46IEtXQ" includingCase="_bimzEJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzGpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzG5VqEeqqGZh46IEtXQ" key="uuid" value="_vf_HEJ5VEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </ownedUseCase>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzHJVqEeqqGZh46IEtXQ" name="Disable System Sensors">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzHZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzHpVqEeqqGZh46IEtXQ" key="uuid" value="_qY1swJDQEDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <include xmi:id="_bimzH5VqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzHJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzIJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzIZVqEeqqGZh46IEtXQ" key="uuid" value="_Qs-WEJDREDW47t2oTzRe4A"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzIpVqEeqqGZh46IEtXQ" name="Enter code">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzI5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzJJVqEeqqGZh46IEtXQ" key="uuid" value="_4icrwJDQEDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <include xmi:id="_bimzJZVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzIpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzJpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzJ5VqEeqqGZh46IEtXQ" key="uuid" value="_2GnNIJjAEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzKJVqEeqqGZh46IEtXQ" name="Authenticate Home Owner">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzKZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzKpVqEeqqGZh46IEtXQ" key="uuid" value="_-zKb4JDQEDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzK5VqEeqqGZh46IEtXQ" name="Reject Alarm">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzLJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzLZVqEeqqGZh46IEtXQ" key="uuid" value="_FFyQgJDREDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimzLpVqEeqqGZh46IEtXQ" extendedCase="_bimzKJVqEeqqGZh46IEtXQ" extension="_bimzK5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzL5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzMJVqEeqqGZh46IEtXQ" key="uuid" value="_NtF64J6CEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extensionPoint xmi:id="_bimzMZVqEeqqGZh46IEtXQ" name="" useCase="_bimzK5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzMpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzM5VqEeqqGZh46IEtXQ" key="uuid" value="_r5eb8J5sEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzNJVqEeqqGZh46IEtXQ" name="" useCase="_bimzK5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzNZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzNpVqEeqqGZh46IEtXQ" key="uuid" value="_-b_3wZ5zEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzN5VqEeqqGZh46IEtXQ" name="" useCase="_bimzK5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzOJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzOZVqEeqqGZh46IEtXQ" key="uuid" value="_BG2UcZ50EDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzOpVqEeqqGZh46IEtXQ" name="Fire Alarm Rang">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzO5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzPJVqEeqqGZh46IEtXQ" key="uuid" value="_MmXNgZG3EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimzPZVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extensionLocation="_bimzapVqEeqqGZh46IEtXQ" extension="_bimzOpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzPpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzP5VqEeqqGZh46IEtXQ" key="uuid" value="_zsyTIJ5fEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extend xmi:id="_bimzQJVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extensionLocation="_bimzbZVqEeqqGZh46IEtXQ" extension="_bimzOpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzQZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzQpVqEeqqGZh46IEtXQ" key="uuid" value="_JgrqAJ5wEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extensionPoint xmi:id="_bimzQ5VqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzOpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzRJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzRZVqEeqqGZh46IEtXQ" key="uuid" value="_uISUUZ5VEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_bimzRpVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzOpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzR5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzSJVqEeqqGZh46IEtXQ" key="uuid" value="_MmX0kJG3EDWUAqhgRIlBrA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzSZVqEeqqGZh46IEtXQ" name="Burglar Alarm Rang">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzSpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzS5VqEeqqGZh46IEtXQ" key="uuid" value="_V2OPUJG3EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimzTJVqEeqqGZh46IEtXQ" extendedCase="_bimzfJVqEeqqGZh46IEtXQ" extensionLocation="_bimzjpVqEeqqGZh46IEtXQ" extension="_bimzSZVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzTZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzTpVqEeqqGZh46IEtXQ" key="uuid" value="_tjdjgJjEEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extend xmi:id="_bimzT5VqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extension="_bimzSZVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzUJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzUZVqEeqqGZh46IEtXQ" key="uuid" value="_2rthcJjEEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extensionPoint xmi:id="_bimzUpVqEeqqGZh46IEtXQ" name="" useCase="_bimzSZVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzU5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzVJVqEeqqGZh46IEtXQ" key="uuid" value="_1-JPwZ51EDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_bimzVZVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzSZVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzVpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzV5VqEeqqGZh46IEtXQ" key="uuid" value="_V2OPUZG3EDWUAqhgRIlBrA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+        <include xmi:id="_bimzWJVqEeqqGZh46IEtXQ" addition="_bimzK5VqEeqqGZh46IEtXQ" includingCase="_bimzSZVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzWZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzWpVqEeqqGZh46IEtXQ" key="uuid" value="_LJc5cJ6CEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzW5VqEeqqGZh46IEtXQ" name="Flood Alarm Rang">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzXJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzXZVqEeqqGZh46IEtXQ" key="uuid" value="_bxGSUJG3EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimzXpVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extension="_bimzW5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzX5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzYJVqEeqqGZh46IEtXQ" key="uuid" value="_wVOEAJjFEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extend xmi:id="_bimzYZVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extensionLocation="_bimzc5VqEeqqGZh46IEtXQ" extension="_bimzW5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzYpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzY5VqEeqqGZh46IEtXQ" key="uuid" value="_bHH8QJ5wEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <include xmi:id="_bimzZJVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzW5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzZZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzZpVqEeqqGZh46IEtXQ" key="uuid" value="_bxG5YJG3EDWUAqhgRIlBrA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzZ5VqEeqqGZh46IEtXQ" name="Alert Emergency Services">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzaJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzaZVqEeqqGZh46IEtXQ" key="uuid" value="_umjVYJG3EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_bimzapVqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimza5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzbJVqEeqqGZh46IEtXQ" key="uuid" value="_zsyTIZ5fEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzbZVqEeqqGZh46IEtXQ" name="" useCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzbpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzb5VqEeqqGZh46IEtXQ" key="uuid" value="_JgrqAZ5wEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzcJVqEeqqGZh46IEtXQ" name="" useCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzcZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzcpVqEeqqGZh46IEtXQ" key="uuid" value="_K2PuwZ5wEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzc5VqEeqqGZh46IEtXQ" name="" useCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzdJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzdZVqEeqqGZh46IEtXQ" key="uuid" value="_bHH8QZ5wEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzdpVqEeqqGZh46IEtXQ" name="" useCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzd5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzeJVqEeqqGZh46IEtXQ" key="uuid" value="_-PURMZ50EDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_bimzeZVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzZ5VqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzepVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimze5VqEeqqGZh46IEtXQ" key="uuid" value="_umjVYZG3EDWUAqhgRIlBrA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzfJVqEeqqGZh46IEtXQ" name="judge if Within Time Limit reset alarm">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzfZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzfpVqEeqqGZh46IEtXQ" key="uuid" value="_REHhAJMREDWNfdgN8UteqA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimzf5VqEeqqGZh46IEtXQ" extendedCase="_bimzKJVqEeqqGZh46IEtXQ" extension="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzgJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzgZVqEeqqGZh46IEtXQ" key="uuid" value="_BbhTEJjFEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extend xmi:id="_bimzgpVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extension="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzg5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzhJVqEeqqGZh46IEtXQ" key="uuid" value="_FP91EJjFEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extend xmi:id="_bimzhZVqEeqqGZh46IEtXQ" extendedCase="_bimzZ5VqEeqqGZh46IEtXQ" extensionLocation="_bimzdpVqEeqqGZh46IEtXQ" extension="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzhpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzh5VqEeqqGZh46IEtXQ" key="uuid" value="_-PURMJ50EDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <extensionPoint xmi:id="_bimziJVqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimziZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzipVqEeqqGZh46IEtXQ" key="uuid" value="_GRLFUJjDEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzi5VqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzjJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzjZVqEeqqGZh46IEtXQ" key="uuid" value="_X_e6IZjDEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzjpVqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzj5VqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzkJVqEeqqGZh46IEtXQ" key="uuid" value="_tjdjgZjEEDWTCItMrmM4SA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <extensionPoint xmi:id="_bimzkZVqEeqqGZh46IEtXQ" name="ExtPoint" useCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzkpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzk5VqEeqqGZh46IEtXQ" key="uuid" value="_r99mQZ5fEDW046oSzoMPzA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_bimzlJVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzlZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzlpVqEeqqGZh46IEtXQ" key="uuid" value="_REIIEJMREDWNfdgN8UteqA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+        <include xmi:id="_bimzl5VqEeqqGZh46IEtXQ" addition="_bimzZ5VqEeqqGZh46IEtXQ" includingCase="_bimzfJVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzmJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzmZVqEeqqGZh46IEtXQ" key="uuid" value="_REIIEZMREDWNfdgN8UteqA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_bimzmpVqEeqqGZh46IEtXQ" name="Detect Smoke">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzm5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimznJVqEeqqGZh46IEtXQ" key="uuid" value="_HsLyIJjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_bimznZVqEeqqGZh46IEtXQ" extendedCase="_bimzOpVqEeqqGZh46IEtXQ" extension="_bimzmpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimznpVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzn5VqEeqqGZh46IEtXQ" key="uuid" value="_HsMZMJjAEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+        <include xmi:id="_bimzoJVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimzmpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzoZVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzopVqEeqqGZh46IEtXQ" key="uuid" value="_HsMZMZjAEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+        <include xmi:id="_bimzo5VqEeqqGZh46IEtXQ" addition="_bimz8ZVqEeqqGZh46IEtXQ" includingCase="_bimzmpVqEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_bimzpJVqEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_bimzpZVqEeqqGZh46IEtXQ" key="uuid" value="_Xp26UJjBEDWjJ7xsVN4GCA"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </nestedClassifier>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzppVqEeqqGZh46IEtXQ" name="Safe security system owner">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzp5VqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzqJVqEeqqGZh46IEtXQ" key="uuid" value="_aepoUJDNEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzqZVqEeqqGZh46IEtXQ" name="Heat Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzqpVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzq5VqEeqqGZh46IEtXQ" key="uuid" value="_jEL6wJDNEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzrJVqEeqqGZh46IEtXQ" name="Smoke Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzrZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzrpVqEeqqGZh46IEtXQ" key="uuid" value="_yGuF0JDNEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzr5VqEeqqGZh46IEtXQ" name="Door Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzsJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzsZVqEeqqGZh46IEtXQ" key="uuid" value="_6RPQMJDNEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzspVqEeqqGZh46IEtXQ" name="Window Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzs5VqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimztJVqEeqqGZh46IEtXQ" key="uuid" value="_79UXgJDNEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimztZVqEeqqGZh46IEtXQ" name="Movement Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimztpVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzt5VqEeqqGZh46IEtXQ" key="uuid" value="_JjstoJDOEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzuJVqEeqqGZh46IEtXQ" name="Emergency Services">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzuZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzupVqEeqqGZh46IEtXQ" key="uuid" value="_XBa3AJDOEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzu5VqEeqqGZh46IEtXQ" name="Police  station">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzvJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzvZVqEeqqGZh46IEtXQ" key="uuid" value="_aEiCsJDOEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_bimzvpVqEeqqGZh46IEtXQ" general="_bimzuJVqEeqqGZh46IEtXQ" specific="_bimzu5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzv5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzwJVqEeqqGZh46IEtXQ" key="uuid" value="_Fet_0JDPEDW47t2oTzRe4A"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimzwZVqEeqqGZh46IEtXQ" name="Fire department">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzwpVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzw5VqEeqqGZh46IEtXQ" key="uuid" value="_blW8QJDOEDW47t2oTzRe4A"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <generalization xmi:id="_bimzxJVqEeqqGZh46IEtXQ" general="_bimzuJVqEeqqGZh46IEtXQ" specific="_bimzwZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzxZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzxpVqEeqqGZh46IEtXQ" key="uuid" value="_YWjQkJ1IEDWWkIDvqRg71w"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </generalization>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bimzx5VqEeqqGZh46IEtXQ" name="Home Owner_Enable System Sensors" memberEnd="_bimzypVqEeqqGZh46IEtXQ _bimzz5VqEeqqGZh46IEtXQ" navigableOwnedEnd="_bimzypVqEeqqGZh46IEtXQ _bimzz5VqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimzyJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimzyZVqEeqqGZh46IEtXQ" key="uuid" value="_Yg7soJG4EDWUAqhgRIlBrA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bimzypVqEeqqGZh46IEtXQ" name="enable System Sensors" type="_bimzCpVqEeqqGZh46IEtXQ" owningAssociation="_bimzx5VqEeqqGZh46IEtXQ" association="_bimzx5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimzy5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimzzJVqEeqqGZh46IEtXQ" key="uuid" value="_Yg53cJG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimzzZVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimzzpVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bimzz5VqEeqqGZh46IEtXQ" name="home Owner" type="_bimzppVqEeqqGZh46IEtXQ" owningAssociation="_bimzx5VqEeqqGZh46IEtXQ" association="_bimzx5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz0JVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz0ZVqEeqqGZh46IEtXQ" key="uuid" value="_Yg7FkJG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimz0pVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimz05VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bimz1JVqEeqqGZh46IEtXQ" name="Home Owner_Disable System Sensors" memberEnd="_bimz15VqEeqqGZh46IEtXQ _bimz3JVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bimz15VqEeqqGZh46IEtXQ _bimz3JVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimz1ZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimz1pVqEeqqGZh46IEtXQ" key="uuid" value="_dtLvEpG4EDWUAqhgRIlBrA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bimz15VqEeqqGZh46IEtXQ" name="disable System Sensors" type="_bimzHJVqEeqqGZh46IEtXQ" owningAssociation="_bimz1JVqEeqqGZh46IEtXQ" association="_bimz1JVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz2JVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz2ZVqEeqqGZh46IEtXQ" key="uuid" value="_dtLvEJG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimz2pVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimz25VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bimz3JVqEeqqGZh46IEtXQ" name="home Owner" type="_bimzppVqEeqqGZh46IEtXQ" owningAssociation="_bimz1JVqEeqqGZh46IEtXQ" association="_bimz1JVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz3ZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz3pVqEeqqGZh46IEtXQ" key="uuid" value="_dtLvEZG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimz35VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimz4JVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bimz4ZVqEeqqGZh46IEtXQ" name="Emergency Services_Alert Emergency Services" memberEnd="_bimz6ZVqEeqqGZh46IEtXQ _bimz5JVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bimz5JVqEeqqGZh46IEtXQ _bimz6ZVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimz4pVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimz45VqEeqqGZh46IEtXQ" key="uuid" value="_nzKgkJG4EDWUAqhgRIlBrA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bimz5JVqEeqqGZh46IEtXQ" name="alert Emergency Services" type="_bimzZ5VqEeqqGZh46IEtXQ" owningAssociation="_bimz4ZVqEeqqGZh46IEtXQ" association="_bimz4ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz5ZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz5pVqEeqqGZh46IEtXQ" key="uuid" value="_nzIrYJG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimz55VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimz6JVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bimz6ZVqEeqqGZh46IEtXQ" name="emergency Services" type="_bimzuJVqEeqqGZh46IEtXQ" owningAssociation="_bimz4ZVqEeqqGZh46IEtXQ" association="_bimz4ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz6pVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz65VqEeqqGZh46IEtXQ" key="uuid" value="_nzJ5gJG4EDWUAqhgRIlBrA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bimz7JVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bimz7ZVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_bimz7pVqEeqqGZh46IEtXQ" name="Water Sensor">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimz75VqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimz8JVqEeqqGZh46IEtXQ" key="uuid" value="_186pgJG4EDWUAqhgRIlBrA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_bimz8ZVqEeqqGZh46IEtXQ" name="Smoke Alarm Rang">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bimz8pVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bimz85VqEeqqGZh46IEtXQ" key="uuid" value="_9BDlMJG5EDWPKdFDxh6PXQ"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <extend xmi:id="_bimz9JVqEeqqGZh46IEtXQ" extendedCase="_bimzEJVqEeqqGZh46IEtXQ" extensionLocation="_bimzE5VqEeqqGZh46IEtXQ" extension="_bimz8ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz9ZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz9pVqEeqqGZh46IEtXQ" key="uuid" value="_WGTPwJ1JEDWWkIDvqRg71w"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extend>
+      <extend xmi:id="_bimz95VqEeqqGZh46IEtXQ" extendedCase="_bimzfJVqEeqqGZh46IEtXQ" extensionLocation="_bimzkZVqEeqqGZh46IEtXQ" extension="_bimz8ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz-JVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz-ZVqEeqqGZh46IEtXQ" key="uuid" value="_r99mQJ5fEDW046oSzoMPzA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extend>
+      <extensionPoint xmi:id="_bimz-pVqEeqqGZh46IEtXQ" name="" useCase="_bimz8ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz-5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz_JVqEeqqGZh46IEtXQ" key="uuid" value="_z9Xq0Z51EDW046oSzoMPzA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </extensionPoint>
+      <include xmi:id="_bimz_ZVqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bimz8ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bimz_pVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bimz_5VqEeqqGZh46IEtXQ" key="uuid" value="_9BDlMZG5EDWPKdFDxh6PXQ"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+      <include xmi:id="_bim0AJVqEeqqGZh46IEtXQ" addition="_bimzK5VqEeqqGZh46IEtXQ" includingCase="_bimz8ZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0AZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0ApVqEeqqGZh46IEtXQ" key="uuid" value="_Knn-wJ6CEDW046oSzoMPzA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0A5VqEeqqGZh46IEtXQ" name="Smoke Sensor_Detect Smoke" memberEnd="_bim0BpVqEeqqGZh46IEtXQ _bim0C5VqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0BpVqEeqqGZh46IEtXQ _bim0C5VqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0BJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0BZVqEeqqGZh46IEtXQ" key="uuid" value="_RSF8cJjAEDWjJ7xsVN4GCA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0BpVqEeqqGZh46IEtXQ" name="detect Smoke" type="_bimzmpVqEeqqGZh46IEtXQ" owningAssociation="_bim0A5VqEeqqGZh46IEtXQ" association="_bim0A5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0B5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0CJVqEeqqGZh46IEtXQ" key="uuid" value="_RSEuUJjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0CZVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0CpVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0C5VqEeqqGZh46IEtXQ" name="smoke Sensor" type="_bimzrJVqEeqqGZh46IEtXQ" owningAssociation="_bim0A5VqEeqqGZh46IEtXQ" association="_bim0A5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0DJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0DZVqEeqqGZh46IEtXQ" key="uuid" value="_RSFVYJjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0DpVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0D5VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_bim0EJVqEeqqGZh46IEtXQ" name="Detect Movement">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0EZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0EpVqEeqqGZh46IEtXQ" key="uuid" value="_VZgdwJjAEDWjJ7xsVN4GCA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_bim0E5VqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bim0EJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0FJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0FZVqEeqqGZh46IEtXQ" key="uuid" value="_VZhE0JjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+      <include xmi:id="_bim0FpVqEeqqGZh46IEtXQ" addition="_bimzEJVqEeqqGZh46IEtXQ" includingCase="_bim0EJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0F5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0GJVqEeqqGZh46IEtXQ" key="uuid" value="_VZhE0ZjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+      <include xmi:id="_bim0GZVqEeqqGZh46IEtXQ" addition="_bimzSZVqEeqqGZh46IEtXQ" includingCase="_bim0EJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0GpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0G5VqEeqqGZh46IEtXQ" key="uuid" value="_RkgfkJ1JEDWWkIDvqRg71w"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_bim0HJVqEeqqGZh46IEtXQ" name="Detect flood">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0HZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0HpVqEeqqGZh46IEtXQ" key="uuid" value="_bZSO4JjAEDWjJ7xsVN4GCA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_bim0H5VqEeqqGZh46IEtXQ" addition="_bimzKJVqEeqqGZh46IEtXQ" includingCase="_bim0HJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0IJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0IZVqEeqqGZh46IEtXQ" key="uuid" value="_bZS18JjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+      <include xmi:id="_bim0IpVqEeqqGZh46IEtXQ" addition="_bimzEJVqEeqqGZh46IEtXQ" includingCase="_bim0HJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0I5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0JJVqEeqqGZh46IEtXQ" key="uuid" value="_bZS18ZjAEDWjJ7xsVN4GCA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+      <include xmi:id="_bim0JZVqEeqqGZh46IEtXQ" addition="_bimzW5VqEeqqGZh46IEtXQ" includingCase="_bim0HJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0JpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0J5VqEeqqGZh46IEtXQ" key="uuid" value="_Ta0g8J1JEDWWkIDvqRg71w"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0KJVqEeqqGZh46IEtXQ" name="Door Sensor_Detect Movement" memberEnd="_bim0K5VqEeqqGZh46IEtXQ _bim0MJVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0K5VqEeqqGZh46IEtXQ _bim0MJVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0KZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0KpVqEeqqGZh46IEtXQ" key="uuid" value="_ivLhkZjEEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0K5VqEeqqGZh46IEtXQ" name="detect Movement" type="_bim0EJVqEeqqGZh46IEtXQ" owningAssociation="_bim0KJVqEeqqGZh46IEtXQ" association="_bim0KJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0LJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0LZVqEeqqGZh46IEtXQ" key="uuid" value="_ivK6gJjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0LpVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0L5VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0MJVqEeqqGZh46IEtXQ" name="door Sensor" type="_bimzr5VqEeqqGZh46IEtXQ" owningAssociation="_bim0KJVqEeqqGZh46IEtXQ" association="_bim0KJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0MZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0MpVqEeqqGZh46IEtXQ" key="uuid" value="_ivLhkJjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0M5VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0NJVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0NZVqEeqqGZh46IEtXQ" name="Window Sensor_Detect Movement" memberEnd="_bim0OJVqEeqqGZh46IEtXQ _bim0PZVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0OJVqEeqqGZh46IEtXQ _bim0PZVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0NpVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0N5VqEeqqGZh46IEtXQ" key="uuid" value="_j8qBUpjEEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0OJVqEeqqGZh46IEtXQ" name="detect Movement" type="_bim0EJVqEeqqGZh46IEtXQ" owningAssociation="_bim0NZVqEeqqGZh46IEtXQ" association="_bim0NZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0OZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0OpVqEeqqGZh46IEtXQ" key="uuid" value="_j8qBUJjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0O5VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0PJVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0PZVqEeqqGZh46IEtXQ" name="window Sensor" type="_bimzspVqEeqqGZh46IEtXQ" owningAssociation="_bim0NZVqEeqqGZh46IEtXQ" association="_bim0NZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0PpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0P5VqEeqqGZh46IEtXQ" key="uuid" value="_j8qBUZjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0QJVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0QZVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0QpVqEeqqGZh46IEtXQ" name="Movement Sensor_Detect Movement" memberEnd="_bim0RZVqEeqqGZh46IEtXQ _bim0SpVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0RZVqEeqqGZh46IEtXQ _bim0SpVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0Q5VqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0RJVqEeqqGZh46IEtXQ" key="uuid" value="_kkF0wZjEEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0RZVqEeqqGZh46IEtXQ" name="detect Movement" type="_bim0EJVqEeqqGZh46IEtXQ" owningAssociation="_bim0QpVqEeqqGZh46IEtXQ" association="_bim0QpVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0RpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0R5VqEeqqGZh46IEtXQ" key="uuid" value="_kkFNsJjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0SJVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0SZVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0SpVqEeqqGZh46IEtXQ" name="movement Sensor" type="_bimztZVqEeqqGZh46IEtXQ" owningAssociation="_bim0QpVqEeqqGZh46IEtXQ" association="_bim0QpVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0S5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0TJVqEeqqGZh46IEtXQ" key="uuid" value="_kkF0wJjEEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0TZVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0TpVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0T5VqEeqqGZh46IEtXQ" name="Water Sensor_Detect Water " memberEnd="_bim0UpVqEeqqGZh46IEtXQ _bim0V5VqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0UpVqEeqqGZh46IEtXQ _bim0V5VqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0UJVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0UZVqEeqqGZh46IEtXQ" key="uuid" value="_WUyA8pjFEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0UpVqEeqqGZh46IEtXQ" name="detect Water " type="_bim0HJVqEeqqGZh46IEtXQ" owningAssociation="_bim0T5VqEeqqGZh46IEtXQ" association="_bim0T5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0U5VqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0VJVqEeqqGZh46IEtXQ" key="uuid" value="_WUyA8JjFEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0VZVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0VpVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0V5VqEeqqGZh46IEtXQ" name="water Sensor" type="_bimz7pVqEeqqGZh46IEtXQ" owningAssociation="_bim0T5VqEeqqGZh46IEtXQ" association="_bim0T5VqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0WJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0WZVqEeqqGZh46IEtXQ" key="uuid" value="_WUyA8ZjFEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0WpVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0W5VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0XJVqEeqqGZh46IEtXQ" name="Door Sensor_Window Sensor" memberEnd="_bim0X5VqEeqqGZh46IEtXQ _bim0ZJVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0X5VqEeqqGZh46IEtXQ _bim0ZJVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0XZVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0XpVqEeqqGZh46IEtXQ" key="uuid" value="_qZWbIJjIEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0X5VqEeqqGZh46IEtXQ" name="window Sensor" type="_bimzspVqEeqqGZh46IEtXQ" owningAssociation="_bim0XJVqEeqqGZh46IEtXQ" association="_bim0XJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0YJVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0YZVqEeqqGZh46IEtXQ" key="uuid" value="_qZV0EJjIEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0YpVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0Y5VqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0ZJVqEeqqGZh46IEtXQ" name="door Sensor" type="_bimzr5VqEeqqGZh46IEtXQ" owningAssociation="_bim0XJVqEeqqGZh46IEtXQ" association="_bim0XJVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0ZZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0ZpVqEeqqGZh46IEtXQ" key="uuid" value="_qZV0EZjIEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0Z5VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0aJVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_bim0aZVqEeqqGZh46IEtXQ" name="Window Sensor_Movement Sensor" memberEnd="_bim0bJVqEeqqGZh46IEtXQ _bim0cZVqEeqqGZh46IEtXQ" navigableOwnedEnd="_bim0bJVqEeqqGZh46IEtXQ _bim0cZVqEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_bim0apVqEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_bim0a5VqEeqqGZh46IEtXQ" key="uuid" value="_rD9eYpjIEDWTCItMrmM4SA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_bim0bJVqEeqqGZh46IEtXQ" name="movement Sensor" type="_bimztZVqEeqqGZh46IEtXQ" owningAssociation="_bim0aZVqEeqqGZh46IEtXQ" association="_bim0aZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0bZVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0bpVqEeqqGZh46IEtXQ" key="uuid" value="_rD9eYJjIEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0b5VqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0cJVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_bim0cZVqEeqqGZh46IEtXQ" name="window Sensor" type="_bimzspVqEeqqGZh46IEtXQ" owningAssociation="_bim0aZVqEeqqGZh46IEtXQ" association="_bim0aZVqEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_bim0cpVqEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_bim0c5VqEeqqGZh46IEtXQ" key="uuid" value="_rD9eYZjIEDWTCItMrmM4SA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_bim0dJVqEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_bim0dZVqEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

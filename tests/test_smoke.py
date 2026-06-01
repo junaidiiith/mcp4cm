@@ -22,6 +22,8 @@ from mcp4cm.extended_parsing.uml.uml_parser import ParseOptions, UMLXMIParser
 from mcp4cm.parsers.extended import RepresentationProfile, UMLXMIModelParser, drop_ir_edges_with_missing_nodes
 from mcp4cm.parsers.archimate import ArchimateParser
 from mcp4cm.parsers.modelset import EcoreParser, UMLParser
+from mcp4cm.statistics import dataset_visualizations
+from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
 
 
 def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warning():
@@ -43,6 +45,27 @@ def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warn
     assert [edge.id for edge in ir.edges] == ["e-ok"]
     assert stats.warnings_by_type[WarningType.UNRESOLVED_REFERENCE] == 2
     assert stats.elements_skipped == 2
+
+
+def test_xmi_name_extraction_is_normalized_and_kept_in_memory(tmp_path):
+    model_path = tmp_path / "names.xmi"
+    model_path.write_text(
+        """<?xml version="1.0"?>
+<uml:Model xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <packagedElement xsi:type="uml:Class" name="HTTPServer"/>
+  <packagedElement xsi:type="uml:Class" name=""/>
+  <ownedComment body="customer_id"/>
+</uml:Model>
+""",
+        encoding="utf-8",
+    )
+
+    extracted = extract_xmi_names(model_path)
+
+    assert normalize_identifier("ownedEnd") == "owned end"
+    assert extracted.names == ("http server", EMPTY_NAME_SENTINEL, "customer id")
+    assert extracted.typed_names == ("class: http server", "class: empty name", "comment: customer id")
 
 
 def test_archimate_parser_smoke():
@@ -102,6 +125,39 @@ def test_duplicate_hash_modes_use_names_and_name_types():
 
     assert len(detect_duplicates_by_node_name_hash(dataset)) == 1
     assert detect_duplicates_by_node_name_type_hash(dataset) == []
+
+
+def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
+    parser = ArchimateParser()
+    first = parser.parse({"elements": [{"id": "a", "name": "Graph A", "type": "Class"}], "relationships": []}, model_id="first")
+    second = parser.parse({"elements": [{"id": "b", "name": "Graph B", "type": "Class"}], "relationships": []}, model_id="second")
+    reordered = parser.parse({"elements": [{"id": "c", "name": "Graph C", "type": "Class"}], "relationships": []}, model_id="reordered")
+    for record in (first, second):
+        record.metadata["extracted_names"] = ["http server", "empty name", "customer id"]
+        record.metadata["extracted_typed_names"] = ["class: http server", "class: empty name", "comment: customer id"]
+    reordered.metadata["extracted_names"] = ["customer id", "empty name", "http server"]
+    reordered.metadata["extracted_typed_names"] = ["comment: customer id", "class: empty name", "class: http server"]
+
+    dataset = Dataset([first, second, reordered], "uml")
+
+    assert len(detect_duplicates_by_node_name_hash(dataset)) == 1
+    assert len(detect_duplicates_by_node_name_type_hash(dataset)) == 1
+
+
+def test_dataset_visualizations_cover_structural_views():
+    parser = ArchimateParser()
+    record = parser.parse({"elements": [{"id": "a", "name": "Graph", "type": "Class"}], "relationships": []}, model_id="first")
+    record.metadata["extracted_names"] = ["customer account", "empty name", "class1"]
+    record.metadata["extracted_typed_names"] = ["class: customer account", "attribute: empty name", "class: class1"]
+
+    payload = dataset_visualizations(Dataset([record], "uml"))
+
+    assert payload["missingNameRatioHistogram"]
+    assert payload["missingNamesByType"] == [{"label": "attribute", "count": 1}]
+    assert payload["topConcepts"][0] == {"label": "customer account", "count": 1}
+    assert payload["topConceptsWithoutTypePlaceholders"] == [{"label": "customer account", "count": 1}]
+    assert payload["modelVocabularyScatter"][0]["missingNames"] == 1
+    assert payload["nameCountBoxplot"]["median"] == 3
 
 
 def test_duplicate_hash_reports_progress():

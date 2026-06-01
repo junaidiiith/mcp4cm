@@ -12,6 +12,7 @@ import tempfile
 import threading
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,7 @@ from mcp4cm.parsers.extended import (
     UMLXMIModelParser,
 )
 from mcp4cm.parsers.modelset import EcoreParser, UMLParser
-from mcp4cm.statistics import dataset_summary, name_counts, node_names, type_counts
+from mcp4cm.statistics import dataset_summary, dataset_visualizations, name_counts, node_names, type_counts
 
 DATASETS: dict[str, Dataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
@@ -435,8 +436,6 @@ def load_dataset_from_runtime(dataset_id: str) -> Dataset | None:
                 continue
             model_payload = json.loads(model_path.read_text(encoding="utf-8"))
             records.append(deserialize_model_from_runtime(model_payload))
-        if not records:
-            return None
         return Dataset(records=records, dataset_type=str(dataset_meta.get("datasetType") or "runtime"), root=dataset_dir)
 
 
@@ -757,6 +756,9 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
                 include_model_root_node=bool(profile_payload.get("includeModelRootNode", False)),
             )
             staged_files = list(session["files"])
+            language, data_format = infer_directory_source(language, data_format, staged_files)
+            if language != "uml":
+                representation = RepresentationProfile()
 
         report(
             status="running",
@@ -775,11 +777,11 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
                 **parse_phase_progress(processed, total),
             ),
         )
-        if not dataset.records:
+        if not dataset.records and not (parse_summary["emptyFiles"] or parse_summary["invalidFiles"]):
             raise ValueError("Parsing produced 0 models. Check parser format and file contents.")
-
         total_records = len(dataset.records)
         parse_summary["format"] = data_format
+        parse_summary["language"] = language
         parse_summary["representationProfile"] = representation.as_metadata()
 
         dataset_id = uuid.uuid4().hex
@@ -839,6 +841,20 @@ def parse_staged_dataset(
     return parse_staged_model_files(language, data_format, representation, staged_files, progress=progress)
 
 
+def infer_directory_source(language: str, data_format: str, staged_files: list[dict[str, Any]]) -> tuple[str, str]:
+    """Correct directory uploads when the browser ignores the file input accept filter."""
+    suffixes = {
+        Path(str(staged.get("relativePath") or "")).suffix.lower()
+        for staged in staged_files
+        if not is_ignored_upload_path(str(staged.get("relativePath") or ""))
+    }
+    if ".archimate" in suffixes and ".xmi" not in suffixes:
+        return "archimate", "xmi"
+    if ".xmi" in suffixes and ".archimate" not in suffixes:
+        return "uml", "xmi"
+    return language, data_format
+
+
 def parse_staged_json_dataset(
     language: str,
     staged_files: list[dict[str, Any]],
@@ -852,8 +868,25 @@ def parse_staged_json_dataset(
         relpath = str(staged.get("relativePath") or "")
         source_path = Path(str(staged.get("storedPath") or ""))
         summary["files"] += 1
+        if is_ignored_upload_path(relpath):
+            summary["ignoredFiles"].append(relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
         if progress:
             progress(file_index - 1, total_files)
+        quality_error = model_file_quality_error(source_path, "json")
+        if quality_error:
+            warning_type, message = quality_error
+            summary["errors"] += 1
+            if warning_type == "EMPTY_FILE":
+                summary["emptyFiles"].append(relpath)
+            elif warning_type == "INVALID_XML":
+                summary["invalidFiles"].append(relpath)
+            add_upload_warning(summary, warning_type, f"{relpath} {message}", path=relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
         try:
             content = source_path.read_text(encoding="utf-8")
             payloads = parse_json_payloads(content)
@@ -900,6 +933,18 @@ def parse_staged_json_dataset(
     return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
 
 
+def model_file_quality_error(source_path: Path, data_format: str) -> tuple[str, str] | None:
+    if source_path.stat().st_size == 0:
+        return "EMPTY_FILE", "is empty."
+    if data_format not in {"xmi", "ecore"}:
+        return None
+    try:
+        ET.parse(source_path)
+    except ET.ParseError as exc:
+        return "INVALID_XML", f"is not valid XML: {exc}."
+    return None
+
+
 def parse_staged_model_files(
     language: str,
     data_format: str,
@@ -916,9 +961,26 @@ def parse_staged_model_files(
         relpath = str(staged.get("relativePath") or "")
         source_path = Path(str(staged.get("storedPath") or ""))
         summary["files"] += 1
+        if is_ignored_upload_path(relpath):
+            summary["ignoredFiles"].append(relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
         summary["payloads"] += 1
         if progress:
             progress(file_index - 1, total_files)
+        quality_error = model_file_quality_error(source_path, data_format)
+        if quality_error:
+            warning_type, message = quality_error
+            summary["errors"] += 1
+            if warning_type == "EMPTY_FILE":
+                summary["emptyFiles"].append(relpath)
+            elif warning_type == "INVALID_XML":
+                summary["invalidFiles"].append(relpath)
+            add_upload_warning(summary, warning_type, f"{relpath} {message}", path=relpath)
+            if progress:
+                progress(file_index, total_files)
+            continue
         try:
             record = parser.parse_file(source_path, model_id=Path(relpath).stem)
             record.source_path = Path(relpath)
@@ -935,6 +997,11 @@ def parse_staged_model_files(
             progress(file_index, total_files)
 
     return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
+
+
+def is_ignored_upload_path(relpath: str) -> bool:
+    parts = Path(relpath).parts
+    return "__MACOSX" in parts or any(part.startswith("._") for part in parts) or Path(relpath).name == ".DS_Store"
 
 
 def sanitized_relpath(name: str) -> str:
@@ -1489,6 +1556,9 @@ def empty_upload_summary() -> dict[str, Any]:
         "payloads": 0,
         "records": 0,
         "errors": 0,
+        "emptyFiles": [],
+        "invalidFiles": [],
+        "ignoredFiles": [],
         "warnings": 0,
         "warningsByType": {},
         "warningsList": [],
@@ -1574,6 +1644,8 @@ def build_parsed_models_summary(summary: dict[str, Any], records: list[ModelReco
                 "name": str(record.name or ""),
                 "path": str(record.source_path or ""),
                 "language": str(record.language or ""),
+                "nodeCount": record.node_count,
+                "edgeCount": record.edge_count,
                 "warnings": int(warning_info.get("warnings", 0)),
                 "types": dict(warning_info.get("types", {})),
             }
@@ -1627,8 +1699,9 @@ def enumerate_model_payloads(payload: Any) -> Iterable[tuple[int, Any]]:
 def serialize_statistics(dataset: Dataset) -> dict[str, Any]:
     return {
         "summary": dataset_summary(dataset),
-        "topTypes": top_items(type_counts(dataset), 15),
-        "topNames": top_items(name_counts(dataset), 15),
+        "topTypes": top_items(type_counts(dataset)),
+        "topNames": top_items(name_counts(dataset)),
+        "visualizations": dataset_visualizations(dataset),
         "sampleModels": [
             {
                 "id": record.model_id,
@@ -1642,7 +1715,7 @@ def serialize_statistics(dataset: Dataset) -> dict[str, Any]:
     }
 
 
-def top_items(counter, limit: int) -> list[dict[str, Any]]:
+def top_items(counter, limit: int | None = None) -> list[dict[str, Any]]:
     return [{"label": label, "count": count} for label, count in counter.most_common(limit)]
 
 

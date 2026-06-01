@@ -619,7 +619,7 @@ function DuplicateResults({
   );
 }
 
-function DuplicateModelCharts({ modelCounts }) {
+function DuplicateModelCharts({ modelCounts }: { modelCounts: DuplicateResult["modelCounts"] }) {
   const entries = Object.entries(modelCounts);
   if (!entries.length) return null;
 
@@ -676,7 +676,7 @@ function PieStat({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | number }) {
+function Metric({ label, value }: { label: string; value: string | number; key?: string }) {
   return (
     <div className="metric">
       <span>{label}</span>

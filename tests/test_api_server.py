@@ -1,4 +1,5 @@
 from io import BytesIO
+from collections import Counter
 import os
 import time
 import json
@@ -17,6 +18,12 @@ from mcp4cm.api_server import (
 from mcp4cm.core import Dataset
 from mcp4cm.parsers.archimate import ArchimateParser
 from mcp4cm.parsers.extended import normalize_graph_attributes
+
+
+def test_top_items_returns_all_values_when_limit_is_omitted():
+    items = api_server.top_items(Counter({f"type-{index}": index for index in range(20)}))
+
+    assert len(items) == 20
 
 
 def clear_runtime():
@@ -462,6 +469,63 @@ def test_flask_upload_dataset_route_accepts_multipart_jsonl():
     assert job["uploadSummary"]["records"] == 2
 
 
+def test_flask_xmi_upload_reports_empty_and_invalid_files_separately():
+    DATASETS.clear()
+    client = create_app().test_client()
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="uml",
+        data_format="xmi",
+        files=[
+            (BytesIO(b""), "models/empty.xmi"),
+            (BytesIO(b"<uml:Model>"), "models/invalid.xmi"),
+        ],
+    )
+
+    assert job["status"] == "complete"
+    assert job["uploadSummary"]["records"] == 0
+    assert job["uploadSummary"]["errors"] == 2
+    assert job["uploadSummary"]["emptyFiles"] == ["models/empty.xmi"]
+    assert job["uploadSummary"]["invalidFiles"] == ["models/invalid.xmi"]
+    assert job["uploadSummary"]["warningsByType"] == {"EMPTY_FILE": 1, "INVALID_XML": 1}
+
+
+def test_directory_upload_infers_archimate_and_ignores_macos_metadata():
+    DATASETS.clear()
+    client = create_app().test_client()
+    archimate = b"""<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:archimate="http://www.archimatetool.com/archimate" name="Example" id="m1" version="4.0.0">
+ <folder name="Application" id="f1" type="application">
+  <element xsi:type="archimate:ApplicationComponent" name="App" id="a1"/>
+ </folder>
+</archimate:model>"""
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="uml",
+        data_format="xmi",
+        files=[
+            (BytesIO(archimate), "eamodelset/model.archimate"),
+            (BytesIO(b"AppleDouble"), "__MACOSX/eamodelset/._model.archimate"),
+        ],
+    )
+
+    assert job["status"] == "complete"
+    assert job["uploadSummary"]["format"] == "xmi"
+    assert job["uploadSummary"]["language"] == "archimate"
+    assert job["uploadSummary"]["records"] == 1
+    assert job["uploadSummary"]["errors"] == 0
+    assert job["uploadSummary"]["ignoredFiles"] == ["__MACOSX/eamodelset/._model.archimate"]
+    assert DATASETS[job["datasetId"]].dataset_type == "archimate"
+    assert api_server.infer_directory_source(
+        "archimate",
+        "xmi",
+        [{"relativePath": "modelset-uml/model.xmi"}],
+    ) == ("uml", "xmi")
+
+
 def test_flask_upload_dataset_route_accepts_signavio_bpmn_format():
     DATASETS.clear()
     client = create_app().test_client()
@@ -683,6 +747,8 @@ def test_flask_model_inspect_route_returns_nodes_and_edges():
     assert len(data["nodes"]) == 1
     assert "attrs" not in data["nodes"][0]
     assert data["truncated"]["nodes"] is True
+    assert job["uploadSummary"]["parsedModels"][0]["nodeCount"] == 2
+    assert job["uploadSummary"]["parsedModels"][0]["edgeCount"] == 1
 
 
 def test_flask_duplicates_returns_model_counts_for_pie_charts():

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BarChart3, Info, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, BarChart3, FileWarning, Info, Loader2, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
   ParsedModelSummary,
@@ -58,12 +58,14 @@ function UploadSummaryPanel({ summary }: { summary: UploadSummary }) {
   const warnings = Number(summary.warnings || 0);
   const filesWithWarnings = Number(summary.warningFiles?.length || 0);
   const failed = Number(summary.errors || 0);
+  const parserSource = summary.language && summary.format ? `${summary.language} / ${summary.format}` : "-";
   const cards = [
     { label: "Input Files", value: inputFiles, tone: "neutral" },
     { label: "Models Parsed", value: parsedModels, tone: "neutral" },
     { label: "Warnings", value: warnings, tone: warnings ? "warn" : "neutral" },
     { label: "Models with Warnings", value: filesWithWarnings, tone: filesWithWarnings ? "warn" : "neutral" },
     { label: "Errors", value: failed, tone: failed ? "error" : "neutral" },
+    { label: "Parser Source", value: parserSource, tone: "neutral" },
   ];
   return (
     <div className="summaryCards">
@@ -78,7 +80,41 @@ function UploadSummaryPanel({ summary }: { summary: UploadSummary }) {
       ) : (
         <p className="summaryHint neutral">Parsing completed without parse errors.</p>
       )}
+      <DatasetQuality summary={summary} />
     </div>
+  );
+}
+
+function DatasetQuality({ summary }: { summary: UploadSummary }) {
+  const emptyFiles = summary.emptyFiles || [];
+  const invalidFiles = summary.invalidFiles || [];
+  const ignoredFiles = summary.ignoredFiles || [];
+  if (!emptyFiles.length && !invalidFiles.length && !ignoredFiles.length) return null;
+  return (
+    <div className="datasetQuality">
+      <h3>
+        <FileWarning size={16} />
+        Dataset Quality Findings
+      </h3>
+      <p>These files were excluded before model parsing.</p>
+      <div className="qualityFindingGrid">
+        <QualityFinding title="Empty files" files={emptyFiles} />
+        <QualityFinding title="Invalid XML files" files={invalidFiles} />
+        <QualityFinding title="Ignored metadata files" files={ignoredFiles} />
+      </div>
+    </div>
+  );
+}
+
+function QualityFinding({ title, files }: { title: string; files: string[] }) {
+  return (
+    <details className="qualityFinding" open={files.length > 0}>
+      <summary>
+        <AlertTriangle size={15} />
+        {title} <b>{files.length}</b>
+      </summary>
+      {files.length ? <ul>{files.map((file) => <li key={file}>{file}</li>)}</ul> : <p>None</p>}
+    </details>
   );
 }
 
@@ -108,6 +144,7 @@ function ParsedModelsTable({
 }) {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [sort, setSort] = useState<{ key: "nodeCount" | "edgeCount"; direction: "asc" | "desc" } | null>(null);
   const warningsByModelId = useMemo(() => {
     const map = new Map<string, WarningEntry[]>();
     for (const warning of warnings) {
@@ -147,6 +184,19 @@ function ParsedModelsTable({
     const rowWarnings = warningsByModelId.get(row.modelId) || [];
     return rowWarnings.some((warning) => `${warning.type} ${warning.message}`.toLowerCase().includes(lowered));
   });
+  const displayedModels = sort
+    ? [...filteredModels].sort((left, right) => {
+        const difference = left[sort.key] - right[sort.key];
+        return sort.direction === "asc" ? difference : -difference;
+      })
+    : filteredModels;
+  const toggleSort = (key: "nodeCount" | "edgeCount") => {
+    setSort((current) => ({
+      key,
+      direction: current?.key === key && current.direction === "desc" ? "asc" : "desc",
+    }));
+  };
+  const sortIndicator = (key: "nodeCount" | "edgeCount") => sort?.key === key ? (sort.direction === "asc" ? " ▲" : " ▼") : "";
 
   return (
     <div className="warningTableWrap">
@@ -165,7 +215,7 @@ function ParsedModelsTable({
       </div>
       <div className="warningFilters">
         <label>
-          Type
+          Warning category
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
             <option value="all">All</option>
             {types.map(([type]) => (
@@ -185,21 +235,34 @@ function ParsedModelsTable({
         </label>
       </div>
       <div className="warningScroll">
-        <table>
+        <table className="parsedModelsTable">
+          <colgroup>
+            <col className="modelColumn" />
+            <col className="fileColumn" />
+            <col className="countColumn" />
+            <col className="countColumn" />
+            <col className="countColumn" />
+            <col className="categoriesColumn" />
+            <col className="inspectColumn" />
+          </colgroup>
           <thead>
             <tr>
               <th>Model</th>
               <th>File</th>
+              <th><button type="button" className="tableSortButton" onClick={() => toggleSort("nodeCount")}>Nodes{sortIndicator("nodeCount")}</button></th>
+              <th><button type="button" className="tableSortButton" onClick={() => toggleSort("edgeCount")}>Edges{sortIndicator("edgeCount")}</button></th>
               <th>Warnings</th>
-              <th>Types</th>
+              <th>Warning Categories</th>
               <th>Inspect</th>
             </tr>
           </thead>
           <tbody>
-            {filteredModels.map((row) => (
+            {displayedModels.map((row) => (
               <tr key={row.modelId}>
                 <td>{row.modelId}</td>
                 <td className="warningPath">{row.path}</td>
+                <td>{row.nodeCount}</td>
+                <td>{row.edgeCount}</td>
                 <td>{row.warnings}</td>
                 <td>
                   {Object.entries(row.types || {}).length
@@ -218,7 +281,7 @@ function ParsedModelsTable({
             ))}
             {!filteredModels.length && (
               <tr>
-                <td colSpan={5}>No parsed models match the current filter.</td>
+                <td colSpan={7}>No parsed models match the current filter.</td>
               </tr>
             )}
           </tbody>
@@ -231,18 +294,33 @@ function ParsedModelsTable({
 function Statistics({ stats }: { stats: StatisticsPayload }) {
   const summary = stats.summary;
   return (
-    <>
-      <div className="metricGrid">
-        <Metric label="Models" value={summary.models} />
-        <Metric label="Avg nodes" value={round(summary.nodes.mean)} />
-        <Metric label="Avg edges" value={round(summary.edges.mean)} />
-        <Metric label="Median names" value={round(summary.names.median)} />
+    <div className="metricGrid">
+      <Metric label="Models" value={summary.models} />
+      <DistributionMetric label="Nodes per model" distribution={summary.nodes} />
+      <DistributionMetric label="Edges per model" distribution={summary.edges} />
+      <DistributionMetric label="Names per model" distribution={summary.names} />
+    </div>
+  );
+}
+
+function DistributionMetric({
+  label,
+  distribution,
+}: {
+  label: string;
+  distribution: { min: number; max: number; mean: number; median: number };
+}) {
+  return (
+    <div className="metric distributionMetric">
+      <span>{label}</span>
+      <strong>{round(distribution.mean)}</strong>
+      <small>average</small>
+      <div>
+        <em>min {distribution.min}</em>
+        <em>median {round(distribution.median)}</em>
+        <em>max {distribution.max}</em>
       </div>
-      <div className="listGrid">
-        <TopList title="Top Types" items={stats.topTypes} />
-        <TopList title="Top Names" items={stats.topNames} />
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -251,26 +329,6 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <div className="metric">
       <span>{label}</span>
       <strong>{value}</strong>
-    </div>
-  );
-}
-
-function TopList({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ label: string; count: number }>;
-}) {
-  return (
-    <div className="topList">
-      <h3>{title}</h3>
-      {items.map((item) => (
-        <div key={item.label}>
-          <span>{item.label}</span>
-          <b>{item.count}</b>
-        </div>
-      ))}
     </div>
   );
 }

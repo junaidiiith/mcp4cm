@@ -56,12 +56,16 @@ export interface UploadSummary {
   payloads: number;
   records: number;
   errors: number;
+  emptyFiles?: string[];
+  invalidFiles?: string[];
+  ignoredFiles?: string[];
   warnings?: number;
   warningsByType?: Record<string, number>;
   warningsList?: WarningEntry[];
   warningFiles?: WarningFileSummary[];
   parsedModels?: ParsedModelSummary[];
   format?: UploadFormat;
+  language?: Language;
   representationProfile?: {
     includeAttributes: boolean;
     includeOperations: boolean;
@@ -97,6 +101,8 @@ export interface ParsedModelSummary {
   name?: string;
   path: string;
   language?: string;
+  nodeCount: number;
+  edgeCount: number;
   warnings: number;
   types: Record<string, number>;
 }
@@ -126,12 +132,61 @@ export interface StatisticItem {
 export interface StatisticsPayload {
   summary: {
     models: number;
-    nodes: { mean: number };
-    edges: { mean: number };
-    names: { median: number };
+    nodes: Distribution;
+    edges: Distribution;
+    names: Distribution;
   };
   topTypes: StatisticItem[];
   topNames: StatisticItem[];
+  visualizations: VisualizationPayload;
+}
+
+export interface Distribution {
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+}
+
+export interface HistogramBin {
+  start: number;
+  end: number;
+  count: number;
+  displayCount: number;
+}
+
+export interface VisualizationPayload {
+  missingNameRatioHistogram: HistogramBin[];
+  missingNamesByType: StatisticItem[];
+  topConcepts: StatisticItem[];
+  topConceptDocumentFrequency: StatisticItem[];
+  topConceptsWithoutTypePlaceholders: StatisticItem[];
+  topConceptDocumentFrequencyWithoutTypePlaceholders: StatisticItem[];
+  elementTypeTreemap: StatisticItem[];
+  vocabularyHeatmap: { tokens: string[]; rows: Array<{ label: string; values: number[] }> };
+  typeConceptLinks: Array<{ type: string; concept: string; count: number }>;
+  modelVocabularyScatter: Array<{
+    id: string;
+    namedElements: number;
+    uniqueNames: number;
+    tokens: number;
+    uniqueTokens: number;
+    nameSlots: number;
+    missingNames: number;
+    missingNameRatio: number;
+  }>;
+  topicModel: {
+    available: boolean;
+    reason?: string;
+    projectionMethod?: string;
+    points?: Array<{ id: string; x: number; y: number; topic: string; topicStrength: number; namedElements: number; uniqueNames: number }>;
+    prevalence?: StatisticItem[];
+  };
+  nameCountBoxplot: { min: number; q1: number; median: number; q3: number; max: number };
+  nameCountHistogramLog: HistogramBin[];
+  fewNamesHistogram: HistogramBin[];
+  topNamesPerModel: StatisticItem[];
+  languageDistribution: StatisticItem[];
 }
 
 export interface ModelInspectPayload {

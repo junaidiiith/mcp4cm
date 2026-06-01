@@ -1,0 +1,281 @@
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="_NL2AQJVTEeqqGZh46IEtXQ" name="model">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="_NL2AQZVTEeqqGZh46IEtXQ" source="genmymodel">
+        <details xmi:id="_NL2AQpVTEeqqGZh46IEtXQ" key="uuid" value="_21YW8Kp0EeeEQN1ZyOr-_g"/>
+        <details xmi:id="_NL2AQ5VTEeqqGZh46IEtXQ" key="author" value="ville.julku"/>
+      </eAnnotations>
+    </xmi:Extension>
+    <packageImport xmi:id="_NL2ARJVTEeqqGZh46IEtXQ" importingNamespace="_NL2AQJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2ARZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2ARpVTEeqqGZh46IEtXQ" key="uuid" value="_21YW8ap0EeeEQN1ZyOr-_g"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_NL2AR5VTEeqqGZh46IEtXQ" name="Käyttäjä">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2ASJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2ASZVTEeqqGZh46IEtXQ" key="uuid" value="_6BAusIyiEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2ASpVTEeqqGZh46IEtXQ" name="Korvauksen Hakeminen">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AS5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2ATJVTEeqqGZh46IEtXQ" key="uuid" value="_7wMNUIyiEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_NL2ATZVTEeqqGZh46IEtXQ" addition="_NL2AUJVTEeqqGZh46IEtXQ" includingCase="_NL2ASpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2ATpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AT5VTEeqqGZh46IEtXQ" key="uuid" value="_XxgjAIyjEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2AUJVTEeqqGZh46IEtXQ" name="Kirjautuminen">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AUZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AUpVTEeqqGZh46IEtXQ" key="uuid" value="_KXz-AIyjEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Activity" xmi:id="_NL2AU5VTEeqqGZh46IEtXQ" name="Activity">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AVJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AVZVTEeqqGZh46IEtXQ" key="uuid" value="_T8QIsIyjEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2AVpVTEeqqGZh46IEtXQ" name="Käyttäjä_Korvauksen Hakeminen" memberEnd="_NL2AWZVTEeqqGZh46IEtXQ _NL2AXpVTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2AWZVTEeqqGZh46IEtXQ _NL2AXpVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AV5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AWJVTEeqqGZh46IEtXQ" key="uuid" value="_adC8MYyjEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2AWZVTEeqqGZh46IEtXQ" name="korvauksen Hakeminen" type="_NL2ASpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AVpVTEeqqGZh46IEtXQ" association="_NL2AVpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AWpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AW5VTEeqqGZh46IEtXQ" key="uuid" value="_adBuEIyjEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AXJVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AXZVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2AXpVTEeqqGZh46IEtXQ" name="käyttäjä" type="_NL2AR5VTEeqqGZh46IEtXQ" owningAssociation="_NL2AVpVTEeqqGZh46IEtXQ" association="_NL2AVpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AX5VTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AYJVTEeqqGZh46IEtXQ" key="uuid" value="_adC8MIyjEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AYZVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AYpVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2AY5VTEeqqGZh46IEtXQ" name="Vakuutusselvitys">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AZJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AZZVTEeqqGZh46IEtXQ" key="uuid" value="_iCNWwIyjEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_NL2AZpVTEeqqGZh46IEtXQ" name="Vakuutusyhtiö">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AZ5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AaJVTEeqqGZh46IEtXQ" key="uuid" value="_XbBgMIykEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2AaZVTEeqqGZh46IEtXQ" name="Korvauksen Hakeminen_Vakuutusyhtiö" memberEnd="_NL2AbJVTEeqqGZh46IEtXQ _NL2AcZVTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2AbJVTEeqqGZh46IEtXQ _NL2AcZVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AapVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2Aa5VTEeqqGZh46IEtXQ" key="uuid" value="_BJ3V0IylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2AbJVTEeqqGZh46IEtXQ" name="vakuutusyhtiö" type="_NL2AZpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AaZVTEeqqGZh46IEtXQ" association="_NL2AaZVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AbZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AbpVTEeqqGZh46IEtXQ" key="uuid" value="_BJ1goIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2Ab5VTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AcJVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2AcZVTEeqqGZh46IEtXQ" name="korvauksen Hakeminen" type="_NL2ASpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AaZVTEeqqGZh46IEtXQ" association="_NL2AaZVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AcpVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2Ac5VTEeqqGZh46IEtXQ" key="uuid" value="_BJ2uwIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AdJVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AdZVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2AdpVTEeqqGZh46IEtXQ" name="Hakemuksen käsittely">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2Ad5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AeJVTEeqqGZh46IEtXQ" key="uuid" value="_CyqfoIylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_NL2AeZVTEeqqGZh46IEtXQ" addition="_NL2AY5VTEeqqGZh46IEtXQ" includingCase="_NL2AdpVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AepVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2Ae5VTEeqqGZh46IEtXQ" key="uuid" value="_JC9ZAIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2AfJVTEeqqGZh46IEtXQ" name="Hakemuksen käsittely_Vakuutusyhtiö" memberEnd="_NL2Af5VTEeqqGZh46IEtXQ _NL2AhJVTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2Af5VTEeqqGZh46IEtXQ _NL2AhJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AfZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AfpVTEeqqGZh46IEtXQ" key="uuid" value="_Lo6HkIylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2Af5VTEeqqGZh46IEtXQ" name="vakuutusyhtiö" type="_NL2AZpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AfJVTEeqqGZh46IEtXQ" association="_NL2AfJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AgJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AgZVTEeqqGZh46IEtXQ" key="uuid" value="_Lo5ggIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AgpVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2Ag5VTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2AhJVTEeqqGZh46IEtXQ" name="hakemuksen käsittely" type="_NL2AdpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AfJVTEeqqGZh46IEtXQ" association="_NL2AfJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AhZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AhpVTEeqqGZh46IEtXQ" key="uuid" value="_Lo5ggYylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2Ah5VTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AiJVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2AiZVTEeqqGZh46IEtXQ" name="Korvauksen maksaminen">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AipVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2Ai5VTEeqqGZh46IEtXQ" key="uuid" value="_RVvHgIylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <include xmi:id="_NL2AjJVTEeqqGZh46IEtXQ" addition="_NL2AtZVTEeqqGZh46IEtXQ" includingCase="_NL2AiZVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AjZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AjpVTEeqqGZh46IEtXQ" key="uuid" value="_snnSYIynEDWmd_HynRLV7Q"/>
+          </eAnnotations>
+        </xmi:Extension>
+      </include>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2Aj5VTEeqqGZh46IEtXQ" name="Korvauksen maksaminen_Vakuutusyhtiö" memberEnd="_NL2AkpVTEeqqGZh46IEtXQ _NL2Al5VTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2AkpVTEeqqGZh46IEtXQ _NL2Al5VTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AkJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AkZVTEeqqGZh46IEtXQ" key="uuid" value="_WvI1IIylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2AkpVTEeqqGZh46IEtXQ" name="vakuutusyhtiö" type="_NL2AZpVTEeqqGZh46IEtXQ" owningAssociation="_NL2Aj5VTEeqqGZh46IEtXQ" association="_NL2Aj5VTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2Ak5VTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AlJVTEeqqGZh46IEtXQ" key="uuid" value="_WvHnAIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AlZVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AlpVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2Al5VTEeqqGZh46IEtXQ" name="korvauksen maksaminen" type="_NL2AiZVTEeqqGZh46IEtXQ" owningAssociation="_NL2Aj5VTEeqqGZh46IEtXQ" association="_NL2Aj5VTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AmJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AmZVTEeqqGZh46IEtXQ" key="uuid" value="_WvIOEIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AmpVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2Am5VTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2AnJVTEeqqGZh46IEtXQ" name="Korvauksen maksaminen_Käyttäjä" memberEnd="_NL2An5VTEeqqGZh46IEtXQ _NL2ApJVTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2An5VTEeqqGZh46IEtXQ _NL2ApJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AnZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AnpVTEeqqGZh46IEtXQ" key="uuid" value="_XWVYAYylEDWNLMKGFu_VEA"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2An5VTEeqqGZh46IEtXQ" name="käyttäjä" type="_NL2AR5VTEeqqGZh46IEtXQ" owningAssociation="_NL2AnJVTEeqqGZh46IEtXQ" association="_NL2AnJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AoJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AoZVTEeqqGZh46IEtXQ" key="uuid" value="_XWUw8IylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AopVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2Ao5VTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2ApJVTEeqqGZh46IEtXQ" name="korvauksen maksaminen" type="_NL2AiZVTEeqqGZh46IEtXQ" owningAssociation="_NL2AnJVTEeqqGZh46IEtXQ" association="_NL2AnJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2ApZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AppVTEeqqGZh46IEtXQ" key="uuid" value="_XWVYAIylEDWNLMKGFu_VEA"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2Ap5VTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AqJVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Class" xmi:id="_NL2AqZVTEeqqGZh46IEtXQ" name="Asiakas">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AqpVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2Aq5VTEeqqGZh46IEtXQ" key="uuid" value="_Nryv4IymEDWmd_HynRLV7Q"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedAttribute xmi:id="_NL2ArJVTEeqqGZh46IEtXQ" name="Asiakas (id)" visibility="public">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2ArZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2ArpVTEeqqGZh46IEtXQ" key="uuid" value="_Ov4DEIymEDWmd_HynRLV7Q"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <type xsi:type="uml:PrimitiveType" href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#//Integer"/>
+      </ownedAttribute>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Class" xmi:id="_NL2Ar5VTEeqqGZh46IEtXQ" name="Vakuutus">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AsJVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AsZVTEeqqGZh46IEtXQ" key="uuid" value="_Xy6J0IymEDWmd_HynRLV7Q"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Class" xmi:id="_NL2AspVTEeqqGZh46IEtXQ" name="Vakuutusyhtiö">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2As5VTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AtJVTEeqqGZh46IEtXQ" key="uuid" value="_ZhOs0IymEDWmd_HynRLV7Q"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:UseCase" xmi:id="_NL2AtZVTEeqqGZh46IEtXQ" name="Kerätään tiedot">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AtpVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2At5VTEeqqGZh46IEtXQ" key="uuid" value="__LsuEIymEDWmd_HynRLV7Q"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_NL2AuJVTEeqqGZh46IEtXQ" name="Vakuutusyhtiö_Kerätään tiedot" memberEnd="_NL2Au5VTEeqqGZh46IEtXQ _NL2AwJVTEeqqGZh46IEtXQ" navigableOwnedEnd="_NL2Au5VTEeqqGZh46IEtXQ _NL2AwJVTEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_NL2AuZVTEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_NL2AupVTEeqqGZh46IEtXQ" key="uuid" value="_uYWQMIynEDWmd_HynRLV7Q"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_NL2Au5VTEeqqGZh46IEtXQ" name="kerätään tiedot" type="_NL2AtZVTEeqqGZh46IEtXQ" owningAssociation="_NL2AuJVTEeqqGZh46IEtXQ" association="_NL2AuJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AvJVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AvZVTEeqqGZh46IEtXQ" key="uuid" value="_uYUbAIynEDWmd_HynRLV7Q"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2AvpVTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2Av5VTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_NL2AwJVTEeqqGZh46IEtXQ" name="vakuutusyhtiö" type="_NL2AZpVTEeqqGZh46IEtXQ" owningAssociation="_NL2AuJVTEeqqGZh46IEtXQ" association="_NL2AuJVTEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_NL2AwZVTEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_NL2AwpVTEeqqGZh46IEtXQ" key="uuid" value="_uYVpIIynEDWmd_HynRLV7Q"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_NL2Aw5VTEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_NL2AxJVTEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

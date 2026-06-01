@@ -14,6 +14,7 @@ from mcp4cm.extended_parsing.types import WarningType
 from mcp4cm.extended_parsing.uml.uml_parser import ParseOptions, UMLXMIParser
 from mcp4cm.extended_parsing.utils import convert_to_networkx
 from mcp4cm.parsers.base import BaseModelParser
+from mcp4cm.xmi_names import extract_xmi_names
 
 FEATURE_ATTRIBUTE_KEYS = ("attributes", "ownedAttributes", "eAttributes")
 FEATURE_OPERATION_KEYS = ("operations", "ownedOperations", "eOperations")
@@ -61,6 +62,10 @@ class ExtendedModelParser(BaseModelParser):
             **stats_to_metadata(stats),
             **dict(ir.data or {}),
         }
+        if self.metadata_language == "uml" and self.format_name == "xmi":
+            extracted_names = extract_xmi_names(source_path)
+            metadata["extracted_names"] = list(extracted_names.names)
+            metadata["extracted_typed_names"] = list(extracted_names.typed_names)
         record_name = None
         if isinstance(ir.data, dict):
             extracted_name = str(ir.data.get("name") or "").strip()

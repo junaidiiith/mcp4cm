@@ -1,0 +1,258 @@
+<xmi:XMI xmi:version="2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="_WhMJkJVUEeqqGZh46IEtXQ" name="model">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="_WhMJkZVUEeqqGZh46IEtXQ" source="genmymodel">
+        <details xmi:id="_WhMJkpVUEeqqGZh46IEtXQ" key="uuid" value="_ngDxsFqyEeeTF9GWmq2Xvg"/>
+        <details xmi:id="_WhMJk5VUEeqqGZh46IEtXQ" key="author" value="bowie.sims"/>
+      </eAnnotations>
+    </xmi:Extension>
+    <ownedComment xmi:id="_WhMJlJVUEeqqGZh46IEtXQ" annotatedElement="_WhMJwZVUEeqqGZh46IEtXQ" body="condition:(Wenn der Username&#xA; bereits vergeben ist)&#xA;extension point: neuer Username">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJlZVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJlpVUEeqqGZh46IEtXQ" key="uuid" value="_MQwmIDziEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </ownedComment>
+    <ownedComment xmi:id="_WhMJl5VUEeqqGZh46IEtXQ" annotatedElement="_WhMJx5VUEeqqGZh46IEtXQ" body="condition:(wenn der Song bereits eingetragen ist)&#xA;extension point: neuen Song">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJmJVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJmZVUEeqqGZh46IEtXQ" key="uuid" value="_TEpUwDziEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </ownedComment>
+    <ownedComment xmi:id="_WhMJmpVUEeqqGZh46IEtXQ" annotatedElement="_WhMJzZVUEeqqGZh46IEtXQ" body="condition:(Username nicht vorhanden)&#xA;extension point: korrekter Username">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJm5VUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJnJVUEeqqGZh46IEtXQ" key="uuid" value="_Ty7XEDziEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </ownedComment>
+    <packageImport xmi:id="_WhMJnZVUEeqqGZh46IEtXQ" importingNamespace="_WhMJkJVUEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJnpVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJn5VUEeqqGZh46IEtXQ" key="uuid" value="_ngDxsVqyEeeTF9GWmq2Xvg"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Component" xmi:id="_WhMJoJVUEeqqGZh46IEtXQ" name="Musikvoting">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJoZVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJopVUEeqqGZh46IEtXQ" key="uuid" value="_ml1uYDzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedUseCase xmi:id="_WhMJo5VUEeqqGZh46IEtXQ" name="Login">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJpJVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJpZVUEeqqGZh46IEtXQ" key="uuid" value="_pfHBkDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_WhMJppVUEeqqGZh46IEtXQ" name="korrekter Username" useCase="_WhMJo5VUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJp5VUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJqJVUEeqqGZh46IEtXQ" key="uuid" value="_LmTJUDzhEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_WhMJqZVUEeqqGZh46IEtXQ" name="Song eintragen">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJqpVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJq5VUEeqqGZh46IEtXQ" key="uuid" value="_qhZlADzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_WhMJrJVUEeqqGZh46IEtXQ" name="neuen Song" useCase="_WhMJqZVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJrZVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJrpVUEeqqGZh46IEtXQ" key="uuid" value="_Qs5PsDzhEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+        <include xmi:id="_WhMJr5VUEeqqGZh46IEtXQ" addition="_WhMJo5VUEeqqGZh46IEtXQ" includingCase="_WhMJqZVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJsJVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJsZVUEeqqGZh46IEtXQ" key="uuid" value="_JoLPwDzhEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_WhMJspVUEeqqGZh46IEtXQ" name="Voten">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJs5VUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJtJVUEeqqGZh46IEtXQ" key="uuid" value="_sYK5YDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <include xmi:id="_WhMJtZVUEeqqGZh46IEtXQ" addition="_WhMJo5VUEeqqGZh46IEtXQ" includingCase="_WhMJspVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJtpVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJt5VUEeqqGZh46IEtXQ" key="uuid" value="_J9djQDzhEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </include>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_WhMJuJVUEeqqGZh46IEtXQ" name="Registrieren">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJuZVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJupVUEeqqGZh46IEtXQ" key="uuid" value="_wrcFYDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extensionPoint xmi:id="_WhMJu5VUEeqqGZh46IEtXQ" name="neuer Username" useCase="_WhMJuJVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJvJVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJvZVUEeqqGZh46IEtXQ" key="uuid" value="_4I9KYDzhEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extensionPoint>
+      </ownedUseCase>
+      <ownedUseCase xmi:id="_WhMJvpVUEeqqGZh46IEtXQ" name="Warnung: Username bereits vergeben">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJv5VUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJwJVUEeqqGZh46IEtXQ" key="uuid" value="__r6lgDzhEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_WhMJwZVUEeqqGZh46IEtXQ" extendedCase="_WhMJuJVUEeqqGZh46IEtXQ" extensionLocation="_WhMJu5VUEeqqGZh46IEtXQ" extension="_WhMJvpVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJwpVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJw5VUEeqqGZh46IEtXQ" key="uuid" value="_JxixsDziEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </ownedUseCase>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_WhMJxJVUEeqqGZh46IEtXQ" name="Warnung: Song bereits eingetragen">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJxZVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJxpVUEeqqGZh46IEtXQ" key="uuid" value="_EOIzgDziEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_WhMJx5VUEeqqGZh46IEtXQ" extendedCase="_WhMJqZVUEeqqGZh46IEtXQ" extension="_WhMJxJVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJyJVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJyZVUEeqqGZh46IEtXQ" key="uuid" value="_JZHDkDziEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </nestedClassifier>
+      <nestedClassifier xsi:type="uml:UseCase" xmi:id="_WhMJypVUEeqqGZh46IEtXQ" name="Warnung: falscher Username">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJy5VUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJzJVUEeqqGZh46IEtXQ" key="uuid" value="_GfH-sDziEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <extend xmi:id="_WhMJzZVUEeqqGZh46IEtXQ" extendedCase="_WhMJo5VUEeqqGZh46IEtXQ" extensionLocation="_WhMJppVUEeqqGZh46IEtXQ" extension="_WhMJypVUEeqqGZh46IEtXQ">
+          <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+            <eAnnotations xmi:id="_WhMJzpVUEeqqGZh46IEtXQ" source="genmymodel">
+              <details xmi:id="_WhMJz5VUEeqqGZh46IEtXQ" key="uuid" value="_JCyOQDziEDWjb5hOmXMZnw"/>
+            </eAnnotations>
+          </xmi:Extension>
+        </extend>
+      </nestedClassifier>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Actor" xmi:id="_WhMJ0JVUEeqqGZh46IEtXQ" name="Nutzer">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJ0ZVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJ0pVUEeqqGZh46IEtXQ" key="uuid" value="_n8W1YDzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_WhMJ05VUEeqqGZh46IEtXQ" name="Nutzer_Login" memberEnd="_WhMJ1pVUEeqqGZh46IEtXQ _WhMJ25VUEeqqGZh46IEtXQ" navigableOwnedEnd="_WhMJ1pVUEeqqGZh46IEtXQ _WhMJ25VUEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJ1JVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJ1ZVUEeqqGZh46IEtXQ" key="uuid" value="_3V3WAjzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_WhMJ1pVUEeqqGZh46IEtXQ" name="login" type="_WhMJo5VUEeqqGZh46IEtXQ" owningAssociation="_WhMJ05VUEeqqGZh46IEtXQ" association="_WhMJ05VUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ15VUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ2JVUEeqqGZh46IEtXQ" key="uuid" value="_3V3WADzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ2ZVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ2pVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_WhMJ25VUEeqqGZh46IEtXQ" name="nutzer" type="_WhMJ0JVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ05VUEeqqGZh46IEtXQ" association="_WhMJ05VUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ3JVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ3ZVUEeqqGZh46IEtXQ" key="uuid" value="_3V3WATzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ3pVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ35VUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_WhMJ4JVUEeqqGZh46IEtXQ" name="Nutzer_Sond eintragen" memberEnd="_WhMJ45VUEeqqGZh46IEtXQ _WhMJ6JVUEeqqGZh46IEtXQ" navigableOwnedEnd="_WhMJ45VUEeqqGZh46IEtXQ _WhMJ6JVUEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJ4ZVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJ4pVUEeqqGZh46IEtXQ" key="uuid" value="_3r4CQDzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_WhMJ45VUEeqqGZh46IEtXQ" name="sond eintragen" type="_WhMJqZVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ4JVUEeqqGZh46IEtXQ" association="_WhMJ4JVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ5JVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ5ZVUEeqqGZh46IEtXQ" key="uuid" value="_3r20IDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ5pVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ55VUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_WhMJ6JVUEeqqGZh46IEtXQ" name="nutzer" type="_WhMJ0JVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ4JVUEeqqGZh46IEtXQ" association="_WhMJ4JVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ6ZVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ6pVUEeqqGZh46IEtXQ" key="uuid" value="_3r3bMDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ65VUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ7JVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_WhMJ7ZVUEeqqGZh46IEtXQ" name="Nutzer_Voten" memberEnd="_WhMJ8JVUEeqqGZh46IEtXQ _WhMJ9ZVUEeqqGZh46IEtXQ" navigableOwnedEnd="_WhMJ8JVUEeqqGZh46IEtXQ _WhMJ9ZVUEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJ7pVUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJ75VUEeqqGZh46IEtXQ" key="uuid" value="_36-1QjzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_WhMJ8JVUEeqqGZh46IEtXQ" name="voten" type="_WhMJspVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ7ZVUEeqqGZh46IEtXQ" association="_WhMJ7ZVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ8ZVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ8pVUEeqqGZh46IEtXQ" key="uuid" value="_36-1QDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ85VUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ9JVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_WhMJ9ZVUEeqqGZh46IEtXQ" name="nutzer" type="_WhMJ0JVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ7ZVUEeqqGZh46IEtXQ" association="_WhMJ7ZVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ9pVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ95VUEeqqGZh46IEtXQ" key="uuid" value="_36-1QTzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMJ-JVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMJ-ZVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xsi:type="uml:Association" xmi:id="_WhMJ-pVUEeqqGZh46IEtXQ" name="Nutzer_Registrieren" memberEnd="_WhMJ_ZVUEeqqGZh46IEtXQ _WhMKApVUEeqqGZh46IEtXQ" navigableOwnedEnd="_WhMJ_ZVUEeqqGZh46IEtXQ _WhMKApVUEeqqGZh46IEtXQ">
+      <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+        <eAnnotations xmi:id="_WhMJ-5VUEeqqGZh46IEtXQ" source="genmymodel">
+          <details xmi:id="_WhMJ_JVUEeqqGZh46IEtXQ" key="uuid" value="_4M9WETzgEDWjb5hOmXMZnw"/>
+        </eAnnotations>
+      </xmi:Extension>
+      <ownedEnd xmi:id="_WhMJ_ZVUEeqqGZh46IEtXQ" name="registrieren" type="_WhMJuJVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ-pVUEeqqGZh46IEtXQ" association="_WhMJ-pVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMJ_pVUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMJ_5VUEeqqGZh46IEtXQ" key="uuid" value="_4M8vADzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMKAJVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMKAZVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="_WhMKApVUEeqqGZh46IEtXQ" name="nutzer" type="_WhMJ0JVUEeqqGZh46IEtXQ" owningAssociation="_WhMJ-pVUEeqqGZh46IEtXQ" association="_WhMJ-pVUEeqqGZh46IEtXQ">
+        <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+          <eAnnotations xmi:id="_WhMKA5VUEeqqGZh46IEtXQ" source="genmymodel">
+            <details xmi:id="_WhMKBJVUEeqqGZh46IEtXQ" key="uuid" value="_4M9WEDzgEDWjb5hOmXMZnw"/>
+          </eAnnotations>
+        </xmi:Extension>
+        <lowerValue xsi:type="uml:LiteralInteger" xmi:id="_WhMKBZVUEeqqGZh46IEtXQ"/>
+        <upperValue xsi:type="uml:LiteralUnlimitedNatural" xmi:id="_WhMKBpVUEeqqGZh46IEtXQ" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

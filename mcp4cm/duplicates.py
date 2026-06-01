@@ -115,7 +115,7 @@ def detect_duplicates_by_name_hash(
             deduplicate_name_tokens=deduplicate_name_tokens,
         )
         if len(tokens) >= max(min_named_nodes, 0) and tokens:
-            groups[hash_tokens(tokens)].append(record.model_id)
+            groups[hash_name_tokens(record, tokens, include_types=include_types)].append(record.model_id)
         _report_progress(
             progress,
             phase="fingerprint",
@@ -574,6 +574,10 @@ def hashable_name_tokens(
     include_types: bool,
     deduplicate_name_tokens: bool = False,
 ) -> list[str]:
+    extracted_tokens = _extracted_name_tokens(record, include_types=include_types)
+    if extracted_tokens is not None:
+        return sorted(set(extracted_tokens)) if deduplicate_name_tokens else extracted_tokens
+
     tokens: list[str] = []
     for _, attrs in record.graph.nodes(data=True):
         name = normalize(attrs.get("name"))
@@ -592,6 +596,10 @@ def hashable_name_tokens(
 
 
 def record_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[str]:
+    extracted_tokens = _extracted_tfidf_tokens(record, token_mode=token_mode)
+    if extracted_tokens is not None:
+        return extracted_tokens
+
     if token_mode == "names":
         return node_names(record)
 
@@ -620,6 +628,32 @@ def node_name_type_pairs(record: ModelRecord) -> list[tuple[str, str]]:
         node_type = normalize(attrs.get("type") or attrs.get("eClass"))
         pairs.append((name, node_type))
     return pairs
+
+
+def _extracted_name_tokens(record: ModelRecord, *, include_types: bool) -> list[str] | None:
+    key = "extracted_typed_names" if include_types else "extracted_names"
+    values = record.metadata.get(key) if isinstance(record.metadata, dict) else None
+    if not isinstance(values, list):
+        return None
+    return [str(value) for value in values if str(value).strip()]
+
+
+def _extracted_tfidf_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[str] | None:
+    names = _extracted_name_tokens(record, include_types=False)
+    typed_names = _extracted_name_tokens(record, include_types=True)
+    if names is None or typed_names is None:
+        return None
+    if token_mode == "names":
+        return names
+    if token_mode in {"names_types_bag", "typed_name_pairs"}:
+        return typed_names
+    raise ValueError(f"Unsupported TF-IDF token mode: {token_mode}")
+
+
+def hash_name_tokens(record: ModelRecord, tokens: Iterable[str], *, include_types: bool) -> str:
+    if _extracted_name_tokens(record, include_types=include_types) is not None:
+        return hash_tokens_in_order(tokens)
+    return hash_tokens(tokens)
 
 
 def _node2vec_graph_embedding(
@@ -946,6 +980,14 @@ def hash_tokens(tokens: Iterable[str], algorithm: str = "sha256") -> str:
     for token in sorted(tokens):
         hasher.update(token.encode("utf-8"))
         hasher.update(b"\0")
+    return hasher.hexdigest()
+
+
+def hash_tokens_in_order(tokens: Iterable[str], algorithm: str = "sha256") -> str:
+    hasher = hashlib.new(algorithm)
+    for token in tokens:
+        hasher.update(token.encode("utf-8"))
+        hasher.update(b"\n")
     return hasher.hexdigest()
 
 
