@@ -1,35 +1,37 @@
 import { API_URL } from "./config";
-import type { DuplicateProgressState, UploadParseJob } from "./types";
+import type { DuplicateProgressState, ModelInspectPayload, UploadParseJob } from "./types";
 
-export async function postJson(path: string, payload: unknown) {
+type JsonObject = Record<string, unknown>;
+
+export async function postJson<TResponse = JsonObject>(path: string, payload: unknown): Promise<TResponse> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return readJsonResponse(response);
+  return readJsonResponse<TResponse>(response);
 }
 
-export async function postForm(path: string, formData: FormData) {
+export async function postForm<TResponse = JsonObject>(path: string, formData: FormData): Promise<TResponse> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
     body: formData,
   });
-  return readJsonResponse(response);
+  return readJsonResponse<TResponse>(response);
 }
 
-export async function getJson(path: string) {
+export async function getJson<TResponse = JsonObject>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_URL}${path}`);
-  return readJsonResponse(response);
+  return readJsonResponse<TResponse>(response);
 }
 
 export async function pollDuplicateJob(
   jobId: string,
   onUpdate?: (job: DuplicateProgressState) => void,
-) {
+): Promise<DuplicateProgressState> {
   for (;;) {
     await delay(700);
-    const job = await getJson(`/api/duplicates/jobs/${jobId}`) as DuplicateProgressState;
+    const job = await getJson<DuplicateProgressState>(`/api/duplicates/jobs/${jobId}`);
     if (onUpdate) onUpdate(job);
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Duplicate detection failed");
@@ -40,10 +42,10 @@ export async function pollUploadParseJob(
   uploadId: string,
   jobId: string,
   onUpdate?: (job: UploadParseJob) => void,
-) {
+): Promise<UploadParseJob> {
   for (;;) {
     await delay(700);
-    const job = await getJson(`/api/uploads/${uploadId}/jobs/${jobId}`) as UploadParseJob;
+    const job = await getJson<UploadParseJob>(`/api/uploads/${uploadId}/jobs/${jobId}`);
     if (onUpdate) onUpdate(job);
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Upload parsing failed");
@@ -54,28 +56,30 @@ export async function getModelInspect(
   datasetId: string,
   modelId: string,
   options?: { nodeLimit?: number; edgeLimit?: number; includeAttrs?: boolean },
-) {
+): Promise<ModelInspectPayload> {
   const query = new URLSearchParams();
   if (options?.nodeLimit) query.set("nodeLimit", String(options.nodeLimit));
   if (options?.edgeLimit) query.set("edgeLimit", String(options.edgeLimit));
   if (typeof options?.includeAttrs === "boolean") query.set("includeAttrs", String(options.includeAttrs));
   const suffix = query.toString() ? `?${query.toString()}` : "";
-  return getJson(`/api/datasets/${encodeURIComponent(datasetId)}/models/${encodeURIComponent(modelId)}/inspect${suffix}`);
+  return getJson<ModelInspectPayload>(
+    `/api/datasets/${encodeURIComponent(datasetId)}/models/${encodeURIComponent(modelId)}/inspect${suffix}`,
+  );
 }
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readJsonResponse(response: Response) {
+async function readJsonResponse<TResponse>(response: Response): Promise<TResponse> {
   const contentType = response.headers.get("content-type") || "";
   const body = await response.text();
-  let data: Record<string, any> = {};
+  let data: unknown = {};
   if (body && contentType.includes("application/json")) {
     data = JSON.parse(body);
   }
   if (!response.ok) {
-    throw new Error(data.error || body || `Request failed with HTTP ${response.status}`);
+    throw new Error(responseErrorMessage(data, body, response.status));
   }
   if (!body) {
     throw new Error("The backend returned an empty response. Make sure Flask is running on 127.0.0.1:8765.");
@@ -83,5 +87,23 @@ async function readJsonResponse(response: Response) {
   if (!contentType.includes("application/json")) {
     throw new Error("The backend returned a non-JSON response. Make sure the Flask API is running and reachable.");
   }
-  return data;
+  return data as TResponse;
+}
+
+function responseErrorMessage(data: unknown, body: string, status: number) {
+  if (data && typeof data === "object") {
+    const payload = data as { error?: unknown; message?: unknown };
+    if (typeof payload.error === "string" && payload.error) return payload.error;
+    if (typeof payload.message === "string" && payload.message) return payload.message;
+  }
+  return body || `Request failed with HTTP ${status}`;
+}
+
+export function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object") {
+    const candidate = (error as { message?: unknown }).message;
+    if (typeof candidate === "string" && candidate) return candidate;
+  }
+  return fallback;
 }

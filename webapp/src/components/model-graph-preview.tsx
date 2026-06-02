@@ -1,20 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
 import Cytoscape from "cytoscape";
+import type cytoscape from "cytoscape";
 import CytoscapeComponent from "react-cytoscapejs";
 import coseBilkent from "cytoscape-cose-bilkent";
 import type { ModelInspectPayload } from "@/types";
 
 Cytoscape.use(coseBilkent);
 
+type CoseBilkentLayoutOptions = cytoscape.LayoutOptions & {
+  name: "cose-bilkent";
+  fit: boolean;
+  animate: boolean;
+  padding: number;
+};
+
+const graphLayout: CoseBilkentLayoutOptions = { name: "cose-bilkent", fit: true, animate: false, padding: 20 };
+
 export default function ModelGraphPreview({ payload }: { payload: ModelInspectPayload }) {
-  const [cy, setCy] = useState<any>(null);
+  const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const [selectedElement, setSelectedElement] = useState<
     | { kind: "node"; id: string; node: ModelInspectPayload["nodes"][number] }
     | { kind: "edge"; id: string; edge: ModelInspectPayload["edges"][number] }
     | null
   >(null);
 
-  const elements = useMemo(() => {
+  const elements = useMemo<cytoscape.ElementDefinition[]>(() => {
     const nodes = payload.nodes.map((node) => ({
       data: {
         id: node.id,
@@ -35,7 +45,7 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
     return [...nodes, ...edges];
   }, [payload.edges, payload.nodes]);
 
-  const stylesheet = useMemo(() => [
+  const stylesheet = useMemo<cytoscape.StylesheetJsonBlock[]>(() => [
     {
       selector: "node",
       style: {
@@ -44,7 +54,7 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
         "background-color": "#247f7f",
         color: "#12353a",
         "text-wrap": "wrap",
-        "text-max-width": 90,
+        "text-max-width": "90px",
       },
     },
     {
@@ -78,8 +88,8 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
 
   useEffect(() => {
     if (!cy) return;
-    const onElementTap = (event: any) => {
-      const element = event.target;
+    const onElementTap: cytoscape.EventHandler = (event) => {
+      const element = event.target as cytoscape.NodeSingular | cytoscape.EdgeSingular;
       if (element.isNode()) {
         const nodeId = String(element.data("nodeId") || element.id());
         const node = payload.nodes.find((entry) => entry.id === nodeId);
@@ -95,7 +105,7 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
         }
       }
     };
-    const onBackgroundTap = (event: any) => {
+    const onBackgroundTap: cytoscape.EventHandler = (event) => {
       if (event.target === cy) {
         setSelectedElement(null);
       }
@@ -138,12 +148,12 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
       <CytoscapeComponent
         className="graphCanvas"
         elements={elements}
-        layout={{ name: "cose-bilkent", fit: true, animate: false, padding: 20 }}
-        stylesheet={stylesheet as any}
+        layout={graphLayout}
+        stylesheet={stylesheet}
         wheelSensitivity={0.15}
         minZoom={0.1}
         maxZoom={2.8}
-        cy={(instance) => setCy(instance)}
+        cy={(instance: cytoscape.Core) => setCy(instance)}
       />
       <div className="graphInspectorPanel">
         <h4>Inspector</h4>

@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { getModelInspect } from "../../api";
+import { errorMessage, getModelInspect } from "../../api";
 import type { ModelInspectPayload, ParsedModelSummary, WarningEntry } from "../../types";
 
 const LazyModelGraphPreview = lazy(() => import("../../components/model-graph-preview"));
@@ -53,10 +53,10 @@ export function useModelInspect(datasetId: string, modelId: string | null): Mode
         if (!cancelled) {
           setPayload(response);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
           setPayload(null);
-          setError(err?.message || "Failed to load parsed model details.");
+          setError(errorMessage(err, "Failed to load parsed model details."));
         }
       } finally {
         if (!cancelled) {

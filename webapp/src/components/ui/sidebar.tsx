@@ -43,6 +43,10 @@ type SidebarMenuButtonProps = React.ComponentProps<"button"> & {
   tooltip?: string;
 };
 
+type SidebarMenuButtonChildProps = React.HTMLAttributes<HTMLElement> & {
+  "data-active"?: string;
+};
+
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 function cn(...classes: Array<string | undefined | null | false>) {
@@ -286,9 +290,9 @@ function SidebarMenuButton({
   const title = tooltip && !isMobile && state === "collapsed" ? tooltip : undefined;
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{ className?: string; title?: string }>;
+    const child = children as React.ReactElement<SidebarMenuButtonChildProps>;
     return React.cloneElement(child, {
-      ...(props as Record<string, unknown>),
+      ...(props as Partial<SidebarMenuButtonChildProps>),
       className: cn("sidebarMenuButton", className, child.props.className),
       "data-active": isActive ? "true" : "false",
       title: title || child.props.title,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Check, FileUp, Filter, GitCompare, Loader2, Network } from "lucide-react";
+import { BarChart3, Check, FileUp, Filter, GitCompare, Loader2 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import {
   Sidebar,
@@ -33,7 +33,6 @@ import type {
 } from "./types";
 import { UploadPanel } from "./features/upload/UploadPanel";
 import { StatisticsPanel } from "./features/upload/StatisticsPanel";
-import { VisualizationPanel } from "./features/upload/VisualizationPanel";
 import { DummyPanel } from "./features/dummy/DummyPanel";
 import { DuplicatePanel } from "./features/duplicates/DuplicatePanel";
 import {
@@ -399,8 +398,6 @@ export default function App() {
               onInspect={openModelInspector}
             />
 
-            <VisualizationPanel data={stats?.visualizations || null} />
-
             <DummyPanel
               filters={dummyFilterConfigs}
               onUpdateFilter={updateDummyFilter}
@@ -517,14 +514,6 @@ function AppSidebar({ activeSection }: { activeSection: string }) {
               <a href="#stats" onClick={onNavigate}>
                 <BarChart3 size={18} />
                 <span className="sidebarLinkLabel">Statistics</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Visualizations" isActive={activeSection === "visualizations"}>
-              <a href="#visualizations" onClick={onNavigate}>
-                <Network size={18} />
-                <span className="sidebarLinkLabel">Visualizations</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>

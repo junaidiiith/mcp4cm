@@ -11,6 +11,11 @@ import type {
   UploadParseJob,
 } from "../../types";
 
+type DirectoryInputAttributes = {
+  webkitdirectory?: string;
+  directory?: string;
+};
+
 export function UploadPanel({
   language,
   format,
@@ -50,6 +55,10 @@ export function UploadPanel({
   onRepresentationChange: (patch: Partial<RepresentationProfile>) => void;
   onParse: () => void;
 }) {
+  const directoryInputAttributes: DirectoryInputAttributes = directoryMode
+    ? { webkitdirectory: "", directory: "" }
+    : {};
+
   return (
     <Card className="panel" id="upload">
       <CardHeader className="panelHeader">
@@ -89,7 +98,7 @@ export function UploadPanel({
                   type="file"
                   multiple
                   accept={selectedFormat.accept}
-                  {...(directoryMode ? ({ webkitdirectory: "", directory: "" } as any) : {})}
+                  {...directoryInputAttributes}
                   onChange={(event) => {
                     onFilesChange(Array.from(event.target.files || []));
                   }}
