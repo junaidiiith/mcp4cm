@@ -52,47 +52,6 @@ def node_names(record: ModelRecord) -> list[str]:
     return [str(attrs.get("name")) for _, attrs in record.graph.nodes(data=True) if attrs.get("name")]
 
 
-def dataset_visualizations(dataset: Dataset) -> dict[str, Any]:
-    """Build visualization data without writing intermediate text files."""
-    models = [_model_visualization_row(record) for record in dataset]
-    entries = [entry for model in models for entry in model["entries"]]
-    valid_entries = [entry for entry in entries if not entry["missing"]]
-    filtered_entries = [entry for entry in valid_entries if not entry["typePlaceholder"]]
-    name_slots = [model["nameSlots"] for model in models]
-    missing_ratios = [model["missingNameRatio"] for model in models if model["nameSlots"]]
-
-    return {
-        "missingNameRatioHistogram": histogram(missing_ratios, bins=30, minimum=0, maximum=1),
-        "missingNamesByType": counter_items(Counter(entry["type"] for entry in entries if entry["missing"])),
-        "topConcepts": counter_items(Counter(entry["name"] for entry in valid_entries)),
-        "topConceptDocumentFrequency": document_frequency(models, exclude_type_placeholders=False),
-        "topConceptsWithoutTypePlaceholders": counter_items(Counter(entry["name"] for entry in filtered_entries)),
-        "topConceptDocumentFrequencyWithoutTypePlaceholders": document_frequency(models, exclude_type_placeholders=True),
-        "elementTypeTreemap": counter_items(Counter(entry["type"] for entry in entries), 40),
-        "vocabularyHeatmap": vocabulary_heatmap(filtered_entries),
-        "typeConceptLinks": type_concept_links(filtered_entries),
-        "modelVocabularyScatter": [
-            {
-                "id": model["id"],
-                "namedElements": model["namedElements"],
-                "uniqueNames": model["uniqueNames"],
-                "tokens": model["tokens"],
-                "uniqueTokens": model["uniqueTokens"],
-                "nameSlots": model["nameSlots"],
-                "missingNames": model["missingNames"],
-                "missingNameRatio": model["missingNameRatio"],
-            }
-            for model in models
-        ],
-        "topicModel": topic_model(models),
-        "nameCountBoxplot": boxplot_summary(name_slots),
-        "nameCountHistogramLog": histogram(name_slots, bins=30, log_counts=True),
-        "fewNamesHistogram": histogram([count for count in name_slots if count < 5], bins=20),
-        "topNamesPerModel": unique_name_frequency(models),
-        "languageDistribution": counter_items(Counter(record.language for record in dataset), 25),
-    }
-
-
 def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     entries = typed_name_entries(record)
     names = [entry["name"] for entry in entries if not entry["missing"]]
@@ -155,26 +114,6 @@ def counter_items(counter: Counter[str], limit: int | None = None) -> list[dict[
     return [{"label": label, "count": count} for label, count in counter.most_common(limit)]
 
 
-def document_frequency(models: list[dict[str, Any]], *, exclude_type_placeholders: bool) -> list[dict[str, Any]]:
-    counter: Counter[str] = Counter()
-    for model in models:
-        counter.update(
-            {
-                entry["name"]
-                for entry in model["entries"]
-                if not entry["missing"] and (not exclude_type_placeholders or not entry["typePlaceholder"])
-            }
-        )
-    return counter_items(counter)
-
-
-def unique_name_frequency(models: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    counter: Counter[str] = Counter()
-    for model in models:
-        counter.update({entry["name"] for entry in model["entries"] if not entry["missing"]})
-    return counter_items(counter, 20)
-
-
 def histogram(values: list[float | int], *, bins: int, minimum: float | None = None, maximum: float | None = None, log_counts: bool = False) -> list[dict[str, Any]]:
     if not values:
         return []
@@ -218,31 +157,6 @@ def percentile(values: list[int], fraction: float) -> float:
     if lower == upper:
         return values[lower]
     return values[lower] + (values[upper] - values[lower]) * (position - lower)
-
-
-def vocabulary_heatmap(entries: list[dict[str, Any]]) -> dict[str, Any]:
-    type_counter = Counter(entry["type"] for entry in entries)
-    types = [label for label, _ in type_counter.most_common(10)]
-    token_counter = Counter(token for entry in entries if entry["type"] in types for token in entry["name"].split())
-    tokens = [label for label, _ in token_counter.most_common(25)]
-    rows = []
-    for element_type in types:
-        counts = Counter(token for entry in entries if entry["type"] == element_type for token in entry["name"].split())
-        total = sum(counts.values()) or 1
-        rows.append({"label": element_type, "values": [round(counts[token] / total, 5) for token in tokens]})
-    return {"tokens": tokens, "rows": rows}
-
-
-def type_concept_links(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    major_types = [label for label, _ in Counter(entry["type"] for entry in entries).most_common(6)]
-    links: list[dict[str, Any]] = []
-    for element_type in major_types:
-        concepts = Counter(entry["name"] for entry in entries if entry["type"] == element_type)
-        links.extend(
-            {"type": element_type, "concept": concept, "count": count}
-            for concept, count in concepts.most_common(8)
-        )
-    return links
 
 
 def topic_model(models: list[dict[str, Any]]) -> dict[str, Any]:
@@ -511,23 +425,3 @@ class CorpusStatisticsAccumulator:
             "topNamesPerModel": counter_items(self.unique_name_doc_freq, 20),
             "languageDistribution": counter_items(self.languages, 25),
         }
-
-
-def serialize_dataset_statistics(dataset: Dataset) -> dict[str, Any]:
-    """Full statistics by iterating an in-memory dataset."""
-    return {
-        "summary": dataset_summary(dataset),
-        "topTypes": counter_items(type_counts(dataset)),
-        "topNames": counter_items(name_counts(dataset)),
-        "visualizations": dataset_visualizations(dataset),
-        "sampleModels": [
-            {
-                "id": record.model_id,
-                "language": record.language,
-                "nodes": record.node_count,
-                "edges": record.edge_count,
-                "names": len(node_names(record)),
-            }
-            for record in list(dataset)[:8]
-        ],
-    }

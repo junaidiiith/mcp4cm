@@ -6,16 +6,30 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterator
 
 from mcp4cm._deps import require_networkx
 from mcp4cm.core import Dataset, ModelDiagnostics, ModelRecord
 from mcp4cm.statistics import model_summary_fields
 
 RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime"
-RUNTIME_IR_DIR = RUNTIME_DIR / "ir"
-RUNTIME_INDEX = RUNTIME_DIR / "index.json"
 RUNTIME_LOCK = threading.RLock()
+
+
+def runtime_dataset_dir(dataset_id: str) -> Path:
+    return RUNTIME_DIR / str(dataset_id)
+
+
+def runtime_dataset_ir_dir(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "ir"
+
+
+def runtime_dataset_index_path(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "index.json"
+
+
+def runtime_dataset_statistics_path(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "statistics.json"
 
 
 def json_safe(value: Any) -> Any:
@@ -33,42 +47,61 @@ def json_safe(value: Any) -> Any:
     return str(value)
 
 
-def runtime_index_template() -> dict[str, Any]:
+def runtime_index_template(
+    *,
+    dataset_id: str = "",
+    dataset_type: str = "",
+    model_entries: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     return {
         "version": 1,
         "updatedAt": time.time(),
-        "datasets": {},
+        "datasetId": str(dataset_id),
+        "datasetType": str(dataset_type),
+        "createdAt": time.time(),
+        "recordCount": len(model_entries or []),
+        "models": model_entries or [],
     }
 
 
-def ensure_runtime_store() -> None:
-    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
-    if not RUNTIME_INDEX.exists():
-        RUNTIME_INDEX.write_text(json.dumps(runtime_index_template(), ensure_ascii=False, indent=2), encoding="utf-8")
+def ensure_runtime_store(dataset_id: str | None = None) -> None:
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    if dataset_id:
+        runtime_dataset_ir_dir(dataset_id).mkdir(parents=True, exist_ok=True)
 
 
-def load_runtime_index() -> dict[str, Any]:
-    ensure_runtime_store()
+def load_runtime_index(dataset_id: str) -> dict[str, Any] | None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return None
+    index_path = runtime_dataset_index_path(dataset_id)
+    if not index_path.exists():
+        return None
     try:
-        payload = json.loads(RUNTIME_INDEX.read_text(encoding="utf-8"))
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
     except Exception:
-        payload = runtime_index_template()
+        return None
     if not isinstance(payload, dict):
-        payload = runtime_index_template()
+        return None
     payload.setdefault("version", 1)
     payload.setdefault("updatedAt", time.time())
-    payload.setdefault("datasets", {})
-    if not isinstance(payload["datasets"], dict):
-        payload["datasets"] = {}
+    payload.setdefault("datasetId", dataset_id)
+    payload.setdefault("datasetType", "runtime")
+    payload.setdefault("createdAt", payload.get("updatedAt") or time.time())
+    payload.setdefault("recordCount", len(payload.get("models") or []))
+    payload.setdefault("models", [])
+    if not isinstance(payload["models"], list):
+        payload["models"] = []
     return payload
 
 
-def save_runtime_index(index_payload: dict[str, Any]) -> None:
+def save_runtime_index(dataset_id: str, index_payload: dict[str, Any]) -> None:
     index_payload["updatedAt"] = time.time()
-    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
-    temp_path = RUNTIME_INDEX.with_suffix(".tmp")
+    ensure_runtime_store(dataset_id)
+    index_path = runtime_dataset_index_path(dataset_id)
+    temp_path = index_path.with_suffix(".tmp")
     temp_path.write_text(json.dumps(index_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    temp_path.replace(RUNTIME_INDEX)
+    temp_path.replace(index_path)
 
 
 def runtime_model_filename(model_id: str, index: int, seen: set[str]) -> str:
@@ -295,16 +328,36 @@ def finalize_runtime_dataset(
     model_entries: list[dict[str, Any]],
 ) -> None:
     with RUNTIME_LOCK:
-        ensure_runtime_store()
-        index_payload = load_runtime_index()
-        index_payload["datasets"][dataset_id] = {
-            "datasetId": dataset_id,
-            "datasetType": str(dataset_type),
-            "createdAt": time.time(),
-            "recordCount": len(model_entries),
-            "models": model_entries,
-        }
-        save_runtime_index(index_payload)
+        index_payload = runtime_index_template(
+            dataset_id=dataset_id,
+            dataset_type=str(dataset_type),
+            model_entries=model_entries,
+        )
+        save_runtime_index(dataset_id, index_payload)
+
+
+def save_dataset_statistics(dataset_id: str, statistics: dict[str, Any]) -> None:
+    with RUNTIME_LOCK:
+        ensure_runtime_store(dataset_id)
+        statistics_path = runtime_dataset_statistics_path(dataset_id)
+        temp_path = statistics_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(json_safe(statistics), ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(statistics_path)
+
+
+def load_dataset_statistics(dataset_id: str) -> dict[str, Any] | None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return None
+    statistics_path = runtime_dataset_statistics_path(dataset_id)
+    if not statistics_path.exists():
+        return None
+    with RUNTIME_LOCK:
+        try:
+            payload = json.loads(statistics_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    return payload if isinstance(payload, dict) else None
 
 
 def get_dataset_meta(dataset_id: str) -> dict[str, Any] | None:
@@ -312,8 +365,7 @@ def get_dataset_meta(dataset_id: str) -> dict[str, Any] | None:
     if not dataset_id:
         return None
     with RUNTIME_LOCK:
-        index_payload = load_runtime_index()
-        dataset_meta = index_payload.get("datasets", {}).get(dataset_id)
+        dataset_meta = load_runtime_index(dataset_id)
         return dict(dataset_meta) if isinstance(dataset_meta, dict) else None
 
 
@@ -340,7 +392,7 @@ def load_model_from_runtime(dataset_id: str, model_id: str) -> tuple[ModelRecord
         filename = str(model_entry.get("file") or "")
         if not filename:
             return None
-        model_path = RUNTIME_IR_DIR / dataset_id / filename
+        model_path = runtime_dataset_ir_dir(dataset_id) / filename
         if not model_path.exists():
             return None
         model_payload = json.loads(model_path.read_text(encoding="utf-8"))
@@ -383,7 +435,7 @@ class RuntimeDataset:
             dataset_type=str(meta.get("datasetType") or "runtime"),
             record_count=int(meta.get("recordCount") or len(model_entries)),
             model_entries=model_entries,
-            root=RUNTIME_IR_DIR / str(dataset_id),
+            root=runtime_dataset_ir_dir(dataset_id),
         )
 
     def __len__(self) -> int:

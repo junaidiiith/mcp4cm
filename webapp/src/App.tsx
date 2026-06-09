@@ -14,7 +14,7 @@ import {
   useSidebar,
 } from "./components/ui/sidebar";
 import { clonePreset, defaultFormatForLanguage, defaultThresholds, formatOptionsByLanguage } from "./config";
-import { errorMessage, pollDuplicateJob, pollUploadParseJob, postForm, postJson } from "./api";
+import { errorMessage, getDatasetStatistics, pollDuplicateJob, pollUploadParseJob, postForm, postJson } from "./api";
 import { backendTechniquesFor } from "./utils";
 import type {
   BusyState,
@@ -53,6 +53,7 @@ interface UploadSessionResponse {
 }
 
 type StartedDuplicateJob = DuplicateProgressState & { jobId: string };
+const LAST_DATASET_ID_KEY = "mcp4cm:lastDatasetId";
 
 export default function App() {
   const uploadChunkSize = 200;
@@ -115,6 +116,36 @@ export default function App() {
     if (!error) return;
     toast.error(error);
   }, [error]);
+
+  useEffect(() => {
+    const savedDatasetId = window.localStorage.getItem(LAST_DATASET_ID_KEY);
+    if (savedDatasetId) setDatasetId(savedDatasetId);
+  }, []);
+
+  useEffect(() => {
+    if (datasetId) {
+      window.localStorage.setItem(LAST_DATASET_ID_KEY, datasetId);
+    } else {
+      window.localStorage.removeItem(LAST_DATASET_ID_KEY);
+    }
+  }, [datasetId]);
+
+  useEffect(() => {
+    if (!datasetId || stats || busy === "parse" || uploadParseJob?.status === "queued" || uploadParseJob?.status === "running") {
+      return;
+    }
+    let cancelled = false;
+    getDatasetStatistics(datasetId)
+      .then((payload) => {
+        if (!cancelled) setStats(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setDatasetId("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [busy, datasetId, stats, uploadParseJob?.status]);
 
   useEffect(() => {
     const readHash = () => setActiveSection((window.location.hash || "#upload").replace(/^#/, ""));

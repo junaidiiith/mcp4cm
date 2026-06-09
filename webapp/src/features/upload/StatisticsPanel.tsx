@@ -35,7 +35,7 @@ export function StatisticsPanel({
       <CardHeader className="panelHeader">
         <h2>
           <BarChart3 size={20} />
-          Descriptive Statistics
+          Statistics
         </h2>
       </CardHeader>
       <CardContent>
@@ -48,7 +48,7 @@ export function StatisticsPanel({
         ) : statsLoading ? (
           <StatisticsLoading job={uploadParseJob} />
         ) : (
-          <EmptyState text="Upload a dataset to see descriptive statistics." />
+          <EmptyState text="Upload a dataset to see statistics." />
         )}
       </CardContent>
     </Card>
@@ -127,8 +127,8 @@ function StatisticsLoading({ job }: { job: UploadParseJob | null }) {
   const parseDone = parseTotal > 0 && parseProcessed >= parseTotal;
   const statisticsStage = job?.stage === "statistics";
   const message = statisticsStage || parseDone
-    ? "Models parsed. Calculating descriptive statistics..."
-    : "Parsing models and collecting descriptive statistics...";
+    ? "Models parsed. Calculating statistics..."
+    : "Parsing models and collecting statistics...";
   return (
     <div className="statsLoading">
       <Loader2 className="spin" size={16} />

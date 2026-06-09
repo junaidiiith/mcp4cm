@@ -81,3 +81,4 @@ def test_upload_parse_uses_accumulator_for_statistics():
     assert finished["status"] == "complete"
     assert finished["statistics"]["summary"]["models"] == 20
     assert finished["statistics"]["visualizations"]["languageDistribution"][0]["count"] == 20
+    assert (api_server.RUNTIME_DIR / finished["datasetId"] / "statistics.json").exists()

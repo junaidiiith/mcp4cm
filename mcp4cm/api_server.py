@@ -37,23 +37,23 @@ from mcp4cm.parsers.catalog import parser_descriptors, resolve_parser
 from mcp4cm.parsers.parse import FileParseIssue, parse_staged_files
 from mcp4cm.runtime_store import (
     RUNTIME_DIR,
-    RUNTIME_IR_DIR,
-    RUNTIME_INDEX,
-    RUNTIME_LOCK,
     RuntimeDataset,
     deserialize_graph_from_runtime,
     finalize_runtime_dataset,
     get_dataset_meta,
     json_safe,
+    load_dataset_statistics,
     list_dataset_models,
     load_model_from_runtime,
     resolve_dataset,
+    runtime_dataset_ir_dir,
     runtime_model_filename,
+    save_dataset_statistics,
     serialize_graph_for_runtime,
     serialize_model_for_runtime,
     spill_model_to_runtime,
 )
-from mcp4cm.statistics import CorpusStatisticsAccumulator, serialize_dataset_statistics
+from mcp4cm.statistics import CorpusStatisticsAccumulator
 
 DATASETS: dict[str, Dataset | RuntimeDataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
@@ -110,6 +110,10 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
                 warning_type=str(request.args.get("warningType") or ""),
             )
         )
+
+    @app.route("/api/datasets/<dataset_id>/statistics", methods=["GET"])
+    def dataset_statistics_route(dataset_id: str):
+        return jsonify(get_dataset_statistics(dataset_id))
 
     @app.route("/api/datasets/<dataset_id>/models/<model_id>/inspect", methods=["GET"])
     def inspect_model_route(dataset_id: str, model_id: str):
@@ -565,6 +569,7 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
             parseTotalFiles=len(staged_files),
         )
         statistics = corpus_stats.build_payload()
+        save_dataset_statistics(dataset_id, statistics)
 
         finished_at = time.time()
         with UPLOAD_LOCK:
@@ -618,7 +623,7 @@ def parse_staged_dataset(
     seen_files: set[str] = set()
     model_entries: list[dict[str, Any]] = []
     corpus_stats = CorpusStatisticsAccumulator()
-    dataset_dir = RUNTIME_IR_DIR / dataset_id
+    dataset_dir = runtime_dataset_ir_dir(dataset_id)
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
     def on_model(record: ModelRecord, diagnostics: ModelDiagnostics) -> None:
@@ -1318,8 +1323,23 @@ def finalize_upload_summary(summary: dict[str, Any]) -> dict[str, Any]:
 
 def serialize_statistics(dataset: Dataset | RuntimeDataset) -> dict[str, Any]:
     if isinstance(dataset, RuntimeDataset):
-        raise ValueError("Runtime datasets must use CorpusStatisticsAccumulator during parse.")
-    return serialize_dataset_statistics(dataset)
+        statistics = load_dataset_statistics(dataset.dataset_id)
+        if statistics is None:
+            raise ValueError("Statistics are unavailable for this runtime dataset.")
+        return statistics
+    accumulator = CorpusStatisticsAccumulator()
+    for record in dataset:
+        accumulator.add(record)
+    return accumulator.build_payload()
+
+
+def get_dataset_statistics(dataset_id: str) -> dict[str, Any]:
+    if get_dataset_meta(dataset_id) is None:
+        raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+    statistics = load_dataset_statistics(dataset_id)
+    if statistics is None:
+        raise ValueError("Statistics are unavailable for this dataset.")
+    return statistics
 
 
 def top_items(counter, limit: int | None = None) -> list[dict[str, Any]]:

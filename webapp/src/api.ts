@@ -1,5 +1,5 @@
 import { API_URL } from "./config";
-import type { DuplicateProgressState, ModelInspectPayload, ParsedModelSummary, UploadParseJob } from "./types";
+import type { DuplicateProgressState, ModelInspectPayload, ParsedModelSummary, StatisticsPayload, UploadParseJob } from "./types";
 
 type JsonObject = Record<string, unknown>;
 
@@ -94,6 +94,10 @@ export async function getDatasetModels(
   if (options?.warningType) query.set("warningType", options.warningType);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return getJson<DatasetModelsPage>(`/api/datasets/${encodeURIComponent(datasetId)}/models${suffix}`);
+}
+
+export async function getDatasetStatistics(datasetId: string): Promise<StatisticsPayload> {
+  return getJson<StatisticsPayload>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics`);
 }
 
 function delay(ms: number) {

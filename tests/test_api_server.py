@@ -172,7 +172,7 @@ def test_upload_start_resets_previous_pipeline_state_and_runtime(tmp_path):
     UPLOAD_PARSE_JOBS["old"] = {"status": "complete"}
     DUPLICATE_JOBS["old"] = {"status": "complete"}
 
-    runtime_dummy = api_server.RUNTIME_DIR / "index.json"
+    runtime_dummy = api_server.RUNTIME_DIR / "old" / "index.json"
     runtime_dummy.parent.mkdir(parents=True, exist_ok=True)
     runtime_dummy.write_text("{}", encoding="utf-8")
 
@@ -233,8 +233,9 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     )
     assert job["status"] == "complete"
     dataset_id = job["datasetId"]
-    assert (api_server.RUNTIME_DIR / "index.json").exists()
-    assert (api_server.RUNTIME_DIR / "ir" / dataset_id).exists()
+    assert (api_server.RUNTIME_DIR / dataset_id / "index.json").exists()
+    assert (api_server.RUNTIME_DIR / dataset_id / "statistics.json").exists()
+    assert (api_server.RUNTIME_DIR / dataset_id / "ir").exists()
 
     DATASETS.clear()
     inspect = client.get(f"/api/datasets/{dataset_id}/models/m-runtime/inspect")
@@ -242,6 +243,13 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
 
     assert inspect.status_code == 200
     assert inspect_data["model"]["id"] == "m-runtime"
+
+    statistics = client.get(f"/api/datasets/{dataset_id}/statistics")
+    statistics_data = statistics.get_json()
+
+    assert statistics.status_code == 200
+    assert statistics_data["summary"]["models"] == 1
+    assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
 
 
 def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields():
@@ -697,6 +705,9 @@ def test_flask_upload_dataset_route_reports_parsed_models():
     assert models_page["total"] == 12
     assert len(models_page["models"]) == 12
     assert "parsedModels" not in job["uploadSummary"]
+
+    statistics = client.get(f"/api/datasets/{job['datasetId']}/statistics").get_json()
+    assert statistics["summary"]["models"] == 12
 
 
 def test_flask_model_inspect_route_returns_nodes_and_edges():

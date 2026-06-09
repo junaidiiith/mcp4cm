@@ -25,7 +25,6 @@ from mcp4cm.parsers.graph import drop_ir_edges_with_missing_nodes
 from mcp4cm.parsers.parse import parse_file
 from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
 from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
-from mcp4cm.statistics import dataset_visualizations
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
 
 
@@ -145,22 +144,6 @@ def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
 
     assert len(detect_duplicates_by_node_name_hash(dataset)) == 1
     assert len(detect_duplicates_by_node_name_type_hash(dataset)) == 1
-
-
-def test_dataset_visualizations_cover_structural_views():
-    parser = ArchimateJsonParser()
-    record = parser.parse({"elements": [{"id": "a", "name": "Graph", "type": "Class"}], "relationships": []}, model_id="first")
-    record.metadata["extracted_names"] = ["customer account", "empty name", "class1"]
-    record.metadata["extracted_typed_names"] = ["class: customer account", "attribute: empty name", "class: class1"]
-
-    payload = dataset_visualizations(Dataset([record], "uml"))
-
-    assert payload["missingNameRatioHistogram"]
-    assert payload["missingNamesByType"] == [{"label": "attribute", "count": 1}]
-    assert payload["topConcepts"][0] == {"label": "customer account", "count": 1}
-    assert payload["topConceptsWithoutTypePlaceholders"] == [{"label": "customer account", "count": 1}]
-    assert payload["modelVocabularyScatter"][0]["missingNames"] == 1
-    assert payload["nameCountBoxplot"]["median"] == 3
 
 
 def test_duplicate_hash_reports_progress():
