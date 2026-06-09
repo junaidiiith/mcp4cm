@@ -1,5 +1,5 @@
 export type Language = "uml" | "ecore" | "archimate" | "bpmn";
-export type UploadFormat = "json" | "xmi" | "ecore" | "signavio";
+export type UploadFormat = "json" | "xmi" | "xml-pyecore" | "ecore" | "signavio";
 export type BusyState = "" | "parse" | "dummy" | "duplicates";
 
 export interface TechniqueOption {
@@ -114,7 +114,7 @@ export interface UploadParseJob {
   progress: number;
   processedFiles: number;
   totalFiles: number;
-  stage?: "queued" | "parse" | "complete";
+  stage?: "queued" | "parse" | "statistics" | "complete";
   parseProcessedFiles?: number;
   parseTotalFiles?: number;
   message: string;
@@ -199,12 +199,19 @@ export interface ModelInspectPayload {
     edgeCount: number;
     metadata: Record<string, unknown>;
   };
+  diagnostics?: {
+    parseStatus: string;
+    warningCount: number;
+    warningsByType: Record<string, number>;
+    warningMessagesByType: Record<string, string[]>;
+    errorMessage: string;
+    elementsLoaded: number;
+    elementsSkipped: number;
+    parseTimeMs: number;
+    sourcePath: string;
+  };
   nodes: Array<{ id: string; attrs?: Record<string, unknown> }>;
   edges: Array<{ source: string; target: string; key?: string; attrs?: Record<string, unknown> }>;
-  truncated: {
-    nodes: boolean;
-    edges: boolean;
-  };
 }
 
 export interface DuplicateProgressState {

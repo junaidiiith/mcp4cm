@@ -193,7 +193,6 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
               </div>
             ))}
           </div>
-          {payload.truncated.nodes && <p className="truncHint">Node list truncated for performance.</p>}
         </div>
         <div>
           <h4>Edges ({payload.edges.length})</h4>
@@ -205,7 +204,6 @@ export default function ModelGraphPreview({ payload }: { payload: ModelInspectPa
               </div>
             ))}
           </div>
-          {payload.truncated.edges && <p className="truncHint">Edge list truncated for performance.</p>}
         </div>
       </div>
     </div>

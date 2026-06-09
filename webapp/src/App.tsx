@@ -99,7 +99,6 @@ export default function App() {
   const directoryMode = selectedFormat.directoryPreferred;
   const representationEnabled = language === "uml" && format === "xmi";
   const warningsList = uploadSummary?.warningsList || [];
-  const parsedModels = uploadSummary?.parsedModels || [];
   const statsLoading =
     !stats &&
     (busy === "parse" || uploadParseJob?.status === "queued" || uploadParseJob?.status === "running");
@@ -110,7 +109,7 @@ export default function App() {
       : "Choose model directory"
     : files.length
       ? `${files.length} file(s) selected`
-      : "Choose JSON / JSONL files";
+      : "Choose JSON files";
 
   useEffect(() => {
     if (!error) return;
@@ -390,8 +389,8 @@ export default function App() {
             />
 
             <StatisticsPanel
+              datasetId={datasetId}
               uploadSummary={uploadSummary}
-              parsedModels={parsedModels}
               warningsList={warningsList}
               stats={stats}
               statsLoading={statsLoading}

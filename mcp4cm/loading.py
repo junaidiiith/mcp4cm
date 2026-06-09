@@ -1,81 +1,74 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
 
 from mcp4cm.core import Dataset, DatasetType, ModelRecord
-from mcp4cm.parsers import ArchimateParser, EcoreParser, UMLParser
-from mcp4cm.parsers.base import BaseModelParser
+from mcp4cm.parsers.parse import parse_file, parse_files
 
 
-def load_dataset(dataset_type: DatasetType | str, root: str | Path, language: str | Iterable[str] | None = None) -> Dataset:
+def load_dataset(
+    dataset_type: DatasetType | str,
+    root: str | Path,
+    language: str | Iterable[str] | None = None,
+    format: str | None = None,
+) -> Dataset:
     dataset_type = DatasetType(dataset_type)
     root = Path(root)
     if dataset_type == DatasetType.MODELSET:
-        records = [
-            *load_modelset(root / "uml.jsonl", UMLParser(), DatasetType.MODELSET_UML, language=language).records,
-            *load_modelset(root / "ecore.jsonl", EcoreParser(), DatasetType.MODELSET_ECORE, language=language).records,
-        ]
-        return Dataset(records=records, dataset_type=DatasetType.MODELSET, root=root)
+        records: list[ModelRecord] = []
+        diagnostics = {}
+        for parser_language in ("uml", "ecore"):
+            dataset = load_modelset(
+                root / parser_language,
+                language=parser_language,
+                format=format or "json",
+                dataset_type=f"modelset_{parser_language}",
+                filter_language=language,
+            )
+            records.extend(dataset.records)
+            diagnostics.update(dataset.diagnostics)
+        return Dataset(records=records, dataset_type=DatasetType.MODELSET, root=root, diagnostics=diagnostics)
     if dataset_type == DatasetType.MODELSET_UML:
-        return load_modelset(root / "uml.jsonl", UMLParser(), DatasetType.MODELSET_UML, language=language)
+        return load_modelset(root, language="uml", format=format or "json", dataset_type=DatasetType.MODELSET_UML, filter_language=language)
     if dataset_type == DatasetType.MODELSET_ECORE:
-        return load_modelset(root / "ecore.jsonl", EcoreParser(), DatasetType.MODELSET_ECORE, language=language)
+        return load_modelset(root, language="ecore", format=format or "json", dataset_type=DatasetType.MODELSET_ECORE, filter_language=language)
     if dataset_type == DatasetType.EAMODELSET:
         processed = root / "processed-models" if (root / "processed-models").exists() else root
-        return load_eamodelset(processed, language=language)
+        return load_eamodelset(processed, natural_language=language, format=format or "json")
     raise ValueError(f"Unsupported dataset type: {dataset_type}")
 
 
 def load_modelset(
     path: str | Path,
-    parser: BaseModelParser | None = None,
+    *,
+    language: str = "uml",
+    format: str = "json",
     dataset_type: DatasetType | str | None = None,
-    language: str | Iterable[str] | None = None,
+    filter_language: str | Iterable[str] | None = None,
 ) -> Dataset:
-    path = Path(path)
-    if parser is None:
-        lower_name = path.name.lower()
-        parser = EcoreParser() if "ecore" in lower_name else UMLParser()
-    with path.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-    if not isinstance(payload, list):
-        raise ValueError(f"Expected MODELSET file to contain a JSON array: {path}")
-
-    records = []
-    for item in payload:
-        record = parser.parse(item)
-        record.source_path = path
-        if _matches_language(record, language):
-            records.append(record)
-    return Dataset(records=records, dataset_type=dataset_type or parser.language, root=path)
+    source = Path(path)
+    filepaths = sorted(source.glob("*.json")) if source.is_dir() else [source]
+    parsed = parse_files(filepaths, language=language, format=format)
+    records = [record for record in parsed.records if _matches_language(record, filter_language)]
+    diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
+    return Dataset(records=records, dataset_type=dataset_type or language, root=source, diagnostics=diagnostics)
 
 
 def load_eamodelset(
     root: str | Path,
-    parser: ArchimateParser | None = None,
+    *,
     language: str | Iterable[str] | None = None,
+    format: str = "json",
+    natural_language: str | Iterable[str] | None = None,
 ) -> Dataset:
     root = Path(root)
-    parser = parser or ArchimateParser()
-    records = []
-    for model_path in sorted(root.glob("*/model.json")):
-        raw = _load_json_object(model_path)
-        record = parser.parse(raw, model_id=model_path.parent.name)
-        record.source_path = model_path
-        if _matches_language(record, language):
-            records.append(record)
-    return Dataset(records=records, dataset_type=DatasetType.EAMODELSET, root=root)
-
-
-def _load_json_object(path: Path) -> dict[str, Any]:
-    with path.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected JSON object in {path}")
-    return payload
+    filter_language = natural_language if natural_language is not None else language
+    filepaths = sorted(root.glob("*/model.json"))
+    parsed = parse_files(filepaths, language="archimate", format=format)
+    records = [record for record in parsed.records if _matches_language(record, filter_language)]
+    diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
+    return Dataset(records=records, dataset_type=DatasetType.EAMODELSET, root=root, diagnostics=diagnostics)
 
 
 def _matches_language(record: ModelRecord, language: str | Iterable[str] | None) -> bool:

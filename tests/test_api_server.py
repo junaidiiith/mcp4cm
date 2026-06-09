@@ -16,8 +16,8 @@ from mcp4cm.api_server import (
     create_app,
 )
 from mcp4cm.core import Dataset
-from mcp4cm.parsers.archimate import ArchimateParser
-from mcp4cm.parsers.extended import normalize_graph_attributes
+from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
+from mcp4cm.parsers.graph import normalize_graph_attributes
 
 
 def test_top_items_returns_all_values_when_limit_is_omitted():
@@ -37,7 +37,7 @@ def upload_and_parse_via_job(
     files,
     data_format: str = "json",
     session_overrides: dict | None = None,
-    poll_attempts: int = 40,
+    poll_attempts: int = 100,
 ):
     payload = {"language": language, "format": data_format}
     if session_overrides:
@@ -149,7 +149,7 @@ def test_upload_session_chunked_parse_job():
     assert job_data["status"] == "complete"
     assert job_data["processedFiles"] == 2
     assert job_data["uploadSummary"]["records"] == 1
-    assert job_data["uploadSummary"]["errors"] == 1
+    assert job_data["uploadSummary"]["errors"] == 0
     assert job_data["uploadSummary"]["warnings"] >= 1
     assert job_data["datasetId"]
     assert job_data["statistics"]["summary"]["models"] == 1
@@ -345,36 +345,21 @@ def test_normalize_graph_attributes_keeps_data_nested_without_top_level_duplicat
     assert edge_attrs["data"]["specific"] == "n1"
 
 
-def test_representation_profile_is_default_for_non_uml_xmi():
+def test_upload_start_rejects_options_not_supported_by_parser_descriptor():
     DATASETS.clear()
     client = create_app().test_client()
 
-    payload = {
-        "archimateId": "m1",
-        "name": "Example",
-        "elements": [{"id": "a", "name": "App", "type": "ApplicationComponent"}],
-        "relationships": [],
-    }
-
-    _, _, job = upload_and_parse_via_job(
-        client,
-        language="archimate",
-        data_format="json",
-        files=(BytesIO(json.dumps(payload).encode("utf-8")), "model.json"),
-        session_overrides={
+    response = client.post(
+        "/api/uploads/start",
+        json={
+            "language": "archimate",
+            "format": "json",
             "includeAttributes": False,
-            "includeOperations": False,
-            "includeParameters": False,
         },
     )
-    assert job["status"] == "complete"
-    profile = job["uploadSummary"]["representationProfile"]
-    assert profile == {
-        "includeAttributes": True,
-        "includeOperations": True,
-        "includeParameters": True,
-        "includeModelRootNode": False,
-    }
+
+    assert response.status_code == 400
+    assert "Unsupported option" in response.get_json()["error"]
 
 
 def test_pids_on_port_uses_lsof(monkeypatch):
@@ -449,7 +434,7 @@ def test_flask_upload_dataset_route():
     assert job["statistics"]["summary"]["models"] == 1
 
 
-def test_flask_upload_dataset_route_accepts_multipart_jsonl():
+def test_flask_upload_dataset_route_rejects_jsonl():
     DATASETS.clear()
     client = create_app().test_client()
     content = b"""
@@ -463,10 +448,10 @@ def test_flask_upload_dataset_route_accepts_multipart_jsonl():
         files=(BytesIO(content), "models.jsonl"),
     )
 
-    assert job["status"] == "complete"
-    assert job["datasetId"] in DATASETS
-    assert job["statistics"]["summary"]["models"] == 2
-    assert job["uploadSummary"]["records"] == 2
+    assert job["status"] == "error"
+    assert job["uploadSummary"]["records"] == 0
+    assert job["uploadSummary"]["ignoredFiles"] == ["models.jsonl"]
+    assert "SKIPPED_UNSUPPORTED_EXTENSION" in job["uploadSummary"]["warningsByType"]
 
 
 def test_flask_xmi_upload_reports_empty_and_invalid_files_separately():
@@ -483,15 +468,15 @@ def test_flask_xmi_upload_reports_empty_and_invalid_files_separately():
         ],
     )
 
-    assert job["status"] == "complete"
+    assert job["status"] == "error"
     assert job["uploadSummary"]["records"] == 0
     assert job["uploadSummary"]["errors"] == 2
     assert job["uploadSummary"]["emptyFiles"] == ["models/empty.xmi"]
     assert job["uploadSummary"]["invalidFiles"] == ["models/invalid.xmi"]
-    assert job["uploadSummary"]["warningsByType"] == {"EMPTY_FILE": 1, "INVALID_XML": 1}
+    assert job["uploadSummary"]["warningsByType"] == {"EMPTY_FILE": 1, "PARSE_ERROR": 1}
 
 
-def test_directory_upload_infers_archimate_and_ignores_macos_metadata():
+def test_directory_upload_does_not_infer_archimate_and_ignores_macos_metadata():
     DATASETS.clear()
     client = create_app().test_client()
     archimate = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -512,18 +497,15 @@ def test_directory_upload_infers_archimate_and_ignores_macos_metadata():
         ],
     )
 
-    assert job["status"] == "complete"
+    assert job["status"] == "error"
     assert job["uploadSummary"]["format"] == "xmi"
-    assert job["uploadSummary"]["language"] == "archimate"
-    assert job["uploadSummary"]["records"] == 1
+    assert job["uploadSummary"]["language"] == "uml"
+    assert job["uploadSummary"]["records"] == 0
     assert job["uploadSummary"]["errors"] == 0
-    assert job["uploadSummary"]["ignoredFiles"] == ["__MACOSX/eamodelset/._model.archimate"]
-    assert DATASETS[job["datasetId"]].dataset_type == "archimate"
-    assert api_server.infer_directory_source(
-        "archimate",
-        "xmi",
-        [{"relativePath": "modelset-uml/model.xmi"}],
-    ) == ("uml", "xmi")
+    assert job["uploadSummary"]["ignoredFiles"] == [
+        "__MACOSX/eamodelset/._model.archimate",
+        "eamodelset/model.archimate",
+    ]
 
 
 def test_flask_upload_dataset_route_accepts_signavio_bpmn_format():
@@ -592,19 +574,19 @@ def test_flask_signavio_upload_reports_parse_error_for_non_json_files():
     )
     assert job["status"] == "complete"
     assert job["statistics"]["summary"]["models"] == 1
-    assert job["uploadSummary"]["errors"] == 1
+    assert job["uploadSummary"]["errors"] == 0
     assert job["uploadSummary"]["warnings"] >= 1
-    assert "PARSE_ERROR" in job["uploadSummary"]["warningsByType"]
+    assert "SKIPPED_UNSUPPORTED_EXTENSION" in job["uploadSummary"]["warningsByType"]
     assert job["uploadSummary"]["warningsList"]
     first_warning = job["uploadSummary"]["warningsList"][0]
-    assert first_warning["type"] == "PARSE_ERROR"
+    assert first_warning["type"] == "SKIPPED_UNSUPPORTED_EXTENSION"
     assert first_warning["path"] == "ignored/readme.txt"
     assert "message" in first_warning
     assert job["uploadSummary"]["warningFiles"][0]["hasDetails"] is True
     assert "modelId" in job["uploadSummary"]["warningFiles"][0]
 
 
-def test_flask_upload_dataset_jsonl_processes_all_models():
+def test_flask_upload_dataset_jsonl_is_not_supported():
     DATASETS.clear()
     client = create_app().test_client()
     lines = "\n".join(
@@ -624,12 +606,12 @@ def test_flask_upload_dataset_jsonl_processes_all_models():
         files=(BytesIO(lines.encode("utf-8")), "models.jsonl"),
     )
 
-    assert job["status"] == "complete"
-    assert job["statistics"]["summary"]["models"] == 12
-    assert job["uploadSummary"]["records"] == 12
+    assert job["status"] == "error"
+    assert job["uploadSummary"]["records"] == 0
+    assert "SKIPPED_UNSUPPORTED_EXTENSION" in job["uploadSummary"]["warningsByType"]
 
 
-def test_flask_upload_dataset_route_flattens_jsonl_array_lines():
+def test_flask_upload_dataset_route_rejects_jsonl_array_lines():
     DATASETS.clear()
     client = create_app().test_client()
     content = b"""
@@ -642,30 +624,25 @@ def test_flask_upload_dataset_route_flattens_jsonl_array_lines():
         files=(BytesIO(content), "models.jsonl"),
     )
 
-    assert job["status"] == "complete"
-    assert job["statistics"]["summary"]["models"] == 2
+    assert job["status"] == "error"
+    assert job["uploadSummary"]["records"] == 0
 
 
-def test_merge_record_warnings_does_not_add_parse_warning_when_typed_warnings_exist():
+def test_merge_model_diagnostics_does_not_add_parse_warning_when_typed_warnings_exist():
     summary = api_server.empty_upload_summary()
-    record = SimpleNamespace(
-        source_path=Path("modelset-uml/f51fd8af-292f-44c7-8a63-b9fc80cb4ab7.xmi"),
-        model_id="f51fd8af-292f-44c7-8a63-b9fc80cb4ab7",
-        metadata={
-            "parse_warnings_total": 1,
-            "parse_warnings_by_type": {"INVALID_TYPE_REFERENCE": 1},
-            "parse_warning_messages_by_type": {
-                "INVALID_TYPE_REFERENCE": [
-                    "Association end end-1 has no resolvable type reference.",
-                ]
-            },
-            "parse_warning_messages": [
+    diagnostics = api_server.ModelDiagnostics(
+        parse_status="warning",
+        warning_count=1,
+        warnings_by_type={"INVALID_TYPE_REFERENCE": 1},
+        warning_messages_by_type={
+            "INVALID_TYPE_REFERENCE": [
                 "Association end end-1 has no resolvable type reference.",
             ],
         },
+        source_path="modelset-uml/f51fd8af-292f-44c7-8a63-b9fc80cb4ab7.xmi",
     )
 
-    api_server.merge_record_warnings(summary, record)
+    api_server.merge_model_diagnostics(summary, "f51fd8af-292f-44c7-8a63-b9fc80cb4ab7", diagnostics)
 
     assert summary["warnings"] == 1
     assert summary["warningsByType"] == {"INVALID_TYPE_REFERENCE": 1}
@@ -691,6 +668,9 @@ def test_flask_upload_dataset_route_rejects_zero_parsed_models():
 
 def test_flask_upload_dataset_route_reports_parsed_models():
     DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
     client = create_app().test_client()
     models = [
         {
@@ -702,20 +682,28 @@ def test_flask_upload_dataset_route_reports_parsed_models():
         for index in range(12)
     ]
 
-    _, _, job = upload_and_parse_via_job(
-        client,
-        language="archimate",
-        files=(BytesIO(json.dumps(models).encode("utf-8")), "models.json"),
-    )
+    files = [
+        (BytesIO(json.dumps(model).encode("utf-8")), f"models/model-{index}.json")
+        for index, model in enumerate(models)
+    ]
+
+    _, _, job = upload_and_parse_via_job(client, language="archimate", files=files)
 
     assert job["status"] == "complete"
     assert job["uploadSummary"]["records"] == 12
     assert job["statistics"]["summary"]["models"] == 12
     assert len(DATASETS[job["datasetId"]]) == 12
+    models_page = client.get(f"/api/datasets/{job['datasetId']}/models?page=1&pageSize=50").get_json()
+    assert models_page["total"] == 12
+    assert len(models_page["models"]) == 12
+    assert "parsedModels" not in job["uploadSummary"]
 
 
 def test_flask_model_inspect_route_returns_nodes_and_edges():
     DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
     client = create_app().test_client()
     payload = {
         "archimateId": "inspect-model",
@@ -737,23 +725,25 @@ def test_flask_model_inspect_route_returns_nodes_and_edges():
     assert job["status"] == "complete"
     dataset_id = job["datasetId"]
 
-    response = client.get(f"/api/datasets/{dataset_id}/models/inspect-model/inspect?nodeLimit=1&includeAttrs=false")
+    response = client.get(f"/api/datasets/{dataset_id}/models/inspect-model/inspect?includeAttrs=false")
     data = response.get_json()
 
     assert response.status_code == 200
     assert data["model"]["id"] == "inspect-model"
     assert data["model"]["nodeCount"] == 2
     assert data["model"]["edgeCount"] == 1
-    assert len(data["nodes"]) == 1
+    assert len(data["nodes"]) == 2
     assert "attrs" not in data["nodes"][0]
-    assert data["truncated"]["nodes"] is True
-    assert job["uploadSummary"]["parsedModels"][0]["nodeCount"] == 2
-    assert job["uploadSummary"]["parsedModels"][0]["edgeCount"] == 1
+
+    models_page = client.get(f"/api/datasets/{dataset_id}/models?page=1&pageSize=10").get_json()
+    assert models_page["total"] == 1
+    assert models_page["models"][0]["nodeCount"] == 2
+    assert models_page["models"][0]["edgeCount"] == 1
 
 
 def test_flask_duplicates_returns_model_counts_for_pie_charts():
     DATASETS.clear()
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {
             "elements": [{"id": "a", "name": "Order", "type": "BusinessObject"}],
@@ -804,7 +794,7 @@ def test_flask_duplicates_returns_model_counts_for_pie_charts():
 
 def test_flask_duplicate_pairs_counts_candidate_pairs_not_only_vote_approved_pairs():
     DATASETS.clear()
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {"elements": [{"id": "a", "name": "Order", "type": "BusinessObject"}], "relationships": []},
         model_id="first",
@@ -841,7 +831,7 @@ def test_flask_duplicate_pairs_counts_candidate_pairs_not_only_vote_approved_pai
 
 def test_flask_duplicate_detection_job_reports_progress_and_result():
     DATASETS.clear()
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {"elements": [{"id": "a", "name": "Order", "type": "BusinessObject"}], "relationships": []},
         model_id="first",

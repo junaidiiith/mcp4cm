@@ -194,6 +194,18 @@ decisions = vote_duplicate_pairs(
 duplicate_model_ids = duplicate_model_ids_from_votes(decisions)
 ```
 
-## Extending With a New Modeling Language
+## Extending Parsers
 
-Add a parser that extends `BaseModelParser` and returns a `ModelRecord` with a NetworkX graph. Register it with `mcp4cm.parsers.registry.register("bpmn", BPMNParser)`. Once the parser maps raw data into nodes, edges, names, types, and metadata, the generic cleansing tools work without language-specific changes.
+Parsers are resolved by `(language, format)` through `mcp4cm.parsers.catalog`.
+Current parser keys are:
+
+- `uml/json`
+- `uml/xmi`
+- `uml/xmi-pyecore`
+- `ecore/json`
+- `ecore/ecore`
+- `archimate/json`
+- `archimate/xmi`
+- `bpmn/signavio`
+
+Add a parser adapter package under `mcp4cm/parsers/`, register a `ParserDescriptor`, and return a `ParsedModelResult` containing a `ModelRecord` plus `ModelDiagnostics`. JSON graph parsers may build `ModelRecord` directly; source-file parsers can emit IR and convert it through the shared graph utilities.

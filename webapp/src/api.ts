@@ -1,5 +1,5 @@
 import { API_URL } from "./config";
-import type { DuplicateProgressState, ModelInspectPayload, UploadParseJob } from "./types";
+import type { DuplicateProgressState, ModelInspectPayload, ParsedModelSummary, UploadParseJob } from "./types";
 
 type JsonObject = Record<string, unknown>;
 
@@ -55,16 +55,45 @@ export async function pollUploadParseJob(
 export async function getModelInspect(
   datasetId: string,
   modelId: string,
-  options?: { nodeLimit?: number; edgeLimit?: number; includeAttrs?: boolean },
+  options?: { includeAttrs?: boolean },
 ): Promise<ModelInspectPayload> {
   const query = new URLSearchParams();
-  if (options?.nodeLimit) query.set("nodeLimit", String(options.nodeLimit));
-  if (options?.edgeLimit) query.set("edgeLimit", String(options.edgeLimit));
   if (typeof options?.includeAttrs === "boolean") query.set("includeAttrs", String(options.includeAttrs));
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return getJson<ModelInspectPayload>(
     `/api/datasets/${encodeURIComponent(datasetId)}/models/${encodeURIComponent(modelId)}/inspect${suffix}`,
   );
+}
+
+export interface DatasetModelsPage {
+  datasetId: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  models: ParsedModelSummary[];
+}
+
+export async function getDatasetModels(
+  datasetId: string,
+  options?: {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    sort?: string;
+    order?: "asc" | "desc";
+    warningType?: string;
+  },
+): Promise<DatasetModelsPage> {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.query) query.set("query", options.query);
+  if (options?.sort) query.set("sort", options.sort);
+  if (options?.order) query.set("order", options.order);
+  if (options?.warningType) query.set("warningType", options.warningType);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<DatasetModelsPage>(`/api/datasets/${encodeURIComponent(datasetId)}/models${suffix}`);
 }
 
 function delay(ms: number) {

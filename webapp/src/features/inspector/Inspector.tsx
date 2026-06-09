@@ -46,8 +46,6 @@ export function useModelInspect(datasetId: string, modelId: string | null): Mode
       setError("");
       try {
         const response = await getModelInspect(datasetId, modelId, {
-          nodeLimit: 400,
-          edgeLimit: 800,
           includeAttrs: true,
         });
         if (!cancelled) {

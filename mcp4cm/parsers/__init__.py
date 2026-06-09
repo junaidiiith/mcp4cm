@@ -1,26 +1,23 @@
-from mcp4cm.parsers.archimate import ArchimateParser
-from mcp4cm.parsers.base import BaseModelParser
-from mcp4cm.parsers.extended import (
-    ArchimateArchiModelParser,
-    BPMNSignavioModelParser,
-    EcoreXMIModelParser,
-    UMLXMIModelParser,
+from mcp4cm.parsers.catalog import (
+    ParsedModelResult,
+    ParserDescriptor,
+    ParserOptions,
+    parser_descriptors,
+    resolve_parser,
 )
-from mcp4cm.parsers.modelset import EcoreParser, UMLParser
-from mcp4cm.parsers.registry import registry
-
-registry.register("uml", UMLParser)
-registry.register("ecore", EcoreParser)
-registry.register("archimate", ArchimateParser)
+from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
+from mcp4cm.parsers.ir import Edge, IR, Node
 
 __all__ = [
-    "ArchimateParser",
-    "ArchimateArchiModelParser",
-    "BaseModelParser",
-    "BPMNSignavioModelParser",
-    "EcoreParser",
-    "EcoreXMIModelParser",
-    "UMLParser",
-    "UMLXMIModelParser",
-    "registry",
+    "CannotParseError",
+    "Edge",
+    "IR",
+    "Node",
+    "ParsedModelResult",
+    "ParserDescriptor",
+    "ParserOptions",
+    "ParserRunStats",
+    "WarningType",
+    "parser_descriptors",
+    "resolve_parser",
 ]

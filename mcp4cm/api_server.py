@@ -12,8 +12,6 @@ import tempfile
 import threading
 import time
 import uuid
-import xml.etree.ElementTree as ET
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +20,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from mcp4cm._deps import require_networkx
-from mcp4cm.core import Dataset, ModelRecord
+from mcp4cm.core import Dataset, ModelDiagnostics, ModelRecord
 from mcp4cm.dummy import (
     default_filter_configs,
     evaluate_dummy_filters,
@@ -35,31 +33,38 @@ from mcp4cm.duplicates import (
     graph_similarity_pairs,
     tfidf_duplicate_pairs,
 )
-from mcp4cm.parsers.archimate import ArchimateParser
-from mcp4cm.parsers.extended import (
-    ArchimateArchiModelParser,
-    BPMNSignavioModelParser,
-    EcoreXMIModelParser,
-    RepresentationProfile,
-    UMLXMIModelParser,
+from mcp4cm.parsers.catalog import parser_descriptors, resolve_parser
+from mcp4cm.parsers.parse import FileParseIssue, parse_staged_files
+from mcp4cm.runtime_store import (
+    RUNTIME_DIR,
+    RUNTIME_IR_DIR,
+    RUNTIME_INDEX,
+    RUNTIME_LOCK,
+    RuntimeDataset,
+    deserialize_graph_from_runtime,
+    finalize_runtime_dataset,
+    get_dataset_meta,
+    json_safe,
+    list_dataset_models,
+    load_model_from_runtime,
+    resolve_dataset,
+    runtime_model_filename,
+    serialize_graph_for_runtime,
+    serialize_model_for_runtime,
+    spill_model_to_runtime,
 )
-from mcp4cm.parsers.modelset import EcoreParser, UMLParser
-from mcp4cm.statistics import dataset_summary, dataset_visualizations, name_counts, node_names, type_counts
+from mcp4cm.statistics import CorpusStatisticsAccumulator, serialize_dataset_statistics
 
-DATASETS: dict[str, Dataset] = {}
+DATASETS: dict[str, Dataset | RuntimeDataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
 UPLOAD_SESSIONS: dict[str, dict[str, Any]] = {}
 UPLOAD_PARSE_JOBS: dict[str, dict[str, Any]] = {}
 DUPLICATE_JOBS_LOCK = threading.Lock()
 UPLOAD_LOCK = threading.Lock()
 WEBAPP_DIST = Path(__file__).resolve().parents[1] / "webapp" / "dist"
-RUNTIME_DIR = Path(__file__).resolve().parents[1] / "runtime"
-RUNTIME_IR_DIR = RUNTIME_DIR / "ir"
-RUNTIME_INDEX = RUNTIME_DIR / "index.json"
 LOG = logging.getLogger("mcp4cm.api")
-SUPPORTED_LANGUAGES = {"uml", "ecore", "archimate", "bpmn"}
-SUPPORTED_FORMATS = {"json", "xmi", "ecore", "signavio"}
-RUNTIME_LOCK = threading.Lock()
+SUPPORTED_LANGUAGES = {descriptor.language for descriptor in parser_descriptors()}
+SUPPORTED_FORMATS = {descriptor.format for descriptor in parser_descriptors()}
 
 
 def default_dummy_filter_configs(language: str) -> list[dict[str, Any]]:
@@ -90,17 +95,29 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
     def health():
         return jsonify({"ok": True})
 
+    @app.route("/api/datasets/<dataset_id>/models", methods=["GET"])
+    def list_models_route(dataset_id: str):
+        page = parse_positive_int_param(request.args.get("page", 1), "page") or 1
+        page_size = parse_positive_int_param(request.args.get("pageSize", 50), "pageSize") or 50
+        return jsonify(
+            list_dataset_models(
+                dataset_id,
+                page=page,
+                page_size=page_size,
+                query=str(request.args.get("query") or ""),
+                sort=str(request.args.get("sort") or "modelId"),
+                order=str(request.args.get("order") or "asc"),
+                warning_type=str(request.args.get("warningType") or ""),
+            )
+        )
+
     @app.route("/api/datasets/<dataset_id>/models/<model_id>/inspect", methods=["GET"])
     def inspect_model_route(dataset_id: str, model_id: str):
-        node_limit = request.args.get("nodeLimit")
-        edge_limit = request.args.get("edgeLimit")
         include_attrs = parse_form_bool(request.args.get("includeAttrs"), True)
         return jsonify(
             inspect_dataset_model(
                 dataset_id=dataset_id,
                 model_id=model_id,
-                node_limit=parse_positive_int_param(node_limit, "nodeLimit"),
-                edge_limit=parse_positive_int_param(edge_limit, "edgeLimit"),
                 include_attrs=include_attrs,
             )
         )
@@ -187,256 +204,6 @@ def configure_logging() -> None:
         handler.setFormatter(formatter)
 
     logging.basicConfig(level=level, handlers=handlers, force=True)
-
-
-def runtime_index_template() -> dict[str, Any]:
-    return {
-        "version": 1,
-        "updatedAt": time.time(),
-        "datasets": {},
-    }
-
-
-def ensure_runtime_store() -> None:
-    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
-    if not RUNTIME_INDEX.exists():
-        RUNTIME_INDEX.write_text(json.dumps(runtime_index_template(), ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def load_runtime_index() -> dict[str, Any]:
-    ensure_runtime_store()
-    try:
-        payload = json.loads(RUNTIME_INDEX.read_text(encoding="utf-8"))
-    except Exception:
-        payload = runtime_index_template()
-    if not isinstance(payload, dict):
-        payload = runtime_index_template()
-    payload.setdefault("version", 1)
-    payload.setdefault("updatedAt", time.time())
-    payload.setdefault("datasets", {})
-    if not isinstance(payload["datasets"], dict):
-        payload["datasets"] = {}
-    return payload
-
-
-def save_runtime_index(index_payload: dict[str, Any]) -> None:
-    index_payload["updatedAt"] = time.time()
-    RUNTIME_IR_DIR.mkdir(parents=True, exist_ok=True)
-    temp_path = RUNTIME_INDEX.with_suffix(".tmp")
-    temp_path.write_text(json.dumps(index_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    temp_path.replace(RUNTIME_INDEX)
-
-
-def runtime_model_filename(model_id: str, index: int, seen: set[str]) -> str:
-    base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(model_id or "").strip()) or f"model_{index + 1}"
-    candidate = f"{base}.json"
-    counter = 1
-    while candidate in seen:
-        candidate = f"{base}_{counter}.json"
-        counter += 1
-    seen.add(candidate)
-    return candidate
-
-
-def _flatten_runtime_attrs(attrs: Any, *, skip_keys: set[str]) -> dict[str, Any]:
-    if not isinstance(attrs, dict):
-        return {}
-    flattened: dict[str, Any] = {}
-    for raw_key, raw_value in attrs.items():
-        key = str(raw_key)
-        if key == "attrs" or key in skip_keys:
-            continue
-        flattened[key] = json_safe(raw_value)
-    return flattened
-
-
-def _drop_runtime_data_duplicates(payload: dict[str, Any], *, protected_keys: set[str]) -> dict[str, Any]:
-    data = payload.get("data")
-    if not isinstance(data, dict):
-        return payload
-    for key in list(payload.keys()):
-        if key == "data" or key in protected_keys:
-            continue
-        if key in data and payload.get(key) == data.get(key):
-            payload.pop(key, None)
-    return payload
-
-
-def serialize_graph_for_runtime(graph) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "directed": bool(graph.is_directed()),
-        "multigraph": bool(graph.is_multigraph()),
-        "graphAttrs": json_safe(dict(graph.graph)),
-        "nodes": [],
-        "edges": [],
-    }
-    for node_id, attrs in graph.nodes(data=True):
-        node_entry: dict[str, Any] = {"id": json_safe(node_id)}
-        node_entry.update(_flatten_runtime_attrs(attrs, skip_keys={"id"}))
-        payload["nodes"].append(
-            _drop_runtime_data_duplicates(
-                node_entry,
-                protected_keys={"id", "type", "name"},
-            )
-        )
-    if graph.is_multigraph():
-        for source, target, key, attrs in graph.edges(keys=True, data=True):
-            edge_entry: dict[str, Any] = {
-                "source": json_safe(source),
-                "target": json_safe(target),
-                "key": json_safe(key),
-            }
-            edge_entry.update(_flatten_runtime_attrs(attrs, skip_keys=set()))
-            if "id" not in edge_entry and edge_entry.get("key") is not None:
-                edge_entry["id"] = edge_entry["key"]
-            payload["edges"].append(
-                _drop_runtime_data_duplicates(
-                    edge_entry,
-                    protected_keys={"source", "target", "key", "id", "type"},
-                )
-            )
-    else:
-        for source, target, attrs in graph.edges(data=True):
-            edge_entry = {"source": json_safe(source), "target": json_safe(target)}
-            edge_entry.update(_flatten_runtime_attrs(attrs, skip_keys=set()))
-            payload["edges"].append(
-                _drop_runtime_data_duplicates(
-                    edge_entry,
-                    protected_keys={"source", "target", "id", "type"},
-                )
-            )
-    return payload
-
-
-def serialize_model_for_runtime(record: ModelRecord) -> dict[str, Any]:
-    return {
-        "modelId": str(record.model_id),
-        "language": str(record.language),
-        "labels": [str(label) for label in record.labels],
-        "name": str(record.name or ""),
-        "sourcePath": str(record.source_path or ""),
-        "rawText": str(record.raw_text or ""),
-        "rawXmi": str(record.raw_xmi or ""),
-        "metadata": json_safe(record.metadata if isinstance(record.metadata, dict) else {}),
-        "graph": serialize_graph_for_runtime(record.graph),
-    }
-
-
-def deserialize_graph_from_runtime(payload: dict[str, Any]):
-    nx = require_networkx()
-    directed = bool(payload.get("directed", True))
-    multigraph = bool(payload.get("multigraph", False))
-    graph_cls = (
-        nx.MultiDiGraph
-        if directed and multigraph
-        else nx.DiGraph
-        if directed
-        else nx.MultiGraph
-        if multigraph
-        else nx.Graph
-    )
-    graph = graph_cls()
-    graph.graph.update(payload.get("graphAttrs") or {})
-    for node in payload.get("nodes") or []:
-        node_id = node.get("id")
-        attrs: dict[str, Any] = {}
-        legacy_attrs = node.get("attrs")
-        if isinstance(legacy_attrs, dict):
-            attrs.update(legacy_attrs)
-        for key, value in (node or {}).items():
-            if key in {"id", "attrs"}:
-                continue
-            attrs[str(key)] = value
-        graph.add_node(node_id, **attrs)
-    for edge in payload.get("edges") or []:
-        source = edge.get("source")
-        target = edge.get("target")
-        attrs: dict[str, Any] = {}
-        legacy_attrs = edge.get("attrs")
-        if isinstance(legacy_attrs, dict):
-            attrs.update(legacy_attrs)
-        for key, value in (edge or {}).items():
-            if key in {"source", "target", "key", "attrs"}:
-                continue
-            attrs[str(key)] = value
-        if multigraph:
-            edge_key = edge.get("key")
-            if edge_key is None:
-                edge_key = attrs.get("id")
-            graph.add_edge(source, target, key=edge_key, **attrs)
-        else:
-            graph.add_edge(source, target, **attrs)
-    return graph
-
-
-def deserialize_model_from_runtime(payload: dict[str, Any]) -> ModelRecord:
-    graph_payload = payload.get("graph")
-    if not isinstance(graph_payload, dict):
-        raise ValueError("Persisted model graph payload is missing or invalid.")
-    source_path = str(payload.get("sourcePath") or "")
-    return ModelRecord(
-        model_id=str(payload.get("modelId") or ""),
-        language=str(payload.get("language") or ""),
-        graph=deserialize_graph_from_runtime(graph_payload),
-        labels=tuple(str(label) for label in (payload.get("labels") or [])),
-        name=str(payload.get("name") or "") or None,
-        source_path=Path(source_path) if source_path else None,
-        raw_text=str(payload.get("rawText") or ""),
-        raw_xmi=str(payload.get("rawXmi") or ""),
-        metadata=dict(payload.get("metadata") or {}),
-    )
-
-
-def persist_dataset_to_runtime(dataset_id: str, dataset: Dataset) -> None:
-    dataset_id = str(dataset_id)
-    if not dataset_id:
-        return
-    with RUNTIME_LOCK:
-        ensure_runtime_store()
-        dataset_dir = RUNTIME_IR_DIR / dataset_id
-        shutil.rmtree(dataset_dir, ignore_errors=True)
-        dataset_dir.mkdir(parents=True, exist_ok=True)
-        seen_files: set[str] = set()
-        model_entries: list[dict[str, Any]] = []
-        for index, record in enumerate(dataset.records):
-            filename = runtime_model_filename(record.model_id, index, seen_files)
-            model_payload = serialize_model_for_runtime(record)
-            (dataset_dir / filename).write_text(json.dumps(model_payload, ensure_ascii=False), encoding="utf-8")
-            model_entries.append({"modelId": str(record.model_id), "file": filename, "language": str(record.language)})
-        index_payload = load_runtime_index()
-        index_payload["datasets"][dataset_id] = {
-            "datasetId": dataset_id,
-            "datasetType": str(dataset.dataset_type),
-            "createdAt": time.time(),
-            "recordCount": len(dataset.records),
-            "models": model_entries,
-        }
-        save_runtime_index(index_payload)
-
-
-def load_dataset_from_runtime(dataset_id: str) -> Dataset | None:
-    dataset_id = str(dataset_id)
-    if not dataset_id:
-        return None
-    with RUNTIME_LOCK:
-        index_payload = load_runtime_index()
-        dataset_meta = index_payload.get("datasets", {}).get(dataset_id)
-        if not isinstance(dataset_meta, dict):
-            return None
-        dataset_dir = RUNTIME_IR_DIR / dataset_id
-        if not dataset_dir.exists():
-            return None
-        records: list[ModelRecord] = []
-        for model_entry in dataset_meta.get("models") or []:
-            filename = str((model_entry or {}).get("file") or "")
-            if not filename:
-                continue
-            model_path = dataset_dir / filename
-            if not model_path.exists():
-                continue
-            model_payload = json.loads(model_path.read_text(encoding="utf-8"))
-            records.append(deserialize_model_from_runtime(model_payload))
-        return Dataset(records=records, dataset_type=str(dataset_meta.get("datasetType") or "runtime"), root=dataset_dir)
 
 
 def has_active_pipeline_run() -> bool:
@@ -549,33 +316,20 @@ def parse_form_bool(value: Any, default: bool = True) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def representation_profile_from_body(body: dict[str, Any], language: str, data_format: str) -> RepresentationProfile:
-    if language != "uml" or data_format != "xmi":
-        return RepresentationProfile()
-    return RepresentationProfile(
-        include_attributes=parse_form_bool(body.get("includeAttributes"), True),
-        include_operations=parse_form_bool(body.get("includeOperations"), True),
-        include_parameters=parse_form_bool(body.get("includeParameters"), True),
-        include_model_root_node=parse_form_bool(body.get("includeModelRootNode"), False),
-    )
-
-
 def validate_language_and_format(language: str, data_format: str) -> None:
-    if language not in SUPPORTED_LANGUAGES:
-        raise ValueError("language must be one of: uml, ecore, archimate, bpmn")
-    if data_format not in SUPPORTED_FORMATS:
-        raise ValueError("format must be one of: json, xmi, ecore, signavio")
+    resolve_parser(language, data_format)
 
-    allowed_formats = {
-        "uml": {"json", "xmi"},
-        "archimate": {"json", "xmi"},
-        "ecore": {"json", "ecore"},
-        "bpmn": {"signavio"},
-    }
-    if data_format not in allowed_formats.get(language, set()):
+
+def parser_option_payload_from_body(body: dict[str, Any], language: str, data_format: str) -> dict[str, Any]:
+    descriptor = resolve_parser(language, data_format)
+    option_names = {spec.external_name for spec in descriptor.option_specs}
+    base_keys = {"language", "format"}
+    unsupported = sorted(str(key) for key in body if key not in base_keys and key not in option_names)
+    if unsupported:
         raise ValueError(
-            f"format '{data_format}' is not supported for language '{language}'."
+            f"Unsupported option(s) for {language}/{data_format}: {', '.join(unsupported)}"
         )
+    return {key: body[key] for key in option_names if key in body}
 
 
 def start_upload_session(body: dict[str, Any]) -> dict[str, Any]:
@@ -585,14 +339,16 @@ def start_upload_session(body: dict[str, Any]) -> dict[str, Any]:
     language = str(body.get("language") or "").lower()
     data_format = str(body.get("format") or "json").lower()
     validate_language_and_format(language, data_format)
-    representation = representation_profile_from_body(body, language, data_format)
+    parser_options_payload = parser_option_payload_from_body(body, language, data_format)
+    parser_options = resolve_parser(language, data_format).normalize_options(parser_options_payload)
     upload_id = uuid.uuid4().hex
     stage_dir = Path(tempfile.mkdtemp(prefix="mcp4cm-upload-"))
     session = {
         "uploadId": upload_id,
         "language": language,
         "format": data_format,
-        "representationProfile": representation.as_metadata(),
+        "parserOptions": parser_options_payload,
+        "parserOptionsNormalized": dict(parser_options.values),
         "stageDir": str(stage_dir),
         "files": [],
         "totalBytes": 0,
@@ -748,17 +504,9 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
             language = str(session["language"])
             data_format = str(session["format"])
             session_stage_dir = str(session.get("stageDir") or "")
-            profile_payload = dict(session["representationProfile"])
-            representation = RepresentationProfile(
-                include_attributes=bool(profile_payload.get("includeAttributes", True)),
-                include_operations=bool(profile_payload.get("includeOperations", True)),
-                include_parameters=bool(profile_payload.get("includeParameters", True)),
-                include_model_root_node=bool(profile_payload.get("includeModelRootNode", False)),
-            )
+            parser_options = dict(session.get("parserOptions") or {})
+            normalized_parser_options = dict(session.get("parserOptionsNormalized") or {})
             staged_files = list(session["files"])
-            language, data_format = infer_directory_source(language, data_format, staged_files)
-            if language != "uml":
-                representation = RepresentationProfile()
 
         report(
             status="running",
@@ -767,27 +515,56 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
             totalFiles=len(staged_files),
             parseTotalFiles=len(staged_files),
         )
-        dataset, parse_summary = parse_staged_dataset(
+        dataset_id = uuid.uuid4().hex
+        runtime_dataset, parse_summary, corpus_stats = parse_staged_dataset(
+            dataset_id,
             language,
             data_format,
-            representation,
+            parser_options,
             staged_files,
             progress=lambda processed, total: report(
                 status="running",
                 **parse_phase_progress(processed, total),
             ),
         )
-        if not dataset.records and not (parse_summary["emptyFiles"] or parse_summary["invalidFiles"]):
-            raise ValueError("Parsing produced 0 models. Check parser format and file contents.")
-        total_records = len(dataset.records)
+        total_records = len(runtime_dataset)
         parse_summary["format"] = data_format
         parse_summary["language"] = language
-        parse_summary["representationProfile"] = representation.as_metadata()
+        parse_summary["parserOptions"] = normalized_parser_options
+        if total_records == 0:
+            finished_at = time.time()
+            with UPLOAD_LOCK:
+                job = UPLOAD_PARSE_JOBS.get(job_id) or {}
+            elapsed_ms = upload_job_elapsed_ms(job, finished_at=finished_at)
+            report(
+                status="error",
+                progress=100,
+                stage="complete",
+                processedFiles=len(staged_files),
+                totalFiles=len(staged_files),
+                parseProcessedFiles=len(staged_files),
+                parseTotalFiles=len(staged_files),
+                message="Parsing produced 0 models. Check parser format and file contents.",
+                error="Parsing produced 0 models. Check parser format and file contents.",
+                uploadSummary=parse_summary,
+                finishedAt=finished_at,
+                elapsedMs=elapsed_ms,
+            )
+            with UPLOAD_LOCK:
+                session = UPLOAD_SESSIONS.get(upload_id)
+                if session:
+                    session["status"] = "error"
+            return
 
-        dataset_id = uuid.uuid4().hex
-        DATASETS[dataset_id] = dataset
-        persist_dataset_to_runtime(dataset_id, dataset)
-        statistics = serialize_statistics(dataset)
+        DATASETS[dataset_id] = runtime_dataset
+        report(
+            status="running",
+            stage="statistics",
+            message="Calculating descriptive statistics.",
+            parseProcessedFiles=len(staged_files),
+            parseTotalFiles=len(staged_files),
+        )
+        statistics = corpus_stats.build_payload()
 
         finished_at = time.time()
         with UPLOAD_LOCK:
@@ -830,178 +607,56 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
 
 
 def parse_staged_dataset(
+    dataset_id: str,
     language: str,
     data_format: str,
-    representation: RepresentationProfile,
+    parser_options: dict[str, Any],
     staged_files: list[dict[str, Any]],
     progress=None,
-) -> tuple[Dataset, dict[str, Any]]:
-    if data_format == "json":
-        return parse_staged_json_dataset(language, staged_files, progress=progress)
-    return parse_staged_model_files(language, data_format, representation, staged_files, progress=progress)
-
-
-def infer_directory_source(language: str, data_format: str, staged_files: list[dict[str, Any]]) -> tuple[str, str]:
-    """Correct directory uploads when the browser ignores the file input accept filter."""
-    suffixes = {
-        Path(str(staged.get("relativePath") or "")).suffix.lower()
-        for staged in staged_files
-        if not is_ignored_upload_path(str(staged.get("relativePath") or ""))
-    }
-    if ".archimate" in suffixes and ".xmi" not in suffixes:
-        return "archimate", "xmi"
-    if ".xmi" in suffixes and ".archimate" not in suffixes:
-        return "uml", "xmi"
-    return language, data_format
-
-
-def parse_staged_json_dataset(
-    language: str,
-    staged_files: list[dict[str, Any]],
-    progress=None,
-) -> tuple[Dataset, dict[str, Any]]:
-    parser = {"uml": UMLParser(), "ecore": EcoreParser(), "archimate": ArchimateParser()}[language]
-    records = []
+) -> tuple[RuntimeDataset, dict[str, Any], CorpusStatisticsAccumulator]:
     summary = empty_upload_summary()
-    total_files = len(staged_files)
-    for file_index, staged in enumerate(staged_files, start=1):
-        relpath = str(staged.get("relativePath") or "")
-        source_path = Path(str(staged.get("storedPath") or ""))
-        summary["files"] += 1
-        if is_ignored_upload_path(relpath):
-            summary["ignoredFiles"].append(relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        if progress:
-            progress(file_index - 1, total_files)
-        quality_error = model_file_quality_error(source_path, "json")
-        if quality_error:
-            warning_type, message = quality_error
-            summary["errors"] += 1
-            if warning_type == "EMPTY_FILE":
-                summary["emptyFiles"].append(relpath)
-            elif warning_type == "INVALID_XML":
-                summary["invalidFiles"].append(relpath)
-            add_upload_warning(summary, warning_type, f"{relpath} {message}", path=relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        try:
-            content = source_path.read_text(encoding="utf-8")
-            payloads = parse_json_payloads(content)
-        except Exception as exc:
-            summary["errors"] += 1
-            add_upload_warning(summary, "PARSE_ERROR", f"{relpath} failed to decode: {exc}", path=relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        for source_index, payload in enumerate(payloads):
-            summary["payloads"] += 1
-            for payload_index, model_payload in enumerate_model_payloads(payload):
-                if not isinstance(model_payload, dict):
-                    summary["errors"] += 1
-                    add_upload_warning(
-                        summary,
-                        "INVALID_PAYLOAD",
-                        f"{relpath}:{source_index}:{payload_index} is {type(model_payload).__name__}, expected object.",
-                        path=relpath,
-                    )
-                    continue
-                try:
-                    record = parser.parse(
-                        model_payload,
-                        model_id=model_payload.get("ids")
-                        or model_payload.get("id")
-                        or model_payload.get("archimateId")
-                        or f"{relpath}:{source_index}:{payload_index}",
-                    )
-                except Exception as exc:
-                    summary["errors"] += 1
-                    add_upload_warning(
-                        summary,
-                        "PARSE_ERROR",
-                        f"{relpath}:{source_index}:{payload_index} failed to parse: {exc}",
-                        path=relpath,
-                    )
-                    continue
-                record.source_path = Path(relpath)
-                records.append(record)
-                summary["records"] += 1
-        if progress:
-            progress(file_index, total_files)
-    return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
+    seen_files: set[str] = set()
+    model_entries: list[dict[str, Any]] = []
+    corpus_stats = CorpusStatisticsAccumulator()
+    dataset_dir = RUNTIME_IR_DIR / dataset_id
+    dataset_dir.mkdir(parents=True, exist_ok=True)
 
+    def on_model(record: ModelRecord, diagnostics: ModelDiagnostics) -> None:
+        merge_model_diagnostics(summary, str(record.model_id), diagnostics)
+        corpus_stats.add(record)
+        filename = runtime_model_filename(record.model_id, len(model_entries), seen_files)
+        model_entries.append(
+            spill_model_to_runtime(
+                dataset_id=dataset_id,
+                dataset_dir=dataset_dir,
+                record=record,
+                diagnostics=diagnostics,
+                filename=filename,
+            )
+        )
 
-def model_file_quality_error(source_path: Path, data_format: str) -> tuple[str, str] | None:
-    if source_path.stat().st_size == 0:
-        return "EMPTY_FILE", "is empty."
-    if data_format not in {"xmi", "ecore"}:
-        return None
-    try:
-        ET.parse(source_path)
-    except ET.ParseError as exc:
-        return "INVALID_XML", f"is not valid XML: {exc}."
-    return None
-
-
-def parse_staged_model_files(
-    language: str,
-    data_format: str,
-    representation: RepresentationProfile,
-    staged_files: list[dict[str, Any]],
-    progress=None,
-) -> tuple[Dataset, dict[str, Any]]:
-    parser = extended_parser_for(language, data_format, representation)
-    records = []
-    summary = empty_upload_summary()
-    total_files = len(staged_files)
-
-    for file_index, staged in enumerate(staged_files, start=1):
-        relpath = str(staged.get("relativePath") or "")
-        source_path = Path(str(staged.get("storedPath") or ""))
-        summary["files"] += 1
-        if is_ignored_upload_path(relpath):
-            summary["ignoredFiles"].append(relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        summary["payloads"] += 1
-        if progress:
-            progress(file_index - 1, total_files)
-        quality_error = model_file_quality_error(source_path, data_format)
-        if quality_error:
-            warning_type, message = quality_error
-            summary["errors"] += 1
-            if warning_type == "EMPTY_FILE":
-                summary["emptyFiles"].append(relpath)
-            elif warning_type == "INVALID_XML":
-                summary["invalidFiles"].append(relpath)
-            add_upload_warning(summary, warning_type, f"{relpath} {message}", path=relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        try:
-            record = parser.parse_file(source_path, model_id=Path(relpath).stem)
-            record.source_path = Path(relpath)
-        except Exception as exc:
-            summary["errors"] += 1
-            add_upload_warning(summary, "PARSE_ERROR", f"{relpath} failed to parse: {exc}", path=relpath)
-            if progress:
-                progress(file_index, total_files)
-            continue
-        records.append(record)
-        summary["records"] += 1
-        merge_record_warnings(summary, record)
-        if progress:
-            progress(file_index, total_files)
-
-    return Dataset(records=records, dataset_type=language), finalize_upload_summary(summary, records)
-
-
-def is_ignored_upload_path(relpath: str) -> bool:
-    parts = Path(relpath).parts
-    return "__MACOSX" in parts or any(part.startswith("._") for part in parts) or Path(relpath).name == ".DS_Store"
+    parsed = parse_staged_files(
+        language=language,
+        format=data_format,
+        staged_files=staged_files,
+        options=parser_options,
+        progress=progress,
+        on_model=on_model,
+        accumulate_records=False,
+    )
+    summary["files"] = parsed.total_files
+    summary["payloads"] = parsed.record_count
+    summary["records"] = parsed.record_count
+    summary["errors"] = len(parsed.invalid_files) + len(parsed.empty_files)
+    summary["emptyFiles"] = list(parsed.empty_files)
+    summary["invalidFiles"] = list(parsed.invalid_files)
+    summary["ignoredFiles"] = [*parsed.ignored_files, *parsed.skipped_files]
+    for issue in parsed.issues:
+        add_upload_warning(summary, issue.type, issue.message, path=issue.path, model_id=issue.model_id)
+    if model_entries:
+        finalize_runtime_dataset(dataset_id=dataset_id, dataset_type=language, model_entries=model_entries)
+    runtime_dataset = RuntimeDataset.from_meta(dataset_id, get_dataset_meta(dataset_id) or {"recordCount": 0, "models": []})
+    return runtime_dataset, finalize_upload_summary(summary), corpus_stats
 
 
 def sanitized_relpath(name: str) -> str:
@@ -1483,16 +1138,13 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     }
 
 
-def merge_record_warnings(summary: dict[str, Any], record) -> None:
-    metadata = record.metadata if isinstance(record.metadata, dict) else {}
-    warning_total = int(metadata.get("parse_warnings_total", 0) or 0)
+def merge_model_diagnostics(summary: dict[str, Any], model_id: str, diagnostics: ModelDiagnostics) -> None:
+    warning_total = int(diagnostics.warning_count or 0)
     if warning_total <= 0:
         return
-    warning_types = metadata.get("parse_warnings_by_type") or {}
-    warning_messages_by_type = metadata.get("parse_warning_messages_by_type") or {}
-    warning_messages = metadata.get("parse_warning_messages") or metadata.get("parse_warning_messages_sample") or []
-    source_path = str(record.source_path or "")
-    model_id = str(record.model_id or "")
+    warning_types = diagnostics.warnings_by_type or {}
+    warning_messages_by_type = diagnostics.warning_messages_by_type or {}
+    source_path = str(diagnostics.source_path or "")
     warning_entries_added = 0
     typed_warning_total = 0
     typed_warning_names: list[str] = []
@@ -1512,9 +1164,14 @@ def merge_record_warnings(summary: dict[str, Any], record) -> None:
     summary["warnings"] += warning_total
     fallback_type = typed_warning_names[0] if typed_warning_names else "PARSE_WARNING"
     if warning_entries_added == 0:
-        for message in warning_messages:
-            append_warning_entry(summary, fallback_type, str(message), path=source_path, model_id=model_id)
-            warning_entries_added += 1
+        append_warning_entry(
+            summary,
+            fallback_type,
+            "Warning emitted without a detailed parser message.",
+            path=source_path,
+            model_id=model_id,
+        )
+        warning_entries_added += 1
     if warning_entries_added < warning_total:
         for _ in range(warning_total - warning_entries_added):
             append_warning_entry(
@@ -1653,92 +1310,38 @@ def build_parsed_models_summary(summary: dict[str, Any], records: list[ModelReco
     return parsed_models
 
 
-def finalize_upload_summary(summary: dict[str, Any], records: list[ModelRecord] | None = None) -> dict[str, Any]:
-    if records is not None:
-        summary["parsedModels"] = build_parsed_models_summary(summary, records)
-    else:
-        summary.setdefault("parsedModels", [])
+def finalize_upload_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    summary.pop("parsedModels", None)
     summary.pop("_warningFileIndex", None)
     return summary
 
 
-def extended_parser_for(language: str, data_format: str, representation: RepresentationProfile):
-    mapping = {
-        ("uml", "xmi"): UMLXMIModelParser,
-        ("archimate", "xmi"): ArchimateArchiModelParser,
-        ("ecore", "ecore"): EcoreXMIModelParser,
-        ("bpmn", "signavio"): BPMNSignavioModelParser,
-    }
-    parser_cls = mapping.get((language, data_format))
-    if parser_cls is None:
-        raise ValueError(f"Unsupported language/format combination: {language}/{data_format}")
-    return parser_cls(representation)
-
-
-def parse_json_payloads(content: str) -> list[Any]:
-    try:
-        payload = json.loads(content)
-        return payload if isinstance(payload, list) else [payload]
-    except json.JSONDecodeError:
-        payloads = []
-        for line in content.splitlines():
-            line = line.strip()
-            if line:
-                payloads.append(json.loads(line))
-        return payloads
-
-
-def enumerate_model_payloads(payload: Any) -> Iterable[tuple[int, Any]]:
-    if isinstance(payload, list):
-        for index, item in enumerate(payload):
-            yield index, item
-        return
-    yield 0, payload
-
-
-def serialize_statistics(dataset: Dataset) -> dict[str, Any]:
-    return {
-        "summary": dataset_summary(dataset),
-        "topTypes": top_items(type_counts(dataset)),
-        "topNames": top_items(name_counts(dataset)),
-        "visualizations": dataset_visualizations(dataset),
-        "sampleModels": [
-            {
-                "id": record.model_id,
-                "language": record.language,
-                "nodes": record.node_count,
-                "edges": record.edge_count,
-                "names": len(node_names(record)),
-            }
-            for record in dataset.records[:8]
-        ],
-    }
+def serialize_statistics(dataset: Dataset | RuntimeDataset) -> dict[str, Any]:
+    if isinstance(dataset, RuntimeDataset):
+        raise ValueError("Runtime datasets must use CorpusStatisticsAccumulator during parse.")
+    return serialize_dataset_statistics(dataset)
 
 
 def top_items(counter, limit: int | None = None) -> list[dict[str, Any]]:
     return [{"label": label, "count": count} for label, count in counter.most_common(limit)]
 
 
-def get_dataset(body: dict[str, Any]) -> Dataset:
+def get_dataset(body: dict[str, Any]) -> Dataset | RuntimeDataset:
     dataset_id = str(body.get("datasetId") or "")
     if dataset_id in DATASETS:
         return DATASETS[dataset_id]
-    runtime_dataset = load_dataset_from_runtime(dataset_id)
-    if runtime_dataset is not None:
-        DATASETS[dataset_id] = runtime_dataset
-        return runtime_dataset
-    raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+    dataset = resolve_dataset(dataset_id)
+    DATASETS[dataset_id] = dataset
+    return dataset
 
 
-def get_dataset_by_id(dataset_id: str) -> Dataset:
+def get_dataset_by_id(dataset_id: str) -> Dataset | RuntimeDataset:
     dataset_id = str(dataset_id)
     if dataset_id in DATASETS:
         return DATASETS[dataset_id]
-    runtime_dataset = load_dataset_from_runtime(dataset_id)
-    if runtime_dataset is not None:
-        DATASETS[dataset_id] = runtime_dataset
-        return runtime_dataset
-    raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+    dataset = resolve_dataset(dataset_id)
+    DATASETS[dataset_id] = dataset
+    return dataset
 
 
 def parse_positive_int_param(raw_value: Any, field_name: str) -> int | None:
@@ -1757,78 +1360,48 @@ def inspect_dataset_model(
     *,
     dataset_id: str,
     model_id: str,
-    node_limit: int | None = None,
-    edge_limit: int | None = None,
     include_attrs: bool = True,
 ) -> dict[str, Any]:
-    dataset = get_dataset_by_id(str(dataset_id))
-    model_id = str(model_id or "")
-    for record in dataset.records:
-        if str(record.model_id) != model_id:
-            continue
+    loaded = load_model_from_runtime(str(dataset_id), str(model_id or ""))
+    if loaded is None:
+        raise ValueError("Unknown modelId for the selected dataset.")
+    record, diagnostics = loaded
 
-        nodes: list[dict[str, Any]] = []
-        for index, (node_id, attrs) in enumerate(record.graph.nodes(data=True)):
-            if node_limit is not None and index >= node_limit:
-                break
-            node_entry: dict[str, Any] = {"id": str(node_id)}
+    nodes: list[dict[str, Any]] = []
+    for node_id, attrs in record.graph.nodes(data=True):
+        node_entry: dict[str, Any] = {"id": str(node_id)}
+        if include_attrs:
+            node_entry["attrs"] = json_safe(attrs)
+        nodes.append(node_entry)
+
+    edges: list[dict[str, Any]] = []
+    if record.graph.is_multigraph():
+        for source, target, key, attrs in record.graph.edges(keys=True, data=True):
+            edge_entry: dict[str, Any] = {"source": str(source), "target": str(target), "key": str(key)}
             if include_attrs:
-                node_entry["attrs"] = json_safe(attrs)
-            nodes.append(node_entry)
+                edge_entry["attrs"] = json_safe(attrs)
+            edges.append(edge_entry)
+    else:
+        for source, target, attrs in record.graph.edges(data=True):
+            edge_entry = {"source": str(source), "target": str(target)}
+            if include_attrs:
+                edge_entry["attrs"] = json_safe(attrs)
+            edges.append(edge_entry)
 
-        edges: list[dict[str, Any]] = []
-        if record.graph.is_multigraph():
-            iterable = record.graph.edges(keys=True, data=True)
-            for index, (source, target, key, attrs) in enumerate(iterable):
-                if edge_limit is not None and index >= edge_limit:
-                    break
-                edge_entry: dict[str, Any] = {"source": str(source), "target": str(target), "key": str(key)}
-                if include_attrs:
-                    edge_entry["attrs"] = json_safe(attrs)
-                edges.append(edge_entry)
-        else:
-            iterable = record.graph.edges(data=True)
-            for index, (source, target, attrs) in enumerate(iterable):
-                if edge_limit is not None and index >= edge_limit:
-                    break
-                edge_entry = {"source": str(source), "target": str(target)}
-                if include_attrs:
-                    edge_entry["attrs"] = json_safe(attrs)
-                edges.append(edge_entry)
-
-        return {
-            "model": {
-                "id": str(record.model_id),
-                "language": str(record.language),
-                "name": str(record.name or ""),
-                "sourcePath": str(record.source_path or ""),
-                "nodeCount": int(record.node_count),
-                "edgeCount": int(record.edge_count),
-                "metadata": json_safe(record.metadata),
-            },
-            "nodes": nodes,
-            "edges": edges,
-            "truncated": {
-                "nodes": node_limit is not None and len(nodes) < int(record.node_count),
-                "edges": edge_limit is not None and len(edges) < int(record.edge_count),
-            },
-        }
-    raise ValueError("Unknown modelId for the selected dataset.")
-
-
-def json_safe(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {str(key): json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [json_safe(item) for item in value]
-    if hasattr(value, "tolist"):
-        try:
-            return json_safe(value.tolist())
-        except Exception:  # pragma: no cover - best effort only
-            return str(value)
-    return str(value)
+    return {
+        "model": {
+            "id": str(record.model_id),
+            "language": str(record.language),
+            "name": str(record.name or ""),
+            "sourcePath": str(record.source_path or ""),
+            "nodeCount": int(record.node_count),
+            "edgeCount": int(record.edge_count),
+            "metadata": json_safe(record.metadata),
+        },
+        "diagnostics": json_safe(diagnostics.to_dict()),
+        "nodes": nodes,
+        "edges": edges,
+    }
 
 
 def pair_key(left_id: str, right_id: str) -> tuple[str, str]:

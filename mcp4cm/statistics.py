@@ -307,3 +307,227 @@ def _distribution(values: list[int]) -> dict[str, float | int]:
         "mean": mean(values),
         "median": median(values),
     }
+
+
+TOPIC_MODEL_MODEL_LIMIT = 500
+SCATTER_POINT_LIMIT = 2000
+
+
+def model_summary_fields(record: ModelRecord) -> dict[str, Any]:
+    row = _model_visualization_row(record)
+    return {
+        "modelId": str(record.model_id or ""),
+        "name": str(record.name or ""),
+        "path": str(record.source_path or ""),
+        "language": str(record.language or ""),
+        "nodeCount": int(record.node_count),
+        "edgeCount": int(record.edge_count),
+        "nameSlots": int(row["nameSlots"]),
+        "missingNames": int(row["missingNames"]),
+        "missingNameRatio": float(row["missingNameRatio"]),
+        "namedElements": int(row["namedElements"]),
+        "uniqueNames": int(row["uniqueNames"]),
+        "tokens": int(row["tokens"]),
+        "uniqueTokens": int(row["uniqueTokens"]),
+    }
+
+
+class CorpusStatisticsAccumulator:
+    """Collect corpus-level statistics while models are already in memory during parse."""
+
+    def __init__(self) -> None:
+        self.node_counts: list[int] = []
+        self.edge_counts: list[int] = []
+        self.name_slot_counts: list[int] = []
+        self.name_count_values: list[int] = []
+        self.missing_ratios: list[float] = []
+        self.languages: Counter[str] = Counter()
+        self.labels: Counter[str] = Counter()
+        self.type_counter: Counter[str] = Counter()
+        self.name_counter: Counter[str] = Counter()
+        self.entry_type_counter: Counter[str] = Counter()
+        self.missing_by_type: Counter[str] = Counter()
+        self.concept_counter: Counter[str] = Counter()
+        self.filtered_concept_counter: Counter[str] = Counter()
+        self.concept_doc_freq: Counter[str] = Counter()
+        self.filtered_concept_doc_freq: Counter[str] = Counter()
+        self.type_concept_counter: dict[str, Counter[str]] = {}
+        self.type_token_counter: dict[str, Counter[str]] = {}
+        self.scatter_rows: list[dict[str, Any]] = []
+        self.topic_model_rows: list[dict[str, Any]] = []
+        self.sample_models: list[dict[str, Any]] = []
+        self.unique_name_doc_freq: Counter[str] = Counter()
+
+    def add(self, record: ModelRecord) -> None:
+        self.node_counts.append(record.node_count)
+        self.edge_counts.append(record.edge_count)
+        self.languages[record.language] += 1
+        for label in record.labels:
+            self.labels[label] += 1
+        for type_name in record.types:
+            if type_name:
+                self.type_counter[str(type_name)] += 1
+        for name in node_names(record):
+            stripped = name.strip()
+            if stripped:
+                self.name_counter[stripped] += 1
+
+        row = _model_visualization_row(record)
+        self.name_slot_counts.append(int(row["nameSlots"]))
+        self.name_count_values.append(len(node_names(record)))
+        if row["nameSlots"]:
+            self.missing_ratios.append(float(row["missingNameRatio"]))
+
+        if len(self.scatter_rows) < SCATTER_POINT_LIMIT:
+            self.scatter_rows.append(
+                {
+                    "id": row["id"],
+                    "namedElements": row["namedElements"],
+                    "uniqueNames": row["uniqueNames"],
+                    "tokens": row["tokens"],
+                    "uniqueTokens": row["uniqueTokens"],
+                    "nameSlots": row["nameSlots"],
+                    "missingNames": row["missingNames"],
+                    "missingNameRatio": row["missingNameRatio"],
+                }
+            )
+
+        if len(self.topic_model_rows) < TOPIC_MODEL_MODEL_LIMIT:
+            self.topic_model_rows.append(row)
+
+        if len(self.sample_models) < 8:
+            self.sample_models.append(
+                {
+                    "id": str(record.model_id),
+                    "language": str(record.language),
+                    "nodes": record.node_count,
+                    "edges": record.edge_count,
+                    "names": len(node_names(record)),
+                }
+            )
+
+        model_concepts: set[str] = set()
+        filtered_concepts: set[str] = set()
+        model_names: set[str] = set()
+        for entry in row["entries"]:
+            element_type = str(entry["type"])
+            self.entry_type_counter[element_type] += 1
+            if entry["missing"]:
+                self.missing_by_type[element_type] += 1
+                continue
+            concept = str(entry["name"])
+            self.concept_counter[concept] += 1
+            model_names.add(concept)
+            type_concepts = self.type_concept_counter.setdefault(element_type, Counter())
+            type_concepts[concept] += 1
+            token_counter = self.type_token_counter.setdefault(element_type, Counter())
+            for token in concept.split():
+                token_counter[token] += 1
+            model_concepts.add(concept)
+            if not entry["typePlaceholder"]:
+                self.filtered_concept_counter[concept] += 1
+                filtered_concepts.add(concept)
+        for concept in model_concepts:
+            self.concept_doc_freq[concept] += 1
+        for concept in filtered_concepts:
+            self.filtered_concept_doc_freq[concept] += 1
+        self.unique_name_doc_freq.update(model_names)
+
+    def build_payload(self) -> dict[str, Any]:
+        model_count = len(self.node_counts)
+        return {
+            "summary": {
+                "models": model_count,
+                "languages": dict(self.languages),
+                "labels": dict(self.labels),
+                "nodes": _distribution(self.node_counts),
+                "edges": _distribution(self.edge_counts),
+                "names": _distribution(self.name_count_values),
+            },
+            "topTypes": counter_items(self.type_counter),
+            "topNames": counter_items(self.name_counter),
+            "visualizations": self._build_visualizations(model_count),
+            "sampleModels": self.sample_models,
+        }
+
+    def _build_visualizations(self, model_count: int) -> dict[str, Any]:
+        major_types = [label for label, _ in self.entry_type_counter.most_common(6)]
+        type_links: list[dict[str, Any]] = []
+        for element_type in major_types:
+            concepts = self.type_concept_counter.get(element_type, Counter())
+            type_links.extend(
+                {"type": element_type, "concept": concept, "count": count}
+                for concept, count in concepts.most_common(8)
+            )
+
+        type_counter = self.entry_type_counter
+        heatmap_types = [label for label, _ in type_counter.most_common(10)]
+        token_counter: Counter[str] = Counter()
+        for element_type in heatmap_types:
+            token_counter.update(self.type_token_counter.get(element_type, Counter()))
+        heatmap_tokens = [label for label, _ in token_counter.most_common(25)]
+        heatmap_rows = []
+        for element_type in heatmap_types:
+            counts = self.type_token_counter.get(element_type, Counter())
+            total = sum(counts.values()) or 1
+            heatmap_rows.append(
+                {
+                    "label": element_type,
+                    "values": [round(counts[token] / total, 5) for token in heatmap_tokens],
+                }
+            )
+
+        topic_result: dict[str, Any]
+        if model_count > TOPIC_MODEL_MODEL_LIMIT:
+            topic_result = {
+                "available": False,
+                "reason": f"Topic modeling skipped for datasets with more than {TOPIC_MODEL_MODEL_LIMIT} models.",
+            }
+        else:
+            topic_result = topic_model(self.topic_model_rows)
+
+        scatter_points = self.scatter_rows
+        if model_count > len(scatter_points):
+            scatter_note = f"Showing {len(scatter_points)} of {model_count} models."
+        else:
+            scatter_note = ""
+
+        return {
+            "missingNameRatioHistogram": histogram(self.missing_ratios, bins=30, minimum=0, maximum=1),
+            "missingNamesByType": counter_items(self.missing_by_type),
+            "topConcepts": counter_items(self.concept_counter),
+            "topConceptDocumentFrequency": counter_items(self.concept_doc_freq),
+            "topConceptsWithoutTypePlaceholders": counter_items(self.filtered_concept_counter),
+            "topConceptDocumentFrequencyWithoutTypePlaceholders": counter_items(self.filtered_concept_doc_freq),
+            "elementTypeTreemap": counter_items(self.entry_type_counter, 40),
+            "vocabularyHeatmap": {"tokens": heatmap_tokens, "rows": heatmap_rows},
+            "typeConceptLinks": type_links,
+            "modelVocabularyScatter": scatter_points,
+            "scatterNote": scatter_note,
+            "topicModel": topic_result,
+            "nameCountBoxplot": boxplot_summary(self.name_slot_counts),
+            "nameCountHistogramLog": histogram(self.name_slot_counts, bins=30, log_counts=True),
+            "fewNamesHistogram": histogram([count for count in self.name_slot_counts if count < 5], bins=20),
+            "topNamesPerModel": counter_items(self.unique_name_doc_freq, 20),
+            "languageDistribution": counter_items(self.languages, 25),
+        }
+
+
+def serialize_dataset_statistics(dataset: Dataset) -> dict[str, Any]:
+    """Full statistics by iterating an in-memory dataset."""
+    return {
+        "summary": dataset_summary(dataset),
+        "topTypes": counter_items(type_counts(dataset)),
+        "topNames": counter_items(name_counts(dataset)),
+        "visualizations": dataset_visualizations(dataset),
+        "sampleModels": [
+            {
+                "id": record.model_id,
+                "language": record.language,
+                "nodes": record.node_count,
+                "edges": record.edge_count,
+                "names": len(node_names(record)),
+            }
+            for record in list(dataset)[:8]
+        ],
+    }

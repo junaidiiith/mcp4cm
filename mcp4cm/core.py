@@ -72,12 +72,59 @@ class ModelRecord:
 
 
 @dataclass(slots=True)
+class ModelDiagnostics:
+    """Parser-neutral diagnostics for a parsed model."""
+
+    parse_status: str
+    warning_count: int = 0
+    warnings_by_type: dict[str, int] = field(default_factory=dict)
+    warning_messages_by_type: dict[str, list[str]] = field(default_factory=dict)
+    error_message: str = ""
+    elements_loaded: int = 0
+    elements_skipped: int = 0
+    parse_time_ms: int = 0
+    source_path: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "parseStatus": self.parse_status,
+            "warningCount": self.warning_count,
+            "warningsByType": dict(self.warnings_by_type),
+            "warningMessagesByType": {key: list(messages) for key, messages in self.warning_messages_by_type.items()},
+            "errorMessage": self.error_message,
+            "elementsLoaded": self.elements_loaded,
+            "elementsSkipped": self.elements_skipped,
+            "parseTimeMs": self.parse_time_ms,
+            "sourcePath": self.source_path,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any] | None) -> "ModelDiagnostics":
+        payload = payload or {}
+        return cls(
+            parse_status=str(payload.get("parseStatus") or payload.get("parse_status") or "success"),
+            warning_count=int(payload.get("warningCount") or payload.get("warning_count") or 0),
+            warnings_by_type=dict(payload.get("warningsByType") or payload.get("warnings_by_type") or {}),
+            warning_messages_by_type={
+                str(key): [str(message) for message in (messages or [])]
+                for key, messages in dict(payload.get("warningMessagesByType") or payload.get("warning_messages_by_type") or {}).items()
+            },
+            error_message=str(payload.get("errorMessage") or payload.get("error_message") or ""),
+            elements_loaded=int(payload.get("elementsLoaded") or payload.get("elements_loaded") or 0),
+            elements_skipped=int(payload.get("elementsSkipped") or payload.get("elements_skipped") or 0),
+            parse_time_ms=int(payload.get("parseTimeMs") or payload.get("parse_time_ms") or 0),
+            source_path=str(payload.get("sourcePath") or payload.get("source_path") or ""),
+        )
+
+
+@dataclass(slots=True)
 class Dataset:
     """A collection of normalized model records."""
 
     records: list[ModelRecord]
     dataset_type: DatasetType | str
     root: Path | None = None
+    diagnostics: dict[str, ModelDiagnostics] = field(default_factory=dict)
 
     def __iter__(self) -> Iterable[ModelRecord]:
         return iter(self.records)

@@ -68,15 +68,16 @@ export const dummyFilterPresets: Record<Language, FilterConfig[]> = {
 
 export const formatOptionsByLanguage: Record<Language, FormatOption[]> = {
   uml: [
-    { value: "json", label: "JSON / JSONL", directoryPreferred: false, accept: ".json,.jsonl,.ndjson" },
+    { value: "json", label: "JSON", directoryPreferred: false, accept: ".json" },
     { value: "xmi", label: "XMI / XML", directoryPreferred: true, accept: ".xmi,.xml" },
+    { value: "xml-pyecore", label: "XML / XMI (PyEcore)", directoryPreferred: true, accept: ".xmi,.uml,.xml" },
   ],
   archimate: [
-    { value: "json", label: "JSON / JSONL", directoryPreferred: false, accept: ".json,.jsonl,.ndjson" },
+    { value: "json", label: "JSON", directoryPreferred: false, accept: ".json" },
     { value: "xmi", label: "Archi .archimate / XML", directoryPreferred: true, accept: ".archimate,.xml" },
   ],
   ecore: [
-    { value: "json", label: "JSON / JSONL", directoryPreferred: false, accept: ".json,.jsonl,.ndjson" },
+    { value: "json", label: "JSON", directoryPreferred: false, accept: ".json" },
     { value: "ecore", label: "Ecore (.ecore)", directoryPreferred: true, accept: ".ecore" },
   ],
   bpmn: [

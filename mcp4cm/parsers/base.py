@@ -1,70 +1,74 @@
+"""Canonical parser contracts and low-level parser registration."""
+
 from __future__ import annotations
 
-import hashlib
-import json
-import re
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from mcp4cm.core import ModelRecord
+from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
+from mcp4cm.parsers.ir import IR
 
-TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 
-
-class BaseModelParser(ABC):
-    """Base class for language-specific parsers.
-
-    Subclasses are responsible for converting source records into a
-    ``ModelRecord``. Generic cleansing features consume only that normalized
-    output, so adding a new language such as BPMN should not require changes in
-    duplicate detection, statistics, or dummy filters.
-    """
+class BaseParser(ABC):
+    """Base interface for low-level source-file parsers that emit IR."""
 
     language: str
+    version: str = "1.0.0"
+
+    def __init__(self):
+        self._run_stats: Optional[ParserRunStats] = None
+
+    @property
+    def parser_id(self) -> str:
+        return f"{self.language.lower()}@{self.version}"
+
+    def _start_run(self) -> None:
+        self._run_stats = ParserRunStats()
+
+    def _stats(self) -> ParserRunStats:
+        assert self._run_stats is not None, "No active parsing run. Call _start_run() first."
+        return self._run_stats
+
+    def warn(self, warning_type: WarningType, message: str) -> None:
+        self._stats().add_warning(warning_type, message)
+
+    def skip_with_warning(self, warning_type: WarningType, message: str) -> None:
+        self._stats().add_skip(warning_type, message)
 
     @abstractmethod
-    def parse(self, raw: Mapping[str, Any], *, model_id: str | None = None) -> ModelRecord:
-        """Parse one raw dataset item into a normalized model record."""
+    def parse(self, filepath: str) -> tuple[IR, ParserRunStats]:
+        """Parse one source file into IR and parser run stats."""
 
-    def names(self, record: ModelRecord) -> list[str]:
-        return record.names
 
-    def tokens(self, record: ModelRecord) -> list[str]:
-        return [match.group(0).lower() for match in TOKEN_RE.finditer(record.text_for_similarity())]
+_LOW_LEVEL_PARSER_REGISTRY: dict[str, type[BaseParser]] = {}
 
-    def canonical_payload(self, record: ModelRecord) -> dict[str, Any]:
-        nodes = []
-        for _, attrs in record.graph.nodes(data=True):
-            nodes.append(
-                {
-                    "name": self._clean(attrs.get("name")),
-                    "type": self._clean(attrs.get("type") or attrs.get("eClass")),
-                    "layer": self._clean(attrs.get("layer")),
-                }
-            )
-        edges = []
-        for source, target, attrs in record.graph.edges(data=True):
-            edges.append(
-                {
-                    "source": str(source),
-                    "target": str(target),
-                    "type": self._clean(attrs.get("type") or attrs.get("relationship")),
-                }
-            )
-        return {
-            "language": record.language,
-            "nodes": sorted(nodes, key=lambda item: json.dumps(item, sort_keys=True)),
-            "edges": sorted(edges, key=lambda item: json.dumps(item, sort_keys=True)),
-        }
 
-    def canonical_hash(self, record: ModelRecord, algorithm: str = "sha256") -> str:
-        payload = json.dumps(self.canonical_payload(record), sort_keys=True, separators=(",", ":"))
-        hasher = hashlib.new(algorithm)
-        hasher.update(payload.encode("utf-8"))
-        return hasher.hexdigest()
+def register_parser(parser_class: type[BaseParser]) -> type[BaseParser]:
+    """Register a low-level parser class by its native parser language name."""
+    parser_instance = parser_class()
+    _LOW_LEVEL_PARSER_REGISTRY[parser_instance.language] = parser_class
+    return parser_class
 
-    @staticmethod
-    def _clean(value: Any) -> str:
-        return "" if value is None else str(value).strip().lower()
+
+def get_parser(language: str) -> type[BaseParser] | None:
+    return _LOW_LEVEL_PARSER_REGISTRY.get(language)
+
+
+def get_all_parsers() -> list[type[BaseParser]]:
+    return list(_LOW_LEVEL_PARSER_REGISTRY.values())
+
+
+@runtime_checkable
+class ParserAdapter(Protocol):
+    """Catalog-facing parser adapter.
+
+    Every adapter consumes exactly one source file and returns one parsed model
+    record plus diagnostics. Adapters may internally use direct JSON graph
+    loading or low-level IR parsers.
+    """
+
+    def parse_file(self, path: Path, *, model_id: str, options: Any) -> Any:
+        ...
 

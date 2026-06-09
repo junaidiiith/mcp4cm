@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, FileWarning, Info, Loader2, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, FileWarning, Info, Loader2, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { getDatasetModels } from "../../api";
 import type {
   ParsedModelSummary,
   StatisticsPayload,
@@ -10,17 +11,19 @@ import type {
 } from "../../types";
 import { round } from "../../utils";
 
+const DEFAULT_PAGE_SIZE = 50;
+
 export function StatisticsPanel({
+  datasetId,
   uploadSummary,
-  parsedModels,
   warningsList,
   stats,
   statsLoading,
   uploadParseJob,
   onInspect,
 }: {
+  datasetId: string;
   uploadSummary: UploadSummary | null;
-  parsedModels: ParsedModelSummary[];
   warningsList: WarningEntry[];
   stats: StatisticsPayload | null;
   statsLoading: boolean;
@@ -37,8 +40,8 @@ export function StatisticsPanel({
       </CardHeader>
       <CardContent>
         {uploadSummary && <UploadSummaryPanel summary={uploadSummary} />}
-        {(uploadSummary?.records || 0) > 0 ? (
-          <ParsedModelsTable models={parsedModels} warnings={warningsList} onInspect={onInspect} />
+        {(uploadSummary?.records || 0) > 0 && datasetId ? (
+          <ParsedModelsTable datasetId={datasetId} onInspect={onInspect} />
         ) : null}
         {stats ? (
           <Statistics stats={stats} />
@@ -122,7 +125,8 @@ function StatisticsLoading({ job }: { job: UploadParseJob | null }) {
   const parseProcessed = Number(job?.parseProcessedFiles || 0);
   const parseTotal = Number(job?.parseTotalFiles || 0);
   const parseDone = parseTotal > 0 && parseProcessed >= parseTotal;
-  const message = parseDone
+  const statisticsStage = job?.stage === "statistics";
+  const message = statisticsStage || parseDone
     ? "Models parsed. Calculating descriptive statistics..."
     : "Parsing models and collecting descriptive statistics...";
   return (
@@ -134,27 +138,66 @@ function StatisticsLoading({ job }: { job: UploadParseJob | null }) {
 }
 
 function ParsedModelsTable({
-  models,
-  warnings,
+  datasetId,
   onInspect,
 }: {
-  models: ParsedModelSummary[];
-  warnings: WarningEntry[];
+  datasetId: string;
   onInspect: (row: ParsedModelSummary) => void;
 }) {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sort, setSort] = useState<{ key: "nodeCount" | "edgeCount"; direction: "asc" | "desc" } | null>(null);
-  const warningsByModelId = useMemo(() => {
-    const map = new Map<string, WarningEntry[]>();
-    for (const warning of warnings) {
-      const modelId = warning.modelId || "";
-      if (!modelId) continue;
-      if (!map.has(modelId)) map.set(modelId, []);
-      map.get(modelId)!.push(warning);
+  const [page, setPage] = useState(1);
+  const [models, setModels] = useState<ParsedModelSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+  }, [datasetId, query, typeFilter, sort]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const response = await getDatasetModels(datasetId, {
+          page,
+          pageSize: DEFAULT_PAGE_SIZE,
+          query: query.trim(),
+          sort: sort?.key || "modelId",
+          order: sort?.direction || "asc",
+          warningType: typeFilter,
+        });
+        if (!cancelled) {
+          setModels(response.models);
+          setTotal(response.total);
+          setTotalPages(response.totalPages);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setModels([]);
+          setTotal(0);
+          setTotalPages(0);
+          setLoadError(error instanceof Error ? error.message : "Failed to load parsed models.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-    return map;
-  }, [warnings]);
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [datasetId, page, query, typeFilter, sort]);
+
   const types = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const row of models) {
@@ -165,31 +208,6 @@ function ParsedModelsTable({
     return Object.entries(counts).sort(([, left], [, right]) => right - left);
   }, [models]);
 
-  const filteredModels = models.filter((row) => {
-    if (typeFilter !== "all" && !(row.types || {})[typeFilter]) return false;
-    if (!query.trim()) return true;
-    const lowered = query.trim().toLowerCase();
-    const typeText = Object.entries(row.types || {})
-      .map(([type, count]) => `${type} ${count}`)
-      .join(" ")
-      .toLowerCase();
-    if (
-      row.path.toLowerCase().includes(lowered) ||
-      String(row.modelId || "").toLowerCase().includes(lowered) ||
-      String(row.name || "").toLowerCase().includes(lowered) ||
-      typeText.includes(lowered)
-    ) {
-      return true;
-    }
-    const rowWarnings = warningsByModelId.get(row.modelId) || [];
-    return rowWarnings.some((warning) => `${warning.type} ${warning.message}`.toLowerCase().includes(lowered));
-  });
-  const displayedModels = sort
-    ? [...filteredModels].sort((left, right) => {
-        const difference = left[sort.key] - right[sort.key];
-        return sort.direction === "asc" ? difference : -difference;
-      })
-    : filteredModels;
   const toggleSort = (key: "nodeCount" | "edgeCount") => {
     setSort((current) => ({
       key,
@@ -203,7 +221,7 @@ function ParsedModelsTable({
       <div className="warningTableHeader">
         <h3>Parsed Models</h3>
         <span>
-          {filteredModels.length} of {models.length} models
+          {loading ? "Loading..." : `${total} models`}
         </span>
       </div>
       <div className="warningTypeChips">
@@ -234,6 +252,7 @@ function ParsedModelsTable({
           />
         </label>
       </div>
+      {loadError ? <p className="summaryHint error">{loadError}</p> : null}
       <div className="warningScroll">
         <table className="parsedModelsTable">
           <colgroup>
@@ -257,7 +276,7 @@ function ParsedModelsTable({
             </tr>
           </thead>
           <tbody>
-            {displayedModels.map((row) => (
+            {models.map((row) => (
               <tr key={row.modelId}>
                 <td>{row.modelId}</td>
                 <td className="warningPath">{row.path}</td>
@@ -279,7 +298,7 @@ function ParsedModelsTable({
                 </td>
               </tr>
             ))}
-            {!filteredModels.length && (
+            {!loading && !models.length && (
               <tr>
                 <td colSpan={7}>No parsed models match the current filter.</td>
               </tr>
@@ -287,6 +306,25 @@ function ParsedModelsTable({
           </tbody>
         </table>
       </div>
+      {totalPages > 1 ? (
+        <div className="tablePagination">
+          <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+            <ChevronLeft size={15} />
+            Previous
+          </button>
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          >
+            Next
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

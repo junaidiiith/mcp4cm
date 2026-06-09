@@ -9,8 +9,7 @@ from typing import Any, Callable, Iterable, Literal
 
 from mcp4cm._deps import require_networkx, require_node2vec, require_sklearn, require_transformers_torch
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.parsers import registry
-from mcp4cm.parsers.base import BaseModelParser
+from mcp4cm.parsers.fingerprints import canonical_graph_hash
 
 HashMode = Literal["names", "names_types", "canonical_graph"]
 IsomorphismMode = Literal["structure", "names", "names_types"]
@@ -55,7 +54,6 @@ class DuplicateDecision:
 
 def detect_duplicates_by_hash(
     dataset: Dataset,
-    parser: BaseModelParser | None = None,
     *,
     mode: HashMode = "canonical_graph",
     progress: ProgressCallback | None = None,
@@ -72,8 +70,7 @@ def detect_duplicates_by_hash(
         total = len(records)
         _report_progress(progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints.")
         for index, record in enumerate(records, start=1):
-            active_parser = parser or parser_for_language(record.language)
-            fingerprint = active_parser.canonical_hash(record)
+            fingerprint = canonical_graph_hash(record)
             groups[fingerprint].append(record.model_id)
             _report_progress(
                 progress,
@@ -558,10 +555,6 @@ def node_name_fingerprint(record: ModelRecord, algorithm: str = "sha256") -> str
 
 def node_name_type_fingerprint(record: ModelRecord, algorithm: str = "sha256") -> str:
     return hash_tokens(hashable_name_tokens(record, include_types=True), algorithm=algorithm)
-
-
-def parser_for_language(language: str) -> BaseModelParser:
-    return registry.create(language)
 
 
 def flatten_duplicate_groups(groups: Iterable[DuplicateGroup]) -> set[str]:

@@ -27,3 +27,15 @@ ml = [
 
 [tool.setuptools.packages.find]
 include = ["mcp4cm*"]
+
+[tool.setuptools.package-data]
+"mcp4cm.parsers.uml_xml_pyecore" = [
+    "metamodel/LICENSE",
+    "metamodel/NOTICE.md",
+    "metamodel/ORIGIN.md",
+    "metamodel/plugins/org.eclipse.uml2.uml/model/*",
+    "metamodel/plugins/org.eclipse.uml2.types/model/*",
+    "metamodel/plugins/org.eclipse.uml2.uml.resources/libraries/*",
+    "metamodel/plugins/org.eclipse.uml2.uml.resources/profiles/*",
+    "metamodel/plugins/org.eclipse.uml2.uml.resources/metamodels/*",
+]

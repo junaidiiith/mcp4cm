@@ -16,12 +16,15 @@ from mcp4cm.duplicates import (
     vote_duplicate_pairs,
 )
 from mcp4cm.loading import load_eamodelset
-from mcp4cm.extended_ir.types import Edge, IR, Node
-from mcp4cm.extended_parsing.types import ParserRunStats, WarningType
-from mcp4cm.extended_parsing.uml.uml_parser import ParseOptions, UMLXMIParser
-from mcp4cm.parsers.extended import RepresentationProfile, UMLXMIModelParser, drop_ir_edges_with_missing_nodes
-from mcp4cm.parsers.archimate import ArchimateParser
-from mcp4cm.parsers.modelset import EcoreParser, UMLParser
+import pytest
+from mcp4cm.parsers.ir import Edge, IR, Node
+from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
+from mcp4cm.parsers.uml_xmi.parser import ParseOptions, UMLXMIParser
+from mcp4cm.parsers.catalog import ParserOptions, resolve_parser
+from mcp4cm.parsers.graph import drop_ir_edges_with_missing_nodes
+from mcp4cm.parsers.parse import parse_file
+from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
+from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
 from mcp4cm.statistics import dataset_visualizations
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
 
@@ -79,14 +82,14 @@ def test_archimate_parser_smoke():
         ],
         "relationships": [{"id": "r1", "sourceId": "a", "targetId": "b", "type": "Access"}],
     }
-    record = ArchimateParser().parse(raw)
+    record = ArchimateJsonParser().parse(raw)
     assert record.node_count == 2
     assert record.edge_count == 1
     assert "App" in record.names
 
 
 def test_hash_duplicate_detection_smoke():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     raw = {
         "elements": [{"id": "a", "name": "Foo", "type": "ApplicationComponent"}],
         "relationships": [],
@@ -99,7 +102,7 @@ def test_hash_duplicate_detection_smoke():
 
 
 def test_duplicate_hash_modes_use_names_and_name_types():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {
             "elements": [
@@ -128,7 +131,7 @@ def test_duplicate_hash_modes_use_names_and_name_types():
 
 
 def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse({"elements": [{"id": "a", "name": "Graph A", "type": "Class"}], "relationships": []}, model_id="first")
     second = parser.parse({"elements": [{"id": "b", "name": "Graph B", "type": "Class"}], "relationships": []}, model_id="second")
     reordered = parser.parse({"elements": [{"id": "c", "name": "Graph C", "type": "Class"}], "relationships": []}, model_id="reordered")
@@ -145,7 +148,7 @@ def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
 
 
 def test_dataset_visualizations_cover_structural_views():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     record = parser.parse({"elements": [{"id": "a", "name": "Graph", "type": "Class"}], "relationships": []}, model_id="first")
     record.metadata["extracted_names"] = ["customer account", "empty name", "class1"]
     record.metadata["extracted_typed_names"] = ["class: customer account", "attribute: empty name", "class: class1"]
@@ -161,7 +164,7 @@ def test_dataset_visualizations_cover_structural_views():
 
 
 def test_duplicate_hash_reports_progress():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     records = [
         parser.parse({"elements": [{"id": str(index), "name": "Order", "type": "BusinessObject"}], "relationships": []}, model_id=str(index))
         for index in range(3)
@@ -177,7 +180,7 @@ def test_duplicate_hash_reports_progress():
 
 
 def test_tfidf_duplicate_modes_and_graph_similarity():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {
             "elements": [
@@ -223,7 +226,7 @@ def test_tfidf_duplicate_modes_and_graph_similarity():
 
 
 def test_pairwise_duplicate_algorithms_report_progress():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     records = [
         parser.parse(
             {
@@ -249,7 +252,7 @@ def test_pairwise_duplicate_algorithms_report_progress():
 
 
 def test_graph_isomorphism_modes():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {
             "elements": [
@@ -279,7 +282,7 @@ def test_graph_isomorphism_modes():
 
 
 def test_duplicate_voting_combines_techniques():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     first = parser.parse(
         {
             "elements": [
@@ -309,7 +312,7 @@ def test_duplicate_voting_combines_techniques():
 
 
 def test_dummy_detection_smoke():
-    parser = ArchimateParser()
+    parser = ArchimateJsonParser()
     record = parser.parse(
         {
             "elements": [
@@ -326,7 +329,7 @@ def test_dummy_detection_smoke():
 
 
 def uml_record(names, *, model_id="uml", node_type="Class"):
-    return UMLParser().parse(
+    return ModelSetJsonParser("uml").parse(
         {
             "ids": model_id,
             "graph": {
@@ -343,7 +346,7 @@ def uml_record(names, *, model_id="uml", node_type="Class"):
 
 
 def test_dummy_cleansing_v2_filter_chain_and_traceability():
-    record = UMLParser().parse(
+    record = ModelSetJsonParser("uml").parse(
         {
             "ids": "uml-dummy",
             "graph": {
@@ -391,7 +394,7 @@ def test_dummy_cleansing_v2_regex_rule():
 
 
 def test_dummy_cleansing_v2_filter_summary_groups_mixed_modelset_by_language():
-    uml = UMLParser().parse(
+    uml = ModelSetJsonParser("uml").parse(
         {
             "ids": "uml-dummy",
             "model_type": "uml",
@@ -404,7 +407,7 @@ def test_dummy_cleansing_v2_filter_summary_groups_mixed_modelset_by_language():
             },
         }
     )
-    ecore = EcoreParser().parse(
+    ecore = ModelSetJsonParser("ecore").parse(
         {
             "ids": "ecore-dummy",
             "model_type": "ecore",
@@ -498,6 +501,170 @@ def test_uml_parser_embeds_multiplicity_without_literal_value_nodes(tmp_path):
     assert assoc_edge.data["end1"]["upper"] == "*"
     assert assoc_edge.data["end2"]["lower"] == "1"
     assert assoc_edge.data["end2"]["upper"] == "1"
+
+
+def test_uml_xml_pye_parser_smoke(tmp_path):
+    pytest.importorskip("pyecore")
+    from mcp4cm.parsers.uml_xml_pyecore.parser import UMLXMLPyEcoreParser
+
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packagedElement xsi:type="uml:Class" xmi:id="A" name="A"/>
+    <packagedElement xsi:type="uml:Class" xmi:id="B" name="B"/>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "model.uml"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, stats = UMLXMLPyEcoreParser().parse(str(model_path))
+
+    assert stats.warning_count == 0
+    assert ir.language == "UML-XML-PyEcore"
+    assert {node.id for node in ir.nodes} >= {"model1", "A", "B"}
+    assert {node.type for node in ir.nodes} >= {"Model", "Class"}
+    assert any(edge.type == "packagedElement" for edge in ir.edges)
+
+
+def test_uml_xml_pye_parser_silently_removes_xmi_extensions(tmp_path):
+    pytest.importorskip("pyecore")
+    from mcp4cm.parsers.diagnostics import WarningType
+    from mcp4cm.parsers.uml_xml_pyecore.parser import UMLXMLPyEcoreParser
+
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <xmi:Extension extender="http://www.eclipse.org/emf/2002/Ecore">
+      <eAnnotations xmi:id="ann1" source="genmymodel"/>
+    </xmi:Extension>
+    <packagedElement xsi:type="uml:Class" xmi:id="A" name="A"/>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "model.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    _ir, stats = UMLXMLPyEcoreParser().parse(str(model_path))
+
+    assert stats.warning_count == 0
+    assert stats.warnings_by_type.get(WarningType.COMPATIBILITY_ADAPTATION, 0) == 0
+
+
+def test_uml_xml_pye_parser_stubs_primitive_types_on_nodes(tmp_path):
+    pytest.importorskip("pyecore")
+    from mcp4cm.parsers.diagnostics import WarningType
+    from mcp4cm.parsers.uml_xml_pyecore.parser import UMLXMLPyEcoreParser
+
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packageImport xmi:id="pi1" importingNamespace="model1">
+      <importedPackage href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Class" xmi:id="A" name="A">
+      <ownedAttribute xmi:id="p1" name="title">
+        <type xsi:type="uml:PrimitiveType" href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#//String"/>
+      </ownedAttribute>
+      <ownedAttribute xmi:id="p2" name="count">
+        <type xsi:type="uml:PrimitiveType" href="http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#//Integer"/>
+      </ownedAttribute>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "model.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, stats = UMLXMLPyEcoreParser().parse(str(model_path))
+
+    assert stats.warning_count == 0
+    assert stats.warnings_by_type.get(WarningType.UNRESOLVED_REFERENCE, 0) == 0
+
+    properties = {node.id: node for node in ir.nodes if node.eClass == "Property"}
+    assert properties["p1"].type == "String"
+    assert properties["p1"].name == "title"
+    assert properties["p1"].eClass == "Property"
+    assert "type" not in properties["p1"].data
+    assert "name" not in properties["p1"].data
+    assert properties["p2"].type == "Integer"
+    assert properties["p2"].eClass == "Property"
+    assert not any(edge.type == "type" for edge in ir.edges)
+
+
+def test_uml_xml_pye_parser_stubs_genmymodel_primitive_types(tmp_path):
+    pytest.importorskip("pyecore")
+    from mcp4cm.parsers.diagnostics import WarningType
+    from mcp4cm.parsers.uml_xml_pyecore.parser import UMLXMLPyEcoreParser
+
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="M">
+    <packageImport xmi:id="pi1" importingNamespace="model1">
+      <importedPackage href="pathmap://GENMYMODEL_LIBRARIES/GenMyModelPrimitiveTypes.library.uml#/"/>
+    </packageImport>
+    <packagedElement xsi:type="uml:Class" xmi:id="A" name="A">
+      <ownedAttribute xmi:id="p1" name="created">
+        <type xsi:type="uml:PrimitiveType" href="pathmap://GENMYMODEL_LIBRARIES/GenMyModelPrimitiveTypes.library.uml#//Date"/>
+      </ownedAttribute>
+      <ownedAttribute xmi:id="p2" name="amount">
+        <type xsi:type="uml:PrimitiveType" href="pathmap://GENMYMODEL_LIBRARIES/GenMyModelPrimitiveTypes.library.uml#//Long"/>
+      </ownedAttribute>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "model.xmi"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    ir, stats = UMLXMLPyEcoreParser().parse(str(model_path))
+
+    assert stats.warning_count == 0
+    assert stats.warnings_by_type.get(WarningType.UNRESOLVED_REFERENCE, 0) == 0
+
+    properties = {node.id: node for node in ir.nodes if node.eClass == "Property"}
+    assert properties["p1"].type == "Date"
+    assert properties["p2"].type == "Long"
+
+
+def test_uml_xml_pye_descriptor_and_adapter(tmp_path):
+    pytest.importorskip("pyecore")
+
+    xmi = """<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1"
+    xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML">
+  <uml:Model xmi:id="model1" name="model">
+    <packagedElement xsi:type="uml:Class" xmi:id="C1" name="Class1"/>
+  </uml:Model>
+</xmi:XMI>
+"""
+    model_path = tmp_path / "descriptor.uml"
+    model_path.write_text(xmi, encoding="utf-8")
+
+    descriptor = resolve_parser("uml", "xml-pyecore")
+    result = parse_file(model_path, language="uml", format="xml-pyecore", model_id="descriptor")
+
+    assert descriptor.parser_id == "uml-xml-pyecore"
+    assert descriptor.matches_extension("model.uml")
+    assert result.record.model_id == "descriptor"
+    assert result.record.language == "uml"
+    assert result.record.metadata["format"] == "xml-pyecore"
+    assert result.record.metadata["parserLanguage"] == "UML-XML-PyEcore"
+    assert result.record.node_count >= 2
 
 
 def test_uml_parser_embeds_guard_and_weight_without_value_spec_nodes(tmp_path):
@@ -729,7 +896,7 @@ def test_uml_parser_materializes_reference_edges_from_node_data(tmp_path):
     assert edges["r1__ref__stateMachine__sm1"].data["referenceKey"] == "stateMachine"
 
 
-def test_uml_extended_parser_keeps_raw_record_name_model_placeholder(tmp_path):
+def test_uml_xmi_adapter_keeps_raw_record_name_model_placeholder(tmp_path):
     xmi = """<?xml version="1.0" encoding="UTF-8"?>
 <xmi:XMI xmi:version="2.1"
     xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
@@ -743,6 +910,11 @@ def test_uml_extended_parser_keeps_raw_record_name_model_placeholder(tmp_path):
     model_path = tmp_path / "record-name-normalization.xmi"
     model_path.write_text(xmi, encoding="utf-8")
 
-    record = UMLXMIModelParser(RepresentationProfile(include_model_root_node=False)).parse_file(model_path)
+    descriptor = resolve_parser("uml", "xmi")
+    record = descriptor.create_adapter().parse_file(
+        model_path,
+        model_id=model_path.stem,
+        options=ParserOptions({"include_model_root_node": False}),
+    ).record
 
     assert record.name == "model"
