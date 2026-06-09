@@ -1,10 +1,22 @@
-import { Network, Plus } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Expand, Grid2X2, ListTree, Network, Plus } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { HistogramBin, StatisticItem, VisualizationPayload } from "../../types";
 import { round } from "../../utils";
 
 export function VisualizationPanel({ data }: { data: VisualizationPayload | null }) {
+  const [activeCategory, setActiveCategory] = useState<VisualizationCategoryId>("quality");
+  const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [expandedChartId, setExpandedChartId] = useState<string | null>(null);
+  const categories = useMemo(() => data ? visualizationCategories(data) : [], [data]);
+  const activeCharts = categories.find((category) => category.id === activeCategory)?.charts || categories[0]?.charts || [];
+  const selectedChart = activeCharts.find((chart) => chart.id === selectedChartId) || activeCharts[0] || null;
+  const expandedChart = categories.flatMap((category) => category.charts).find((chart) => chart.id === expandedChartId) || null;
+
   return (
     <Card className="panel" id="visualizations">
       <CardHeader className="panelHeader">
@@ -12,89 +24,250 @@ export function VisualizationPanel({ data }: { data: VisualizationPayload | null
       </CardHeader>
       <CardContent>
         {!data ? <div className="empty"><Plus size={18} />Parse a dataset to render visualizations.</div> : (
-          <div className="visualizationSections">
-            <VisualizationGroup title="Missing Names">
-              <Chart title="Distribution of Missing-Name Ratio per Model" subtitle="Share of name slots recorded as empty name">
-                <Histogram bins={data.missingNameRatioHistogram} ratioAxis />
-              </Chart>
-              <Chart title="Missing Names by Element Type" subtitle="Number of missing names grouped by normalized element type">
-                <LimitedHorizontalBars items={data.missingNamesByType} ariaLabel="Missing names by element type count" />
-              </Chart>
-            </VisualizationGroup>
+          <>
+            <Tabs
+              className="visualizationTabs"
+              value={activeCategory}
+              onValueChange={(value) => {
+                const nextCategory = value as VisualizationCategoryId;
+                setActiveCategory(nextCategory);
+                setSelectedChartId(categories.find((category) => category.id === nextCategory)?.charts[0]?.id || null);
+              }}
+            >
+              <div className="visualizationToolbar">
+                <TabsList className="visualizationTabList">
+                  {categories.map((category) => (
+                    <TabsTrigger key={category.id} value={category.id}>{category.label}</TabsTrigger>
+                  ))}
+                </TabsList>
+                <Button className="visualizationModeButton" type="button" variant="secondary" size="sm" onClick={() => setShowAll((current) => !current)}>
+                  {showAll ? <ListTree size={16} /> : <Grid2X2 size={16} />}
+                  {showAll ? "Focused" : "Show all"}
+                </Button>
+              </div>
 
-            <VisualizationGroup title="Concepts And Types">
-              <Chart title="Most Frequent Full Concepts" subtitle="Occurrences across the complete corpus">
-                <LimitedHorizontalBars items={data.topConcepts} ariaLabel="Most frequent full concepts count" />
-              </Chart>
-              <Chart title="Concepts by Document Frequency" subtitle="Number of models containing each concept">
-                <LimitedHorizontalBars items={data.topConceptDocumentFrequency} ariaLabel="Concepts by document frequency count" />
-              </Chart>
-              <Chart title="Top Concepts Excluding Type-Based Placeholders" subtitle="Names such as class and class1 are excluded">
-                <LimitedHorizontalBars items={data.topConceptsWithoutTypePlaceholders} ariaLabel="Concepts excluding type-based placeholders count" />
-              </Chart>
-              <Chart title="Document Frequency Excluding Type-Based Placeholders" subtitle="Number of models containing each filtered concept">
-                <LimitedHorizontalBars items={data.topConceptDocumentFrequencyWithoutTypePlaceholders} ariaLabel="Document frequency excluding type-based placeholders count" />
-              </Chart>
-              <Chart title="Element Types in the Corpus" subtitle="Treemap area is proportional to element count" wide>
-                <Treemap items={data.elementTypeTreemap} />
-              </Chart>
-              <Chart title="Type-Specific Vocabulary Heatmap" subtitle="Relative token frequency within each major element type" wide>
-                <Heatmap data={data.vocabularyHeatmap} />
-              </Chart>
-              <Chart title="Element Type to Frequent Concepts" subtitle="Strongest type-to-concept links" wide>
-                <TypeConceptLinks links={data.typeConceptLinks} />
-              </Chart>
-              <Chart title="Frequent Concepts within Element Types" subtitle="Hierarchical treemap grouped by major type" wide>
-                <ConceptTreemap links={data.typeConceptLinks} />
-              </Chart>
-            </VisualizationGroup>
+              {categories.map((category) => (
+                <TabsContent key={category.id} value={category.id}>
+                  {showAll ? (
+                    <div className="visualizationShowAllGrid">
+                      {category.charts.map((chart) => (
+                        <ChartPreview key={chart.id} chart={chart} onExpand={() => setExpandedChartId(chart.id)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="visualizationWorkbench">
+                      <nav className="visualizationChartNav" aria-label={`${category.label} charts`}>
+                        {category.charts.map((chart) => (
+                          <button
+                            className={chart.id === selectedChart?.id ? "active" : ""}
+                            key={chart.id}
+                            type="button"
+                            onClick={() => setSelectedChartId(chart.id)}
+                          >
+                            <strong>{chart.title}</strong>
+                            <span>{chart.description}</span>
+                          </button>
+                        ))}
+                      </nav>
+                      {selectedChart && <ChartPreview chart={selectedChart} featured onExpand={() => setExpandedChartId(selectedChart.id)} />}
+                    </div>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
 
-            <VisualizationGroup title="Model Structure">
-              <Chart title="Model Size vs Vocabulary Richness" subtitle="Point size follows token count; color follows missing-name ratio" wide>
-                <Scatter points={data.modelVocabularyScatter} />
-              </Chart>
-              <Chart title="Boxplot of Name Counts in Models" subtitle="Five-number summary of extracted name slots">
-                <Boxplot summary={data.nameCountBoxplot} />
-              </Chart>
-              <Chart title="Histogram of Name Counts (Log Scale)" subtitle="Log-scaled model frequency">
-                <Histogram bins={data.nameCountHistogramLog} useDisplayCount />
-              </Chart>
-              <Chart title="Models with Fewer Than Five Names" subtitle="Name-count distribution for small models">
-                <Histogram bins={data.fewNamesHistogram} />
-              </Chart>
-              <Chart title="Top 20 Names by Model Frequency" subtitle="Each concept contributes at most once per model">
-                <HorizontalBars items={data.topNamesPerModel} />
-              </Chart>
-              <Chart title="Modeling Language Distribution" subtitle="Parsed model count by modeling language">
-                <HorizontalBars items={data.languageDistribution} />
-              </Chart>
-            </VisualizationGroup>
-
-            <VisualizationGroup title="Topics">
-              {data.topicModel.available ? (
-                <>
-                  <Chart title={`Document Topic Map (${data.topicModel.projectionMethod} projection)`} subtitle="NMF topic assignment projected into two dimensions" wide>
-                    <TopicScatter points={data.topicModel.points || []} />
-                  </Chart>
-                  <Chart title="Average Topic Prevalence in the Corpus" subtitle="Mean NMF topic weight">
-                    <HorizontalBars items={data.topicModel.prevalence || []} />
-                  </Chart>
-                </>
-              ) : <p className="visualizationNote">{data.topicModel.reason}</p>}
-            </VisualizationGroup>
-          </div>
+            <Dialog open={Boolean(expandedChart)} onOpenChange={(open) => !open && setExpandedChartId(null)}>
+              {expandedChart && (
+                <DialogContent className="visualizationDialog">
+                  <DialogHeader>
+                    <DialogTitle>{expandedChart.title}</DialogTitle>
+                    <DialogDescription>{expandedChart.description}</DialogDescription>
+                  </DialogHeader>
+                  <div className="visualizationDialogBody">{expandedChart.render()}</div>
+                </DialogContent>
+              )}
+            </Dialog>
+          </>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function VisualizationGroup({ title, children }: { title: string; children: ReactNode }) {
-  return <section><h3 className="visualizationGroupTitle">{title}</h3><div className="visualizationGrid">{children}</div></section>;
+type VisualizationCategoryId = "quality" | "vocabulary" | "structure" | "topics";
+
+interface VisualizationChartDefinition {
+  id: string;
+  title: string;
+  description: string;
+  render: () => ReactNode;
 }
 
-function Chart({ title, subtitle, wide, children }: { title: string; subtitle: string; wide?: boolean; children: ReactNode }) {
-  return <article className={`visualizationCard${wide ? " wide" : ""}`}><h4>{title}</h4><p>{subtitle}</p><div className="chartBody">{children}</div></article>;
+interface VisualizationCategory {
+  id: VisualizationCategoryId;
+  label: string;
+  charts: VisualizationChartDefinition[];
+}
+
+function visualizationCategories(data: VisualizationPayload): VisualizationCategory[] {
+  return [
+    {
+      id: "quality",
+      label: "Quality",
+      charts: [
+        {
+          id: "missing-name-ratio",
+          title: "Distribution of Missing-Name Ratio per Model",
+          description: "Share of name slots recorded as empty name.",
+          render: () => <Histogram bins={data.missingNameRatioHistogram} ratioAxis />,
+        },
+        {
+          id: "missing-names-by-type",
+          title: "Missing Names by Element Type",
+          description: "Number of missing names grouped by normalized element type.",
+          render: () => <LimitedHorizontalBars items={data.missingNamesByType} ariaLabel="Missing names by element type count" />,
+        },
+      ],
+    },
+    {
+      id: "vocabulary",
+      label: "Vocabulary",
+      charts: [
+        {
+          id: "frequent-names",
+          title: "Most Frequent Names",
+          description: "Name occurrences across the complete corpus.",
+          render: () => <LimitedHorizontalBars items={data.topConcepts} ariaLabel="Most frequent names count" />,
+        },
+        {
+          id: "name-document-frequency",
+          title: "Names by Document Frequency",
+          description: "Number of models containing each name.",
+          render: () => <LimitedHorizontalBars items={data.topConceptDocumentFrequency} ariaLabel="Names by document frequency count" />,
+        },
+        {
+          id: "filtered-frequent-names",
+          title: "Top Names Excluding Type-Based Placeholders",
+          description: "Generic names such as class and class1 are excluded.",
+          render: () => <LimitedHorizontalBars items={data.topConceptsWithoutTypePlaceholders} ariaLabel="Names excluding type-based placeholders count" />,
+        },
+        {
+          id: "filtered-name-document-frequency",
+          title: "Document Frequency Excluding Type-Based Placeholders",
+          description: "Number of models containing each filtered name.",
+          render: () => <LimitedHorizontalBars items={data.topConceptDocumentFrequencyWithoutTypePlaceholders} ariaLabel="Document frequency excluding type-based placeholders count" />,
+        },
+        {
+          id: "type-vocabulary-heatmap",
+          title: "Type-Specific Vocabulary Heatmap",
+          description: "Relative token frequency within each major element type.",
+          render: () => <Heatmap data={data.vocabularyHeatmap} />,
+        },
+        {
+          id: "top-names-per-model",
+          title: "Top 20 Names by Model Frequency",
+          description: "Each name contributes at most once per model.",
+          render: () => <HorizontalBars items={data.topNamesPerModel} />,
+        },
+      ],
+    },
+    {
+      id: "structure",
+      label: "Structure",
+      charts: [
+        {
+          id: "element-type-treemap",
+          title: "Element Types in the Corpus",
+          description: "Treemap area is proportional to element count.",
+          render: () => <Treemap items={data.elementTypeTreemap} />,
+        },
+        {
+          id: "type-name-links",
+          title: "Element Type to Frequent Names",
+          description: "Strongest type-to-name links.",
+          render: () => <TypeConceptLinks links={data.typeConceptLinks} />,
+        },
+        {
+          id: "names-within-types",
+          title: "Frequent Names within Element Types",
+          description: "Hierarchical treemap grouped by major type.",
+          render: () => <ConceptTreemap links={data.typeConceptLinks} />,
+        },
+        {
+          id: "model-vocabulary-scatter",
+          title: "Model Size vs Vocabulary Richness",
+          description: "Point size follows token count; color follows missing-name ratio.",
+          render: () => <Scatter points={data.modelVocabularyScatter} />,
+        },
+        {
+          id: "name-count-boxplot",
+          title: "Boxplot of Name Counts in Models",
+          description: "Five-number summary of extracted name slots.",
+          render: () => <Boxplot summary={data.nameCountBoxplot} />,
+        },
+        {
+          id: "name-count-histogram-log",
+          title: "Histogram of Name Counts (Log Scale)",
+          description: "Log-scaled model frequency.",
+          render: () => <Histogram bins={data.nameCountHistogramLog} useDisplayCount />,
+        },
+        {
+          id: "few-names-histogram",
+          title: "Models with Fewer Than Five Names",
+          description: "Name-count distribution for small models.",
+          render: () => <Histogram bins={data.fewNamesHistogram} />,
+        },
+        {
+          id: "language-distribution",
+          title: "Modeling Language Distribution",
+          description: "Parsed model count by modeling language.",
+          render: () => <HorizontalBars items={data.languageDistribution} />,
+        },
+      ],
+    },
+    {
+      id: "topics",
+      label: "Topics",
+      charts: data.topicModel.available ? [
+        {
+          id: "topic-map",
+          title: `Document Topic Map (${data.topicModel.projectionMethod} projection)`,
+          description: "NMF topic assignment projected into two dimensions.",
+          render: () => <TopicScatter points={data.topicModel.points || []} />,
+        },
+        {
+          id: "topic-prevalence",
+          title: "Average Topic Prevalence in the Corpus",
+          description: "Mean NMF topic weight.",
+          render: () => <HorizontalBars items={data.topicModel.prevalence || []} />,
+        },
+      ] : [
+        {
+          id: "topics-unavailable",
+          title: "Topic Model",
+          description: "Topic modeling is unavailable for this dataset.",
+          render: () => <p className="visualizationNote">{data.topicModel.reason}</p>,
+        },
+      ],
+    },
+  ];
+}
+
+function ChartPreview({ chart, featured, onExpand }: { chart: VisualizationChartDefinition; featured?: boolean; onExpand: () => void }) {
+  return (
+    <article className={`visualizationCard${featured ? " featured" : ""}`}>
+      <div className="visualizationCardHeader">
+        <div>
+          <h4>{chart.title}</h4>
+          <p>{chart.description}</p>
+        </div>
+        <Button aria-label={`Expand ${chart.title}`} type="button" variant="ghost" size="icon" onClick={onExpand}>
+          <Expand size={16} />
+        </Button>
+      </div>
+      <div className="chartBody">{chart.render()}</div>
+    </article>
+  );
 }
 
 function HorizontalBars({ items }: { items: StatisticItem[] }) {

@@ -564,7 +564,7 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
         report(
             status="running",
             stage="statistics",
-            message="Calculating descriptive statistics.",
+            message="Calculating statistics.",
             parseProcessedFiles=len(staged_files),
             parseTotalFiles=len(staged_files),
         )

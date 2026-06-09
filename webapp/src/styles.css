@@ -1245,14 +1245,43 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .infoModal {
   width: min(860px, 96vw);
 }
-.visualizationSections { display: grid; gap: 22px; }
-.visualizationGroupTitle { border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; color: #23404b; }
-.visualizationGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.visualizationCard { min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: #fbfdff; }
-.visualizationCard.wide { grid-column: 1 / -1; }
-.visualizationCard h4 { margin: 0; font-size: 14px; color: #243d49; }
-.visualizationCard p { margin-top: 4px; font-size: 12px; }
-.chartBody { min-height: 170px; margin-top: 14px; overflow: auto; }
+.visualizationTabs { gap: 14px; }
+.visualizationToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.visualizationTabList { display: inline-grid; grid-template-columns: repeat(4, minmax(92px, 1fr)); height: auto; min-height: 42px; }
+.visualizationModeButton { flex-shrink: 0; }
+.visualizationWorkbench { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.visualizationChartNav { display: grid; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
+.visualizationChartNav button {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--foreground);
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.visualizationChartNav button:hover { border-color: color-mix(in srgb, var(--primary) 42%, var(--border)); background: #f7fbfc; }
+.visualizationChartNav button.active { border-color: var(--primary); background: #edf8f7; box-shadow: inset 3px 0 0 var(--primary); }
+.visualizationChartNav strong { display: block; color: #243d49; font-size: 13px; line-height: 1.25; }
+.visualizationChartNav span { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 12px; line-height: 1.35; }
+.visualizationShowAllGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.visualizationCard { min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: #fbfdff; }
+.visualizationCard.featured { min-height: 520px; }
+.visualizationCardHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.visualizationCardHeader h4 { margin: 0; font-size: 14px; color: #243d49; line-height: 1.25; }
+.visualizationCardHeader p { margin-top: 4px; font-size: 12px; line-height: 1.35; }
+.visualizationCardHeader button { flex: 0 0 auto; width: 32px; height: 32px; min-height: 32px; padding: 0; }
+.chartBody { min-height: 190px; margin-top: 14px; overflow: auto; }
+.visualizationCard.featured .chartBody { min-height: 420px; }
+.visualizationDialog { width: min(1280px, 96vw); max-width: min(1280px, 96vw); max-height: 92vh; overflow: hidden; }
+.visualizationDialogBody { max-height: calc(92vh - 130px); overflow: auto; padding-right: 4px; }
+.visualizationDialogBody .chartRowsScrollable { max-height: none; }
+.visualizationDialogBody .scatter { height: 520px; }
+.visualizationDialogBody .treemap { min-height: 440px; }
+.visualizationDialogBody .boxplot { min-height: 260px; }
 .chartLimit { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; color: #53677a; font-size: 12px; font-weight: 700; }
 .chartLimit input { width: 62px; min-height: 30px; padding: 4px 6px; }
 .chartRowsScrollable { max-height: 300px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
@@ -1321,6 +1350,11 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   .dummyFindingCard summary { grid-template-columns: 1fr; }
   .actionBar button { width: 100%; }
   .topbar { flex-direction: column; }
-  .visualizationGrid { grid-template-columns: 1fr; }
+  .visualizationToolbar { align-items: stretch; }
+  .visualizationTabList { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .visualizationModeButton { width: 100%; }
+  .visualizationWorkbench { grid-template-columns: 1fr; }
+  .visualizationChartNav { max-height: none; }
+  .visualizationShowAllGrid { grid-template-columns: 1fr; }
   .conceptTreemap { grid-template-columns: 1fr; }
 }
