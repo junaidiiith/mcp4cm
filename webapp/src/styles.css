@@ -1248,6 +1248,33 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .visualizationTabs { gap: 14px; }
 .visualizationToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .visualizationTabList { display: inline-grid; grid-template-columns: repeat(4, minmax(92px, 1fr)); height: auto; min-height: 42px; }
+.visualizationToolbarActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.visualizationSnapshotControl {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(78px, 1fr));
+  min-height: 36px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.visualizationSnapshotControl button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.visualizationSnapshotControl button.active {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: var(--shadow-soft);
+}
+.visualizationSnapshotControl button:disabled { cursor: not-allowed; opacity: 0.45; }
+.visualizationSnapshotStatus { margin-top: -4px; color: var(--muted-foreground); font-size: 12px; }
 .visualizationModeButton { flex-shrink: 0; }
 .visualizationWorkbench { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; align-items: start; }
 .visualizationChartNav { display: grid; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
@@ -1352,6 +1379,8 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   .topbar { flex-direction: column; }
   .visualizationToolbar { align-items: stretch; }
   .visualizationTabList { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .visualizationToolbarActions { width: 100%; align-items: stretch; }
+  .visualizationSnapshotControl { flex: 1 1 220px; }
   .visualizationModeButton { width: 100%; }
   .visualizationWorkbench { grid-template-columns: 1fr; }
   .visualizationChartNav { max-height: none; }

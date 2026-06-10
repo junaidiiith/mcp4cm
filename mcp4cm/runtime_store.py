@@ -32,6 +32,10 @@ def runtime_dataset_statistics_path(dataset_id: str) -> Path:
     return runtime_dataset_dir(dataset_id) / "statistics.json"
 
 
+def runtime_dataset_after_dummy_statistics_path(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "statistics-after-dummy.json"
+
+
 def json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -345,11 +349,43 @@ def save_dataset_statistics(dataset_id: str, statistics: dict[str, Any]) -> None
         temp_path.replace(statistics_path)
 
 
+def save_dataset_after_dummy_statistics(dataset_id: str, statistics: dict[str, Any]) -> None:
+    with RUNTIME_LOCK:
+        ensure_runtime_store(dataset_id)
+        statistics_path = runtime_dataset_after_dummy_statistics_path(dataset_id)
+        temp_path = statistics_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(json_safe(statistics), ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(statistics_path)
+
+
+def delete_dataset_after_dummy_statistics(dataset_id: str) -> None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return
+    with RUNTIME_LOCK:
+        runtime_dataset_after_dummy_statistics_path(dataset_id).unlink(missing_ok=True)
+
+
 def load_dataset_statistics(dataset_id: str) -> dict[str, Any] | None:
     dataset_id = str(dataset_id or "")
     if not dataset_id:
         return None
     statistics_path = runtime_dataset_statistics_path(dataset_id)
+    if not statistics_path.exists():
+        return None
+    with RUNTIME_LOCK:
+        try:
+            payload = json.loads(statistics_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
+def load_dataset_after_dummy_statistics(dataset_id: str) -> dict[str, Any] | None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return None
+    statistics_path = runtime_dataset_after_dummy_statistics_path(dataset_id)
     if not statistics_path.exists():
         return None
     with RUNTIME_LOCK:

@@ -252,6 +252,93 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
 
 
+def test_dummy_filters_persist_after_cleansing_statistics():
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
+    client = create_app().test_client()
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=[
+            (
+                BytesIO(
+                    json.dumps(
+                        {
+                            "archimateId": "kept-model",
+                            "name": "Kept model",
+                            "elements": [
+                                {"id": "a", "name": "Customer portal", "type": "ApplicationComponent"},
+                                {"id": "b", "name": "Order service", "type": "ApplicationComponent"},
+                                {"id": "c", "name": "Billing ledger", "type": "DataObject"},
+                            ],
+                            "relationships": [
+                                {"id": "r1", "sourceId": "a", "targetId": "b", "type": "Flow"},
+                                {"id": "r2", "sourceId": "b", "targetId": "c", "type": "Access"},
+                            ],
+                        }
+                    ).encode("utf-8")
+                ),
+                "kept.json",
+            ),
+            (
+                BytesIO(
+                    json.dumps(
+                        {
+                            "archimateId": "removed-model",
+                            "name": "Removed model",
+                            "elements": [{"id": "x", "name": "Tiny", "type": "ApplicationComponent"}],
+                            "relationships": [],
+                        }
+                    ).encode("utf-8")
+                ),
+                "removed.json",
+            ),
+        ],
+    )
+
+    dataset_id = job["datasetId"]
+    response = client.post(
+        "/api/dummy",
+        json={
+            "datasetId": dataset_id,
+            "filterConfigs": [
+                {"id": "empty_graph", "enabled": False},
+                {"id": "min_size", "enabled": True, "minNodes": 2, "minEdges": 1},
+                {"id": "too_few_named_elements", "enabled": False},
+                {"id": "short_median_name_length", "enabled": False},
+                {"id": "placeholder_name_ratio", "enabled": False},
+                {"id": "low_vocabulary", "enabled": False},
+                {"id": "type_like_name_ratio", "enabled": False},
+                {"id": "name_repetition_ratio", "enabled": False},
+                {"id": "regex_rule", "enabled": False},
+            ],
+        },
+    )
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["runSummary"]["remainingModels"] == 1
+    assert "statistics" not in payload
+    assert payload["statisticsJobId"]
+
+    after_statistics_data = {}
+    after_statistics = None
+    for _ in range(30):
+        after_statistics = client.get(f"/api/datasets/{dataset_id}/statistics/after-dummy")
+        after_statistics_data = after_statistics.get_json()
+        if "summary" in after_statistics_data:
+            break
+        time.sleep(0.05)
+
+    assert (api_server.RUNTIME_DIR / dataset_id / "statistics-after-dummy.json").exists()
+    assert after_statistics is not None
+    assert after_statistics.status_code == 200
+    assert after_statistics_data["summary"]["models"] == 1
+
+
 def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields():
     nx = api_server.require_networkx()
     graph = nx.MultiDiGraph()

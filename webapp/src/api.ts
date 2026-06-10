@@ -1,5 +1,12 @@
 import { API_URL } from "./config";
-import type { DuplicateProgressState, ModelInspectPayload, ParsedModelSummary, StatisticsPayload, UploadParseJob } from "./types";
+import type {
+  AfterDummyStatisticsResponse,
+  DuplicateProgressState,
+  ModelInspectPayload,
+  ParsedModelSummary,
+  StatisticsPayload,
+  UploadParseJob,
+} from "./types";
 
 type JsonObject = Record<string, unknown>;
 
@@ -100,7 +107,11 @@ export async function getDatasetStatistics(datasetId: string): Promise<Statistic
   return getJson<StatisticsPayload>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics`);
 }
 
-function delay(ms: number) {
+export async function getDatasetAfterDummyStatistics(datasetId: string): Promise<AfterDummyStatisticsResponse> {
+  return getJson<AfterDummyStatisticsResponse>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics/after-dummy`);
+}
+
+export function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 

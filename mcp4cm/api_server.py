@@ -38,16 +38,19 @@ from mcp4cm.parsers.parse import FileParseIssue, parse_staged_files
 from mcp4cm.runtime_store import (
     RUNTIME_DIR,
     RuntimeDataset,
+    delete_dataset_after_dummy_statistics,
     deserialize_graph_from_runtime,
     finalize_runtime_dataset,
     get_dataset_meta,
     json_safe,
     load_dataset_statistics,
+    load_dataset_after_dummy_statistics,
     list_dataset_models,
     load_model_from_runtime,
     resolve_dataset,
     runtime_dataset_ir_dir,
     runtime_model_filename,
+    save_dataset_after_dummy_statistics,
     save_dataset_statistics,
     serialize_graph_for_runtime,
     serialize_model_for_runtime,
@@ -59,8 +62,10 @@ DATASETS: dict[str, Dataset | RuntimeDataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
 UPLOAD_SESSIONS: dict[str, dict[str, Any]] = {}
 UPLOAD_PARSE_JOBS: dict[str, dict[str, Any]] = {}
+AFTER_DUMMY_STATISTICS_JOBS: dict[str, dict[str, Any]] = {}
 DUPLICATE_JOBS_LOCK = threading.Lock()
 UPLOAD_LOCK = threading.Lock()
+AFTER_DUMMY_STATISTICS_LOCK = threading.Lock()
 WEBAPP_DIST = Path(__file__).resolve().parents[1] / "webapp" / "dist"
 LOG = logging.getLogger("mcp4cm.api")
 SUPPORTED_LANGUAGES = {descriptor.language for descriptor in parser_descriptors()}
@@ -114,6 +119,10 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
     @app.route("/api/datasets/<dataset_id>/statistics", methods=["GET"])
     def dataset_statistics_route(dataset_id: str):
         return jsonify(get_dataset_statistics(dataset_id))
+
+    @app.route("/api/datasets/<dataset_id>/statistics/after-dummy", methods=["GET"])
+    def dataset_after_dummy_statistics_route(dataset_id: str):
+        return jsonify(get_dataset_after_dummy_statistics_response(dataset_id))
 
     @app.route("/api/datasets/<dataset_id>/models/<model_id>/inspect", methods=["GET"])
     def inspect_model_route(dataset_id: str, model_id: str):
@@ -245,6 +254,8 @@ def reset_pipeline_state() -> None:
         UPLOAD_PARSE_JOBS.clear()
     with DUPLICATE_JOBS_LOCK:
         DUPLICATE_JOBS.clear()
+    with AFTER_DUMMY_STATISTICS_LOCK:
+        AFTER_DUMMY_STATISTICS_JOBS.clear()
     DATASETS.clear()
     for stage_dir in stage_dirs:
         remove_directory_quietly(stage_dir)
@@ -690,9 +701,72 @@ def unique_staged_path(stage_dir: Path, relpath: str) -> Path:
 
 
 def handle_dummy(body: dict[str, Any]) -> dict[str, Any]:
-    dataset = get_dataset(body)
+    total_start = time.perf_counter()
+    mark = total_start
+    dataset_id = str(body.get("datasetId") or "")
     configs = body.get("filterConfigs")
-    evaluation = evaluate_dummy_filters(dataset, filter_configs=configs if isinstance(configs, list) else None)
+    config_count = len(configs) if isinstance(configs, list) else 0
+    LOG.info("dummy_run_start dataset_id=%s filter_configs=%s", dataset_id, config_count)
+
+    dataset = get_dataset(body)
+    now = time.perf_counter()
+    LOG.info(
+        "dummy_phase_get_dataset dataset_id=%s dataset_type=%s elapsed_ms=%.1f",
+        dataset_id,
+        type(dataset).__name__,
+        (now - mark) * 1000,
+    )
+    mark = now
+
+    records = list(dataset)
+    now = time.perf_counter()
+    LOG.info(
+        "dummy_phase_materialize_records dataset_id=%s records=%s elapsed_ms=%.1f",
+        dataset_id,
+        len(records),
+        (now - mark) * 1000,
+    )
+    mark = now
+
+    evaluation_dataset = Dataset(records, getattr(dataset, "dataset_type", "runtime"), getattr(dataset, "root", None))
+    evaluation = evaluate_dummy_filters(evaluation_dataset, filter_configs=configs if isinstance(configs, list) else None)
+    now = time.perf_counter()
+    LOG.info(
+        "dummy_phase_evaluate_filters dataset_id=%s records=%s findings=%s removed=%s remaining=%s elapsed_ms=%.1f",
+        dataset_id,
+        len(records),
+        len(evaluation.findings),
+        evaluation.run_summary.removed_models,
+        evaluation.run_summary.remaining_models,
+        (now - mark) * 1000,
+    )
+    mark = now
+
+    retained_model_ids = {outcome.model_id for outcome in evaluation.model_outcomes if not outcome.removed}
+    LOG.info(
+        "dummy_phase_retained_ids dataset_id=%s retained=%s elapsed_ms=%.1f",
+        dataset_id,
+        len(retained_model_ids),
+        (time.perf_counter() - mark) * 1000,
+    )
+    mark = time.perf_counter()
+
+    statistics_job_id = uuid.uuid4().hex
+    if dataset_id:
+        start_after_dummy_statistics_job(
+            dataset_id=dataset_id,
+            job_id=statistics_job_id,
+            records=records,
+            retained_model_ids=retained_model_ids,
+        )
+    now = time.perf_counter()
+    LOG.info(
+        "dummy_phase_start_after_statistics dataset_id=%s job_id=%s elapsed_ms=%.1f",
+        dataset_id,
+        statistics_job_id if dataset_id else "",
+        (now - mark) * 1000,
+    )
+    mark = now
 
     filter_rows = [
         {
@@ -712,8 +786,16 @@ def handle_dummy(body: dict[str, Any]) -> dict[str, Any]:
         }
         for summary in evaluation.filter_summaries
     ]
+    now = time.perf_counter()
+    LOG.info(
+        "dummy_phase_build_filter_rows dataset_id=%s rows=%s elapsed_ms=%.1f",
+        dataset_id,
+        len(filter_rows),
+        (now - mark) * 1000,
+    )
+    mark = now
 
-    return {
+    response = {
         "runSummary": {
             "totalModels": evaluation.run_summary.total_models,
             "removedModels": evaluation.run_summary.removed_models,
@@ -753,7 +835,131 @@ def handle_dummy(body: dict[str, Any]) -> dict[str, Any]:
             for finding in evaluation.findings
         ],
         "rows": filter_rows,
+        "statisticsJobId": statistics_job_id if dataset_id else "",
     }
+    LOG.info(
+        "dummy_run_response_ready dataset_id=%s total_elapsed_ms=%.1f response_build_elapsed_ms=%.1f",
+        dataset_id,
+        (time.perf_counter() - total_start) * 1000,
+        (time.perf_counter() - mark) * 1000,
+    )
+    return response
+
+
+def start_after_dummy_statistics_job(
+    *,
+    dataset_id: str,
+    job_id: str,
+    records: list[ModelRecord],
+    retained_model_ids: set[str],
+) -> None:
+    start = time.perf_counter()
+    LOG.info(
+        "dummy_after_stats_job_schedule dataset_id=%s job_id=%s records=%s retained=%s",
+        dataset_id,
+        job_id,
+        len(records),
+        len(retained_model_ids),
+    )
+    delete_dataset_after_dummy_statistics(dataset_id)
+    LOG.info(
+        "dummy_after_stats_delete_previous dataset_id=%s job_id=%s elapsed_ms=%.1f",
+        dataset_id,
+        job_id,
+        (time.perf_counter() - start) * 1000,
+    )
+    with AFTER_DUMMY_STATISTICS_LOCK:
+        AFTER_DUMMY_STATISTICS_JOBS[dataset_id] = {
+            "jobId": job_id,
+            "status": "running",
+            "error": "",
+            "startedAt": time.time(),
+            "finishedAt": None,
+        }
+
+    thread = threading.Thread(
+        target=run_after_dummy_statistics_job,
+        kwargs={
+            "dataset_id": dataset_id,
+            "job_id": job_id,
+            "records": records,
+            "retained_model_ids": retained_model_ids,
+        },
+        daemon=True,
+    )
+    thread.start()
+    LOG.info(
+        "dummy_after_stats_thread_started dataset_id=%s job_id=%s elapsed_ms=%.1f",
+        dataset_id,
+        job_id,
+        (time.perf_counter() - start) * 1000,
+    )
+
+
+def run_after_dummy_statistics_job(
+    *,
+    dataset_id: str,
+    job_id: str,
+    records: list[ModelRecord],
+    retained_model_ids: set[str],
+) -> None:
+    start = time.perf_counter()
+    LOG.info(
+        "dummy_after_stats_job_start dataset_id=%s job_id=%s records=%s retained=%s",
+        dataset_id,
+        job_id,
+        len(records),
+        len(retained_model_ids),
+    )
+    try:
+        build_start = time.perf_counter()
+        after_statistics = build_statistics_payload(
+            (record for record in records if record.model_id in retained_model_ids),
+            skip_topic_model=True,
+            topic_model_skip_reason="Topic modeling skipped for after-cleansing visualizations.",
+        )
+        LOG.info(
+            "dummy_after_stats_build_complete dataset_id=%s job_id=%s models=%s elapsed_ms=%.1f",
+            dataset_id,
+            job_id,
+            after_statistics.get("summary", {}).get("models"),
+            (time.perf_counter() - build_start) * 1000,
+        )
+        with AFTER_DUMMY_STATISTICS_LOCK:
+            current = AFTER_DUMMY_STATISTICS_JOBS.get(dataset_id)
+            if current and current.get("jobId") != job_id:
+                LOG.info(
+                    "dummy_after_stats_job_superseded dataset_id=%s job_id=%s current_job_id=%s total_elapsed_ms=%.1f",
+                    dataset_id,
+                    job_id,
+                    current.get("jobId"),
+                    (time.perf_counter() - start) * 1000,
+                )
+                return
+        save_start = time.perf_counter()
+        save_dataset_after_dummy_statistics(dataset_id, after_statistics)
+        LOG.info(
+            "dummy_after_stats_save_complete dataset_id=%s job_id=%s elapsed_ms=%.1f",
+            dataset_id,
+            job_id,
+            (time.perf_counter() - save_start) * 1000,
+        )
+        with AFTER_DUMMY_STATISTICS_LOCK:
+            current = AFTER_DUMMY_STATISTICS_JOBS.get(dataset_id)
+            if current and current.get("jobId") == job_id:
+                current.update({"status": "complete", "finishedAt": time.time(), "error": ""})
+        LOG.info(
+            "dummy_after_stats_job_complete dataset_id=%s job_id=%s total_elapsed_ms=%.1f",
+            dataset_id,
+            job_id,
+            (time.perf_counter() - start) * 1000,
+        )
+    except Exception as exc:  # pragma: no cover - defensive background worker
+        LOG.exception("after_dummy_statistics_failed dataset_id=%s job_id=%s", dataset_id, job_id)
+        with AFTER_DUMMY_STATISTICS_LOCK:
+            current = AFTER_DUMMY_STATISTICS_JOBS.get(dataset_id)
+            if current and current.get("jobId") == job_id:
+                current.update({"status": "error", "finishedAt": time.time(), "error": str(exc)})
 
 
 def start_duplicate_job(body: dict[str, Any]) -> dict[str, Any]:
@@ -1327,10 +1533,14 @@ def serialize_statistics(dataset: Dataset | RuntimeDataset) -> dict[str, Any]:
         if statistics is None:
             raise ValueError("Statistics are unavailable for this runtime dataset.")
         return statistics
+    return build_statistics_payload(dataset)
+
+
+def build_statistics_payload(records, *, skip_topic_model: bool = False, topic_model_skip_reason: str = "") -> dict[str, Any]:
     accumulator = CorpusStatisticsAccumulator()
-    for record in dataset:
+    for record in records:
         accumulator.add(record)
-    return accumulator.build_payload()
+    return accumulator.build_payload(skip_topic_model=skip_topic_model, topic_model_skip_reason=topic_model_skip_reason)
 
 
 def get_dataset_statistics(dataset_id: str) -> dict[str, Any]:
@@ -1340,6 +1550,41 @@ def get_dataset_statistics(dataset_id: str) -> dict[str, Any]:
     if statistics is None:
         raise ValueError("Statistics are unavailable for this dataset.")
     return statistics
+
+
+def get_dataset_after_dummy_statistics(dataset_id: str) -> dict[str, Any]:
+    if get_dataset_meta(dataset_id) is None:
+        raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+    statistics = load_dataset_after_dummy_statistics(dataset_id)
+    if statistics is None:
+        raise ValueError("After-cleansing statistics are unavailable for this dataset.")
+    return statistics
+
+
+def get_dataset_after_dummy_statistics_response(dataset_id: str) -> dict[str, Any]:
+    if get_dataset_meta(dataset_id) is None:
+        raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+    statistics = load_dataset_after_dummy_statistics(dataset_id)
+    if statistics is not None:
+        LOG.info(
+            "dummy_after_stats_poll dataset_id=%s status=ready models=%s",
+            dataset_id,
+            statistics.get("summary", {}).get("models"),
+        )
+        return statistics
+    with AFTER_DUMMY_STATISTICS_LOCK:
+        job = dict(AFTER_DUMMY_STATISTICS_JOBS.get(str(dataset_id)) or {})
+    LOG.info(
+        "dummy_after_stats_poll dataset_id=%s status=%s job_id=%s",
+        dataset_id,
+        job.get("status") or "pending",
+        job.get("jobId") or "",
+    )
+    return {
+        "status": job.get("status") or "pending",
+        "jobId": job.get("jobId") or "",
+        "error": job.get("error") or "",
+    }
 
 
 def top_items(counter, limit: int | None = None) -> list[dict[str, Any]]:

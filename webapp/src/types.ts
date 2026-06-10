@@ -303,8 +303,18 @@ export interface DummyResponse {
   filterSummaries: DummyFilterSummary[];
   modelOutcomes: DummyModelOutcome[];
   findings: DummyFinding[];
+  statistics?: StatisticsPayload;
+  statisticsJobId?: string;
   rows?: DummyRow[];
 }
+
+export type AfterDummyStatisticsResponse =
+  | StatisticsPayload
+  | {
+      status: "pending" | "running" | "error";
+      jobId?: string;
+      error?: string;
+    };
 
 interface BaseFilterConfig {
   enabled: boolean;
