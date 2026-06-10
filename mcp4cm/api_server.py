@@ -39,17 +39,20 @@ from mcp4cm.runtime_store import (
     RUNTIME_DIR,
     RuntimeDataset,
     delete_dataset_after_dummy_statistics,
+    delete_dataset_after_dummy_retained_model_ids,
     deserialize_graph_from_runtime,
     finalize_runtime_dataset,
     get_dataset_meta,
     json_safe,
     load_dataset_statistics,
     load_dataset_after_dummy_statistics,
+    load_dataset_after_dummy_retained_model_ids,
     list_dataset_models,
     load_model_from_runtime,
     resolve_dataset,
     runtime_dataset_ir_dir,
     runtime_model_filename,
+    save_dataset_after_dummy_retained_model_ids,
     save_dataset_after_dummy_statistics,
     save_dataset_statistics,
     serialize_graph_for_runtime,
@@ -938,6 +941,8 @@ def start_after_dummy_statistics_job(
     retained_model_ids: set[str],
 ) -> None:
     delete_dataset_after_dummy_statistics(dataset_id)
+    delete_dataset_after_dummy_retained_model_ids(dataset_id)
+    save_dataset_after_dummy_retained_model_ids(dataset_id, retained_model_ids)
     with AFTER_DUMMY_STATISTICS_LOCK:
         AFTER_DUMMY_STATISTICS_JOBS[dataset_id] = {
             "jobId": job_id,
@@ -991,7 +996,7 @@ def run_after_dummy_statistics_job(
 
 
 def start_duplicate_job(body: dict[str, Any]) -> dict[str, Any]:
-    dataset = get_dataset(body)
+    dataset = get_duplicate_detection_dataset(body)
     selected = selected_duplicate_techniques(body)
     if not selected:
         raise_no_duplicate_technique_error(body)
@@ -1074,7 +1079,7 @@ def duplicate_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> i
 
 
 def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
-    dataset = get_dataset(body)
+    dataset = get_duplicate_detection_dataset(body)
     selected_order = selected_duplicate_techniques(body)
     if not selected_order:
         raise_no_duplicate_technique_error(body)
@@ -1375,6 +1380,21 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "configEcho": config_echo,
         "elapsedMs": round((time.perf_counter() - duplicate_started_at) * 1000),
     }
+
+
+def get_duplicate_detection_dataset(body: dict[str, Any]) -> Dataset | RuntimeDataset:
+    dataset = get_dataset(body)
+    dataset_id = str(body.get("datasetId") or "")
+    retained_model_ids = load_dataset_after_dummy_retained_model_ids(dataset_id)
+    if retained_model_ids is None:
+        return dataset
+    records = [record for record in dataset if str(record.model_id) in retained_model_ids]
+    return Dataset(
+        records=records,
+        dataset_type=getattr(dataset, "dataset_type", "runtime"),
+        root=getattr(dataset, "root", None),
+        diagnostics=getattr(dataset, "diagnostics", {}),
+    )
 
 
 def merge_model_diagnostics(summary: dict[str, Any], model_id: str, diagnostics: ModelDiagnostics) -> None:

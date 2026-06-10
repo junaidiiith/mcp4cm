@@ -387,6 +387,90 @@ def test_dummy_filters_persist_after_cleansing_statistics():
     assert after_statistics_data["summary"]["models"] == 1
 
 
+def test_duplicate_detection_uses_retained_models_after_dummy_cleansing():
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    DUPLICATE_JOBS.clear()
+    clear_runtime()
+    client = create_app().test_client()
+
+    def archimate_payload(model_id: str, *, include_edge: bool) -> bytes:
+        relationships = [{"id": "r1", "sourceId": "a", "targetId": "b", "type": "Flow"}] if include_edge else []
+        return json.dumps(
+            {
+                "archimateId": model_id,
+                "name": model_id,
+                "elements": [
+                    {"id": "a", "name": "Customer portal", "type": "ApplicationComponent"},
+                    {"id": "b", "name": "Order service", "type": "ApplicationComponent"},
+                ],
+                "relationships": relationships,
+            }
+        ).encode("utf-8")
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=[
+            (BytesIO(archimate_payload("kept-a", include_edge=True)), "kept-a.json"),
+            (BytesIO(archimate_payload("kept-b", include_edge=True)), "kept-b.json"),
+            (BytesIO(archimate_payload("removed-c", include_edge=False)), "removed-c.json"),
+        ],
+    )
+    dataset_id = job["datasetId"]
+
+    dummy_response = client.post(
+        "/api/dummy/jobs",
+        json={
+            "datasetId": dataset_id,
+            "filterConfigs": [
+                {"id": "min_size", "enabled": True, "minNodes": 2, "minEdges": 1},
+                {"id": "too_few_named_elements", "enabled": False},
+                {"id": "short_median_name_length", "enabled": False},
+                {"id": "placeholder_name_ratio", "enabled": False},
+                {"id": "low_vocabulary", "enabled": False},
+                {"id": "type_like_name_ratio", "enabled": False},
+                {"id": "name_repetition_ratio", "enabled": False},
+                {"id": "regex_rule", "enabled": False},
+            ],
+        },
+    )
+    assert dummy_response.status_code == 200
+    dummy_job_id = dummy_response.get_json()["jobId"]
+    dummy_payload = {}
+    for _ in range(30):
+        response = client.get(f"/api/dummy/jobs/{dummy_job_id}")
+        assert response.status_code == 200
+        dummy_payload = response.get_json()
+        if dummy_payload["status"] == "complete":
+            break
+        time.sleep(0.05)
+
+    assert dummy_payload["status"] == "complete"
+    assert dummy_payload["result"]["runSummary"]["remainingModels"] == 2
+    assert (api_server.RUNTIME_DIR / dataset_id / "retained-models-after-dummy.json").exists()
+
+    duplicate_payload = run_duplicate_job(
+        client,
+        {
+            "datasetId": dataset_id,
+            "techniques": ["hash"],
+            "selectedTechniques": ["hash"],
+            "mandatoryTechniques": ["hash"],
+            "minVotes": 1,
+            "thresholds": {"hashIncludeTypes": False},
+        },
+    )
+
+    assert duplicate_payload["status"] == "complete"
+    result = duplicate_payload["result"]
+    assert result["modelCounts"]["hash"]["totalModels"] == 2
+    assert result["duplicatePairs"] == 1
+    assert result["decisions"][0]["leftId"] == "kept-a"
+    assert result["decisions"][0]["rightId"] == "kept-b"
+
+
 def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields():
     nx = api_server.require_networkx()
     graph = nx.MultiDiGraph()

@@ -36,6 +36,10 @@ def runtime_dataset_after_dummy_statistics_path(dataset_id: str) -> Path:
     return runtime_dataset_dir(dataset_id) / "statistics-after-dummy.json"
 
 
+def runtime_dataset_after_dummy_retained_models_path(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "retained-models-after-dummy.json"
+
+
 def json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -364,6 +368,52 @@ def delete_dataset_after_dummy_statistics(dataset_id: str) -> None:
         return
     with RUNTIME_LOCK:
         runtime_dataset_after_dummy_statistics_path(dataset_id).unlink(missing_ok=True)
+
+
+def save_dataset_after_dummy_retained_model_ids(dataset_id: str, model_ids: set[str] | list[str] | tuple[str, ...]) -> None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return
+    payload = {
+        "version": 1,
+        "updatedAt": time.time(),
+        "datasetId": dataset_id,
+        "retainedModelIds": sorted(str(model_id) for model_id in model_ids),
+    }
+    with RUNTIME_LOCK:
+        ensure_runtime_store(dataset_id)
+        retained_path = runtime_dataset_after_dummy_retained_models_path(dataset_id)
+        temp_path = retained_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(json_safe(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(retained_path)
+
+
+def delete_dataset_after_dummy_retained_model_ids(dataset_id: str) -> None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return
+    with RUNTIME_LOCK:
+        runtime_dataset_after_dummy_retained_models_path(dataset_id).unlink(missing_ok=True)
+
+
+def load_dataset_after_dummy_retained_model_ids(dataset_id: str) -> set[str] | None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id:
+        return None
+    retained_path = runtime_dataset_after_dummy_retained_models_path(dataset_id)
+    if not retained_path.exists():
+        return None
+    with RUNTIME_LOCK:
+        try:
+            payload = json.loads(retained_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    if not isinstance(payload, dict):
+        return None
+    raw_ids = payload.get("retainedModelIds")
+    if not isinstance(raw_ids, list):
+        return None
+    return {str(model_id) for model_id in raw_ids}
 
 
 def load_dataset_statistics(dataset_id: str) -> dict[str, Any] | None:
