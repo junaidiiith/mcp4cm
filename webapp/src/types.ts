@@ -236,26 +236,105 @@ export interface DuplicateResult {
   duplicatePairs: number;
   candidatePairs?: number;
   approvedPairs?: number;
+  duplicateGroups?: number;
+  affectedModels?: number;
+  largestGroupSize?: number;
   votedDuplicatePairs?: number;
   totalDecisions?: number;
   returnedDecisions?: number;
   truncated?: boolean;
-  truncationLimit?: number;
+  truncationLimit?: number | null;
   elapsedMs: number;
+  jobId?: string;
+  datasetId?: string;
   techniqueStatus?: Record<string, { status: string; reason?: string; pairCount?: number; elapsedMs?: number }>;
   configEcho?: Record<string, unknown>;
   techniqueCounts: Record<string, number>;
   modelCounts: Record<string, { duplicateModels: number; uniqueModels: number; totalModels: number; pairCount: number; elapsedMs: number }>;
-  decisions: Array<{
-    leftId: string;
-    rightId: string;
-    isDuplicate: boolean;
-    voteCount: number;
-    requiredVotes?: number;
-    techniques: string[];
-    scores?: Record<string, number>;
-    metrics?: Record<string, Record<string, number>>;
-  }>;
+  groupSummary?: DuplicateGroupSummary;
+  groups?: DuplicateGroup[];
+  groupsPage?: DuplicateGroupsPage;
+  pairsPage?: DuplicatePairsPage;
+  decisions: DuplicatePairDecision[];
+}
+
+export interface DuplicatePairDecision {
+  leftId: string;
+  rightId: string;
+  groupId?: string;
+  isDuplicate: boolean;
+  voteCount: number;
+  requiredVotes?: number;
+  techniques: string[];
+  scores?: Record<string, number>;
+  metrics?: Record<string, Record<string, number>>;
+}
+
+export interface DuplicateGroupSummary {
+  totalGroups: number;
+  affectedModels: number;
+  largestGroupSize: number;
+  completeGroups: number;
+  linkedGroups: number;
+  mixedGroups: number;
+  weakGroups: number;
+}
+
+export interface DuplicateModelSummary {
+  modelId: string;
+  name?: string;
+  path?: string;
+  language?: string;
+  nodeCount?: number;
+  edgeCount?: number;
+  namedElements?: number;
+  warnings?: number;
+}
+
+export interface DuplicateGroup {
+  groupId: string;
+  modelIds: string[];
+  size: number;
+  approvedInternalPairs: number;
+  candidateRejectedInternalPairs: number;
+  missingInternalPairs: number;
+  possibleInternalPairs: number;
+  density: number;
+  confidence: "complete" | "linked" | "mixed" | "weak" | string;
+  warnings: string[];
+  techniques: string[];
+  canonicalModelId: string;
+  canonicalReason?: string;
+  scoreStats?: { min: number; max: number; avg: number };
+  modelSummaries?: DuplicateModelSummary[];
+}
+
+export interface DuplicateGroupsPage {
+  groups: DuplicateGroup[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface DuplicatePairsPage {
+  pairs: DuplicatePairDecision[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface DuplicateGroupDetail {
+  group: DuplicateGroup;
+  pairs: DuplicatePairDecision[];
+  modelSummaries: DuplicateModelSummary[];
+}
+
+export interface DuplicateCanonicalSelection {
+  groupId: string;
+  canonicalModelId: string;
+  duplicateModelIds: string[];
 }
 
 export interface DummyRow {

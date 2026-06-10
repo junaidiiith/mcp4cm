@@ -13,6 +13,7 @@ import { errorMessage, getModelInspect } from "../../api";
 import type { ModelInspectPayload, ParsedModelSummary, WarningEntry } from "../../types";
 
 const LazyModelGraphPreview = lazy(() => import("../../components/model-graph-preview"));
+const LazyPairGraphCompareView = lazy(() => import("../../components/pair-graph-compare-view"));
 
 export interface ModelInspectState {
   payload: ModelInspectPayload | null;
@@ -234,30 +235,43 @@ export function PairCompareModal({
             {leftId} {"<->"} {rightId}
           </DialogDescription>
         </DialogHeader>
-        <div className="pairCompareGrid">
-          <div className="pairComparePane">
-            <div className="pairComparePaneHeader">
-              <h4>Left</h4>
-              <p>{leftId}</p>
+        {leftInspectModel && rightInspectModel && !leftInspectLoading && !rightInspectLoading && !leftInspectError && !rightInspectError ? (
+          <Suspense
+            fallback={
+              <div className="inspectState">
+                <Loader2 className="spin" size={16} />
+                Loading graph comparison...
+              </div>
+            }
+          >
+            <LazyPairGraphCompareView left={leftInspectModel} right={rightInspectModel} />
+          </Suspense>
+        ) : (
+          <div className="pairCompareGrid">
+            <div className="pairComparePane">
+              <div className="pairComparePaneHeader">
+                <h4>Left</h4>
+                <p>{leftId}</p>
+              </div>
+              <ModelInspectBody
+                inspectLoading={leftInspectLoading}
+                inspectError={leftInspectError}
+                inspectModel={leftInspectModel}
+              />
             </div>
-            <ModelInspectBody
-              inspectLoading={leftInspectLoading}
-              inspectError={leftInspectError}
-              inspectModel={leftInspectModel}
-            />
-          </div>
-          <div className="pairComparePane">
-            <div className="pairComparePaneHeader">
-              <h4>Right</h4>
-              <p>{rightId}</p>
+            <div className="pairComparePane">
+              <div className="pairComparePaneHeader">
+                <h4>Right</h4>
+                <p>{rightId}</p>
+              </div>
+              <ModelInspectBody
+                inspectLoading={rightInspectLoading}
+                inspectError={rightInspectError}
+                inspectModel={rightInspectModel}
+              />
             </div>
-            <ModelInspectBody
-              inspectLoading={rightInspectLoading}
-              inspectError={rightInspectError}
-              inspectModel={rightInspectModel}
-            />
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

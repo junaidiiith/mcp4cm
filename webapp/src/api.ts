@@ -1,6 +1,9 @@
 import { API_URL } from "./config";
 import type {
   AfterDummyStatisticsResponse,
+  DuplicateGroupDetail,
+  DuplicateGroupsPage,
+  DuplicatePairsPage,
   DummyProgressState,
   DuplicateProgressState,
   ModelInspectPayload,
@@ -44,6 +47,38 @@ export async function pollDuplicateJob(
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Duplicate detection failed");
   }
+}
+
+export async function getDuplicateGroups(
+  jobId: string,
+  options?: { page?: number; pageSize?: number; query?: string },
+): Promise<DuplicateGroupsPage> {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.query) query.set("query", options.query);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<DuplicateGroupsPage>(`/api/duplicates/jobs/${encodeURIComponent(jobId)}/groups${suffix}`);
+}
+
+export async function getDuplicateGroupDetail(jobId: string, groupId: string): Promise<DuplicateGroupDetail> {
+  return getJson<DuplicateGroupDetail>(
+    `/api/duplicates/jobs/${encodeURIComponent(jobId)}/groups/${encodeURIComponent(groupId)}`,
+  );
+}
+
+export async function getDuplicatePairs(
+  jobId: string,
+  options?: { page?: number; pageSize?: number; decision?: "all" | "approved" | "rejected"; query?: string; groupId?: string },
+): Promise<DuplicatePairsPage> {
+  const query = new URLSearchParams();
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.decision) query.set("decision", options.decision);
+  if (options?.query) query.set("query", options.query);
+  if (options?.groupId) query.set("groupId", options.groupId);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<DuplicatePairsPage>(`/api/duplicates/jobs/${encodeURIComponent(jobId)}/pairs${suffix}`);
 }
 
 export async function pollDummyJob(

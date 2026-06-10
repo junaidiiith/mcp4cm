@@ -48,10 +48,12 @@ from mcp4cm.runtime_store import (
     load_dataset_after_dummy_statistics,
     load_dataset_after_dummy_retained_model_ids,
     list_dataset_models,
+    load_dataset_duplicate_detection,
     load_model_from_runtime,
     resolve_dataset,
     runtime_dataset_ir_dir,
     runtime_model_filename,
+    save_dataset_duplicate_detection,
     save_dataset_after_dummy_retained_model_ids,
     save_dataset_after_dummy_statistics,
     save_dataset_statistics,
@@ -59,7 +61,7 @@ from mcp4cm.runtime_store import (
     serialize_model_for_runtime,
     spill_model_to_runtime,
 )
-from mcp4cm.statistics import CorpusStatisticsAccumulator
+from mcp4cm.statistics import CorpusStatisticsAccumulator, model_summary_fields
 
 DATASETS: dict[str, Dataset | RuntimeDataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
@@ -177,6 +179,18 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
     @app.route("/api/duplicates/jobs/<job_id>", methods=["GET"])
     def get_duplicates_job(job_id: str):
         return jsonify(get_duplicate_job(job_id))
+
+    @app.route("/api/duplicates/jobs/<job_id>/groups", methods=["GET"])
+    def get_duplicate_groups_route(job_id: str):
+        return jsonify(get_duplicate_groups_page(job_id, request.args))
+
+    @app.route("/api/duplicates/jobs/<job_id>/groups/<group_id>", methods=["GET"])
+    def get_duplicate_group_route(job_id: str, group_id: str):
+        return jsonify(get_duplicate_group_detail(job_id, group_id))
+
+    @app.route("/api/duplicates/jobs/<job_id>/pairs", methods=["GET"])
+    def get_duplicate_pairs_route(job_id: str):
+        return jsonify(get_duplicate_pairs_page(job_id, request.args))
 
     @app.route("/api/<path:_path>", methods=["GET", "POST", "OPTIONS"])
     def api_not_found(_path: str):
@@ -1005,6 +1019,7 @@ def start_duplicate_job(body: dict[str, Any]) -> dict[str, Any]:
     now = time.time()
     job = {
         "jobId": job_id,
+        "datasetId": str(body.get("datasetId") or ""),
         "status": "queued",
         "progress": 0,
         "currentTechnique": "",
@@ -1050,12 +1065,18 @@ def run_duplicate_job(job_id: str, body: dict[str, Any]) -> None:
         finished_at = time.time()
         elapsed_ms = duplicate_job_elapsed_ms(job_id, finished_at=finished_at)
         result["elapsedMs"] = elapsed_ms
+        dataset_id = str(body.get("datasetId") or result.get("datasetId") or "")
+        if dataset_id:
+            result["datasetId"] = dataset_id
+            result["jobId"] = job_id
+            save_dataset_duplicate_detection(dataset_id, result)
+        response_result = duplicate_result_response_preview(result)
         report(
             status="complete",
             progress=100,
             currentTechnique="",
             message="Duplicate detection complete.",
-            result=result,
+            result=response_result,
             finishedAt=finished_at,
             elapsedMs=elapsed_ms,
         )
@@ -1078,6 +1099,340 @@ def duplicate_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> i
     return round(((finished_at or time.time()) - started_at) * 1000)
 
 
+def duplicate_result_response_preview(result: dict[str, Any]) -> dict[str, Any]:
+    preview = dict(result)
+    pairs_page = build_duplicate_pairs_page(result, page=1, page_size=50, decision="all", query="", group_id="")
+    groups_page = build_duplicate_groups_page(result, page=1, page_size=25, query="")
+    preview["decisions"] = pairs_page["pairs"]
+    preview["returnedDecisions"] = len(pairs_page["pairs"])
+    preview["truncated"] = pairs_page["total"] > len(pairs_page["pairs"])
+    preview["truncationLimit"] = pairs_page["pageSize"]
+    preview["pairsPage"] = pairs_page
+    preview["groupsPage"] = groups_page
+    preview["groups"] = groups_page["groups"]
+    return preview
+
+
+def get_duplicate_result_for_job(job_id: str) -> dict[str, Any]:
+    dataset_id = ""
+    with DUPLICATE_JOBS_LOCK:
+        job = DUPLICATE_JOBS.get(job_id) or {}
+        dataset_id = str(job.get("datasetId") or job.get("result", {}).get("datasetId") or "")
+    if dataset_id:
+        result = load_dataset_duplicate_detection(dataset_id)
+        if result:
+            return result
+
+    dataset_dirs = RUNTIME_DIR.iterdir() if RUNTIME_DIR.exists() else []
+    for dataset_dir in dataset_dirs:
+        if not dataset_dir.is_dir():
+            continue
+        result = load_dataset_duplicate_detection(dataset_dir.name)
+        if result and str(result.get("jobId") or "") == str(job_id):
+            return result
+
+    with DUPLICATE_JOBS_LOCK:
+        job = DUPLICATE_JOBS.get(job_id)
+        result = (job or {}).get("result")
+    if isinstance(result, dict):
+        return result
+    raise ValueError("Unknown duplicate detection result. The job has not completed or the persisted result is unavailable.")
+
+
+def get_duplicate_groups_page(job_id: str, args: Any) -> dict[str, Any]:
+    result = get_duplicate_result_for_job(job_id)
+    return build_duplicate_groups_page(
+        result,
+        page=parse_positive_int(args.get("page"), 1),
+        page_size=parse_positive_int(args.get("pageSize"), 25),
+        query=str(args.get("query") or "").strip(),
+    )
+
+
+def get_duplicate_group_detail(job_id: str, group_id: str) -> dict[str, Any]:
+    result = get_duplicate_result_for_job(job_id)
+    group = next((item for item in result.get("groups", []) if str(item.get("groupId")) == str(group_id)), None)
+    if not group:
+        raise ValueError("Unknown duplicate group.")
+    decisions = result.get("decisions") or []
+    model_ids = set(group.get("modelIds") or [])
+    internal_pairs = [
+        decision for decision in decisions
+        if decision.get("leftId") in model_ids and decision.get("rightId") in model_ids
+    ]
+    internal_pairs.sort(key=lambda item: (item.get("isDuplicate") is True, int(item.get("voteCount") or 0)), reverse=True)
+    return {
+        "group": group,
+        "pairs": internal_pairs,
+        "modelSummaries": [result.get("modelSummaries", {}).get(model_id, {"modelId": model_id}) for model_id in group.get("modelIds", [])],
+    }
+
+
+def get_duplicate_pairs_page(job_id: str, args: Any) -> dict[str, Any]:
+    result = get_duplicate_result_for_job(job_id)
+    return build_duplicate_pairs_page(
+        result,
+        page=parse_positive_int(args.get("page"), 1),
+        page_size=parse_positive_int(args.get("pageSize"), 50),
+        decision=str(args.get("decision") or "all"),
+        query=str(args.get("query") or "").strip(),
+        group_id=str(args.get("groupId") or "").strip(),
+    )
+
+
+def build_duplicate_groups_page(result: dict[str, Any], *, page: int, page_size: int, query: str) -> dict[str, Any]:
+    groups = list(result.get("groups") or [])
+    if query:
+        query_lower = query.lower()
+        groups = [
+            group for group in groups
+            if query_lower in str(group.get("groupId", "")).lower()
+            or any(query_lower in str(model_id).lower() for model_id in group.get("modelIds", []))
+        ]
+    groups.sort(key=lambda group: (int(group.get("size") or 0), int(group.get("approvedInternalPairs") or 0)), reverse=True)
+    return paginate_items(groups, page=page, page_size=page_size, item_key="groups")
+
+
+def build_duplicate_pairs_page(
+    result: dict[str, Any],
+    *,
+    page: int,
+    page_size: int,
+    decision: str,
+    query: str,
+    group_id: str,
+) -> dict[str, Any]:
+    pairs = list(result.get("decisions") or [])
+    if decision == "approved":
+        pairs = [pair for pair in pairs if pair.get("isDuplicate") is True]
+    elif decision in {"rejected", "candidate", "not_approved"}:
+        pairs = [pair for pair in pairs if pair.get("isDuplicate") is not True]
+    if group_id:
+        group_lookup = result.get("pairGroupLookup") or {}
+        pairs = [
+            pair for pair in pairs
+            if group_lookup.get(pair_lookup_key(str(pair.get("leftId")), str(pair.get("rightId")))) == group_id
+        ]
+    if query:
+        query_lower = query.lower()
+        pairs = [
+            pair for pair in pairs
+            if query_lower in str(pair.get("leftId", "")).lower()
+            or query_lower in str(pair.get("rightId", "")).lower()
+            or any(query_lower in str(technique).lower() for technique in pair.get("techniques", []))
+        ]
+    pairs.sort(key=lambda item: (item.get("isDuplicate") is True, int(item.get("voteCount") or 0)), reverse=True)
+    return paginate_items(pairs, page=page, page_size=page_size, item_key="pairs")
+
+
+def paginate_items(items: list[dict[str, Any]], *, page: int, page_size: int, item_key: str) -> dict[str, Any]:
+    page_size = min(max(page_size, 1), 250)
+    total = len(items)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * page_size
+    return {
+        item_key: items[start : start + page_size],
+        "page": page,
+        "pageSize": page_size,
+        "total": total,
+        "totalPages": total_pages,
+    }
+
+
+def parse_positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def pair_lookup_key(left_id: str, right_id: str) -> str:
+    left, right = pair_key(left_id, right_id)
+    return f"{left}\u0000{right}"
+
+
+def build_duplicate_groups(
+    decisions: list[dict[str, Any]],
+    model_summaries: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    adjacency: dict[str, set[str]] = {}
+    approved_lookup: dict[str, dict[str, Any]] = {}
+    decision_lookup: dict[str, dict[str, Any]] = {}
+    for decision in decisions:
+        left_id = str(decision.get("leftId") or "")
+        right_id = str(decision.get("rightId") or "")
+        if not left_id or not right_id:
+            continue
+        lookup = pair_lookup_key(left_id, right_id)
+        decision_lookup[lookup] = decision
+        if decision.get("isDuplicate") is True:
+            approved_lookup[lookup] = decision
+            adjacency.setdefault(left_id, set()).add(right_id)
+            adjacency.setdefault(right_id, set()).add(left_id)
+
+    visited: set[str] = set()
+    components: list[list[str]] = []
+    for model_id in sorted(adjacency):
+        if model_id in visited:
+            continue
+        stack = [model_id]
+        component: list[str] = []
+        visited.add(model_id)
+        while stack:
+            current = stack.pop()
+            component.append(current)
+            for neighbor in sorted(adjacency.get(current, set())):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+        if len(component) > 1:
+            components.append(sorted(component))
+
+    groups: list[dict[str, Any]] = []
+    pair_group_lookup: dict[str, str] = {}
+    for index, model_ids in enumerate(sorted(components, key=lambda item: (-len(item), item)), start=1):
+        group_id = f"group-{index}"
+        approved_internal = 0
+        rejected_internal = 0
+        vote_counts: list[int] = []
+        techniques: set[str] = set()
+        score_values: list[float] = []
+        internal_decision_keys: list[str] = []
+        for left_index, left_id in enumerate(model_ids):
+            for right_id in model_ids[left_index + 1 :]:
+                lookup = pair_lookup_key(left_id, right_id)
+                decision = decision_lookup.get(lookup)
+                if not decision:
+                    continue
+                internal_decision_keys.append(lookup)
+                pair_group_lookup[lookup] = group_id
+                if decision.get("isDuplicate") is True:
+                    approved_internal += 1
+                    vote_counts.append(int(decision.get("voteCount") or 0))
+                else:
+                    rejected_internal += 1
+                techniques.update(str(item) for item in decision.get("techniques", []))
+                for score in (decision.get("scores") or {}).values():
+                    try:
+                        score_values.append(float(score))
+                    except (TypeError, ValueError):
+                        pass
+
+        possible_pairs = len(model_ids) * (len(model_ids) - 1) // 2
+        missing_pairs = max(possible_pairs - approved_internal - rejected_internal, 0)
+        density = approved_internal / possible_pairs if possible_pairs else 0
+        canonical_model_id = propose_canonical_model(model_ids, model_summaries)
+        confidence = duplicate_group_confidence(
+            possible_pairs=possible_pairs,
+            approved_internal=approved_internal,
+            rejected_internal=rejected_internal,
+            missing_pairs=missing_pairs,
+            vote_counts=vote_counts,
+        )
+        warnings = duplicate_group_warnings(
+            confidence=confidence,
+            rejected_internal=rejected_internal,
+            missing_pairs=missing_pairs,
+            vote_counts=vote_counts,
+        )
+        groups.append(
+            {
+                "groupId": group_id,
+                "modelIds": model_ids,
+                "size": len(model_ids),
+                "approvedInternalPairs": approved_internal,
+                "candidateRejectedInternalPairs": rejected_internal,
+                "missingInternalPairs": missing_pairs,
+                "possibleInternalPairs": possible_pairs,
+                "density": density,
+                "confidence": confidence,
+                "warnings": warnings,
+                "techniques": sorted(techniques),
+                "canonicalModelId": canonical_model_id,
+                "canonicalReason": "largest graph, then most named elements, then stable model id",
+                "scoreStats": score_stats(score_values),
+                "modelSummaries": [model_summaries.get(model_id, {"modelId": model_id}) for model_id in model_ids],
+                "decisionKeys": internal_decision_keys,
+            }
+        )
+
+    return groups, pair_group_lookup
+
+
+def propose_canonical_model(model_ids: list[str], model_summaries: dict[str, dict[str, Any]]) -> str:
+    def sort_key(model_id: str) -> tuple[int, int, str]:
+        summary = model_summaries.get(model_id, {})
+        graph_size = int(summary.get("nodeCount") or 0) + int(summary.get("edgeCount") or 0)
+        named_elements = int(summary.get("namedElements") or 0)
+        return (-graph_size, -named_elements, str(model_id))
+
+    return sorted(model_ids, key=sort_key)[0] if model_ids else ""
+
+
+def duplicate_group_confidence(
+    *,
+    possible_pairs: int,
+    approved_internal: int,
+    rejected_internal: int,
+    missing_pairs: int,
+    vote_counts: list[int],
+) -> str:
+    if possible_pairs and approved_internal == possible_pairs and rejected_internal == 0:
+        return "complete"
+    if rejected_internal:
+        return "mixed"
+    if vote_counts and min(vote_counts) <= 1:
+        return "weak"
+    if missing_pairs:
+        return "linked"
+    return "linked"
+
+
+def duplicate_group_warnings(
+    *,
+    confidence: str,
+    rejected_internal: int,
+    missing_pairs: int,
+    vote_counts: list[int],
+) -> list[str]:
+    warnings: list[str] = []
+    if confidence == "mixed":
+        warnings.append(f"{rejected_internal} internal candidate pair(s) were not approved.")
+    if missing_pairs:
+        warnings.append(f"{missing_pairs} internal pair(s) have no direct candidate evidence.")
+    if vote_counts and min(vote_counts) <= 1:
+        warnings.append("At least one approved link has only one technique vote.")
+    return warnings
+
+
+def score_stats(values: list[float]) -> dict[str, float]:
+    if not values:
+        return {"min": 0, "max": 0, "avg": 0}
+    return {
+        "min": min(values),
+        "max": max(values),
+        "avg": sum(values) / len(values),
+    }
+
+
+def model_summary_lookup(dataset: Dataset | RuntimeDataset) -> dict[str, dict[str, Any]]:
+    summaries: dict[str, dict[str, Any]] = {}
+    for record in dataset:
+        try:
+            summary = model_summary_fields(record)
+        except Exception:
+            summary = {
+                "modelId": str(record.model_id),
+                "nodeCount": int(record.node_count),
+                "edgeCount": int(record.edge_count),
+                "namedElements": 0,
+            }
+        summaries[str(record.model_id)] = summary
+    return summaries
+
+
 def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     dataset = get_duplicate_detection_dataset(body)
     selected_order = selected_duplicate_techniques(body)
@@ -1093,7 +1448,6 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     }
     min_votes = max(min_votes, len(mandatory), 1)
 
-    result_limit = max(1, int(body.get("resultLimit", thresholds.get("resultLimit", 500))))
     projected_dataset = dataset
 
     evidence: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
@@ -1339,8 +1693,26 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     decisions.sort(key=lambda item: (item["isDuplicate"], item["voteCount"]), reverse=True)
     approved_pairs = sum(1 for decision in decisions if decision["isDuplicate"])
     total_decisions = len(decisions)
-    returned_decisions = min(result_limit, total_decisions)
-    truncated = returned_decisions < total_decisions
+    returned_decisions = total_decisions
+    truncated = False
+    model_summaries = model_summary_lookup(projected_dataset)
+    groups, pair_group_lookup = build_duplicate_groups(decisions, model_summaries)
+    for decision in decisions:
+        group_id = pair_group_lookup.get(pair_lookup_key(str(decision.get("leftId")), str(decision.get("rightId"))))
+        if group_id:
+            decision["groupId"] = group_id
+
+    affected_model_ids = sorted({model_id for group in groups for model_id in group.get("modelIds", [])})
+    largest_group_size = max((int(group.get("size") or 0) for group in groups), default=0)
+    group_summary = {
+        "totalGroups": len(groups),
+        "affectedModels": len(affected_model_ids),
+        "largestGroupSize": largest_group_size,
+        "completeGroups": sum(1 for group in groups if group.get("confidence") == "complete"),
+        "linkedGroups": sum(1 for group in groups if group.get("confidence") == "linked"),
+        "mixedGroups": sum(1 for group in groups if group.get("confidence") == "mixed"),
+        "weakGroups": sum(1 for group in groups if group.get("confidence") == "weak"),
+    }
 
     tfidf_threshold = float(
         body.get(
@@ -1352,7 +1724,6 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "selectedTechniques": list(selected_order),
         "mandatoryTechniques": sorted(mandatory),
         "minVotes": min_votes,
-        "resultLimit": result_limit,
         "hashIncludeTypes": parse_form_bool(thresholds.get("hashIncludeTypes"), False),
         "minNamedNodes": int(thresholds.get("minNamedNodes", 0)),
         "deduplicateNameTokens": parse_form_bool(thresholds.get("deduplicateNameTokens"), False),
@@ -1371,11 +1742,18 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "votedDuplicatePairs": approved_pairs,
         "candidatePairs": total_decisions,
         "approvedPairs": approved_pairs,
+        "duplicateGroups": len(groups),
+        "affectedModels": len(affected_model_ids),
+        "largestGroupSize": largest_group_size,
+        "groupSummary": group_summary,
         "totalDecisions": total_decisions,
         "returnedDecisions": returned_decisions,
         "truncated": truncated,
-        "truncationLimit": result_limit,
-        "decisions": decisions[:result_limit],
+        "truncationLimit": None,
+        "decisions": decisions,
+        "groups": groups,
+        "pairGroupLookup": pair_group_lookup,
+        "modelSummaries": model_summaries,
         "techniqueStatus": technique_status,
         "configEcho": config_echo,
         "elapsedMs": round((time.perf_counter() - duplicate_started_at) * 1000),

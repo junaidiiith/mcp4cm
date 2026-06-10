@@ -40,6 +40,10 @@ def runtime_dataset_after_dummy_retained_models_path(dataset_id: str) -> Path:
     return runtime_dataset_dir(dataset_id) / "retained-models-after-dummy.json"
 
 
+def runtime_dataset_duplicate_detection_path(dataset_id: str) -> Path:
+    return runtime_dataset_dir(dataset_id) / "duplicate_detection.json"
+
+
 def json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -110,6 +114,25 @@ def save_runtime_index(dataset_id: str, index_payload: dict[str, Any]) -> None:
     temp_path = index_path.with_suffix(".tmp")
     temp_path.write_text(json.dumps(index_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     temp_path.replace(index_path)
+
+
+def save_dataset_duplicate_detection(dataset_id: str, payload: dict[str, Any]) -> None:
+    ensure_runtime_store(dataset_id)
+    path = runtime_dataset_duplicate_detection_path(dataset_id)
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(json_safe(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(path)
+
+
+def load_dataset_duplicate_detection(dataset_id: str) -> dict[str, Any] | None:
+    path = runtime_dataset_duplicate_detection_path(dataset_id)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def runtime_model_filename(model_id: str, index: int, seen: set[str]) -> str:

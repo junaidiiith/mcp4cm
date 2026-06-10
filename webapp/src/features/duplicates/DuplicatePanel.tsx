@@ -1,11 +1,24 @@
-import type { CSSProperties } from "react";
-import { GitCompare, Layers3, Loader2, Plus, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { ChevronLeft, ChevronRight, Download, Eye, GitCompare, Layers3, Loader2, Plus, SlidersHorizontal } from "lucide-react";
+import { getDuplicateGroupDetail, getDuplicateGroups, getDuplicatePairs } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { techniques } from "../../config";
-import type { BusyState, DuplicateProgressState, DuplicateResult, Thresholds } from "../../types";
+import type {
+  BusyState,
+  DuplicateCanonicalSelection,
+  DuplicateGroup,
+  DuplicateGroupDetail,
+  DuplicateGroupsPage,
+  DuplicatePairDecision,
+  DuplicatePairsPage,
+  DuplicateProgressState,
+  DuplicateResult,
+  Thresholds,
+} from "../../types";
 import { formatDuration, round, techniqueLabel } from "../../utils";
 
 export function DuplicatePanel({
@@ -89,16 +102,6 @@ export function DuplicatePanel({
               min="1"
               value={minVotes}
               onChange={(event) => onMinVotesChange(Number(event.target.value))}
-            />
-          </Label>
-          <Label>
-            Result limit
-            <Input
-              type="number"
-              min="1"
-              step="50"
-              value={thresholds.resultLimit}
-              onChange={(event) => onThresholdsChange({ ...thresholds, resultLimit: Number(event.target.value) })}
             />
           </Label>
         </div>
@@ -543,89 +546,545 @@ function DuplicateResults({
   if (!result) return <EmptyState text="Run duplicate detection to see technique votes and candidate pairs." />;
   const candidatePairs = result.candidatePairs ?? result.duplicatePairs;
   const approvedPairs = result.approvedPairs ?? result.votedDuplicatePairs ?? 0;
-  const totalDecisions = result.totalDecisions ?? result.decisions.length;
-  const returnedDecisions = result.returnedDecisions ?? result.decisions.length;
+  const duplicateGroups = result.duplicateGroups ?? result.groupSummary?.totalGroups ?? result.groups?.length ?? 0;
+  const affectedModels = result.affectedModels ?? result.groupSummary?.affectedModels ?? 0;
+  const largestGroupSize = result.largestGroupSize ?? result.groupSummary?.largestGroupSize ?? 0;
 
   return (
     <div className="results">
       <div className="metricGrid small">
         <Metric label="Candidate pairs" value={candidatePairs} />
         <Metric label="Vote-approved pairs" value={approvedPairs} />
+        <Metric label="Duplicate groups" value={duplicateGroups} />
+        <Metric label="Affected models" value={affectedModels} />
+        <Metric label="Largest group" value={largestGroupSize} />
         <Metric label="Runtime" value={formatDuration(result.elapsedMs)} />
         {Object.entries(result.techniqueCounts).map(([key, value]) => (
-          <Metric key={key} label={key} value={value} />
+          <Metric key={key} label={techniqueLabel(key)} value={value} />
         ))}
       </div>
-      {result.truncated && (
-        <div className="error">
-          Showing {returnedDecisions} of {totalDecisions} decisions due to result limit ({result.truncationLimit}).
-        </div>
-      )}
       <DuplicateModelCharts modelCounts={result.modelCounts || {}} />
-      <div className="duplicateDecisionTable">
+      <DuplicateReviewTabs result={result} onInspectModel={onInspectModel} onInspectBoth={onInspectBoth} />
+    </div>
+  );
+}
+
+function DuplicateReviewTabs({
+  result,
+  onInspectModel,
+  onInspectBoth,
+}: {
+  result: DuplicateResult;
+  onInspectModel: (modelId: string) => void;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+}) {
+  return (
+    <Tabs defaultValue="groups" className="duplicateTabs">
+      <div className="resultsHeader duplicateResultsHeader">
+        <div>
+          <span>Review results</span>
+          <strong>{result.totalDecisions ?? result.decisions.length} candidate decision(s)</strong>
+        </div>
+        <TabsList>
+          <TabsTrigger value="groups">Groups</TabsTrigger>
+          <TabsTrigger value="pairs">Pairs</TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="groups">
+        <DuplicateGroupsReview result={result} onInspectModel={onInspectModel} onInspectBoth={onInspectBoth} />
+      </TabsContent>
+      <TabsContent value="pairs">
+        <DuplicatePairsReview result={result} onInspectBoth={onInspectBoth} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function DuplicateGroupsReview({
+  result,
+  onInspectModel,
+  onInspectBoth,
+}: {
+  result: DuplicateResult;
+  onInspectModel: (modelId: string) => void;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+}) {
+  const jobId = result.jobId || "";
+  const initialPage = useMemo<DuplicateGroupsPage>(
+    () =>
+      result.groupsPage || {
+        groups: result.groups || [],
+        page: 1,
+        pageSize: 25,
+        total: result.groups?.length || 0,
+        totalPages: 1,
+      },
+    [result],
+  );
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const [groupsPage, setGroupsPage] = useState<DuplicateGroupsPage>(initialPage);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [groupDetail, setGroupDetail] = useState<DuplicateGroupDetail | null>(null);
+  const [canonicalOverrides, setCanonicalOverrides] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setPage(1);
+    setQuery("");
+    setGroupsPage(initialPage);
+    setSelectedGroupId(null);
+    setGroupDetail(null);
+    setCanonicalOverrides({});
+  }, [initialPage]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const next = await getDuplicateGroups(jobId, { page, pageSize: 25, query: query.trim() });
+        if (!cancelled) setGroupsPage(next);
+      } catch (err) {
+        if (!cancelled) setLoadError(errorText(err, "Could not load duplicate groups."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, page, query]);
+
+  useEffect(() => {
+    if (!jobId || !selectedGroupId) return;
+    let cancelled = false;
+    async function loadDetail() {
+      try {
+        const detail = await getDuplicateGroupDetail(jobId, selectedGroupId);
+        if (!cancelled) setGroupDetail(detail);
+      } catch (err) {
+        if (!cancelled) setLoadError(errorText(err, "Could not load duplicate group detail."));
+      }
+    }
+    loadDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, selectedGroupId]);
+
+  function canonicalFor(group: DuplicateGroup) {
+    return canonicalOverrides[group.groupId] || group.canonicalModelId;
+  }
+
+  async function exportCanonicalSelections() {
+    const groups = await loadAllGroupsForExport(jobId, result, groupsPage);
+    const selections: DuplicateCanonicalSelection[] = groups.map((group) => {
+      const canonicalModelId = canonicalOverrides[group.groupId] || group.canonicalModelId;
+      return {
+        groupId: group.groupId,
+        canonicalModelId,
+        duplicateModelIds: group.modelIds.filter((modelId) => modelId !== canonicalModelId),
+      };
+    });
+    downloadText("duplicate-canonical-selection.json", JSON.stringify({ selections }, null, 2), "application/json");
+  }
+
+  return (
+    <div className="duplicateReview">
+      <div className="duplicateToolbar">
+        <Input
+          value={query}
+          placeholder="Search groups or model IDs"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Button type="button" variant="secondary" onClick={exportCanonicalSelections} disabled={!groupsPage.total}>
+          <Download size={16} />
+          Export canonical JSON
+        </Button>
+      </div>
+      {loadError && <div className="error">{loadError}</div>}
+      <div className="duplicateDecisionTable duplicateGroupTable">
         <table>
           <thead>
             <tr>
-              <th>Left</th>
-              <th>Right</th>
-              <th>Compare</th>
-              <th>Approved</th>
-              <th>Votes</th>
-              <th>Techniques</th>
-              <th>Scores</th>
+              <th>Group</th>
+              <th>Evidence</th>
+              <th>Quality</th>
+              <th>Canonical model</th>
+              <th>Methods</th>
+              <th>Review</th>
             </tr>
           </thead>
           <tbody>
-            {result.decisions.map((row) => (
-              <tr key={`${row.leftId}-${row.rightId}`}>
+            {groupsPage.groups.map((group) => (
+              <tr key={group.groupId}>
                 <td>
-                  <div className="decisionCell">
-                    <span>{row.leftId}</span>
-                    <button type="button" className="tableInfoButton" onClick={() => onInspectModel(row.leftId)}>
-                      Inspect Left
-                    </button>
-                  </div>
+                  <strong>{group.groupId}</strong>
+                  <small>{group.size} models</small>
                 </td>
                 <td>
-                  <div className="decisionCell">
-                    <span>{row.rightId}</span>
-                    <button type="button" className="tableInfoButton" onClick={() => onInspectModel(row.rightId)}>
-                      Inspect Right
-                    </button>
-                  </div>
+                  <strong>
+                    {group.approvedInternalPairs} / {group.possibleInternalPairs}
+                  </strong>
+                  <small>
+                    {group.candidateRejectedInternalPairs} not approved, {group.missingInternalPairs} missing
+                  </small>
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="tableInfoButton"
-                    onClick={() => onInspectBoth(row.leftId, row.rightId)}
+                  <span className={`qualityPill ${group.confidence}`}>{group.confidence}</span>
+                  {group.warnings?.length ? <small>{group.warnings[0]}</small> : <small>All direct evidence looks consistent.</small>}
+                </td>
+                <td>
+                  <select
+                    value={canonicalFor(group)}
+                    onChange={(event) =>
+                      setCanonicalOverrides((current) => ({ ...current, [group.groupId]: event.target.value }))
+                    }
                   >
-                    Inspect Both
-                  </button>
+                    {(group.modelSummaries || group.modelIds.map((modelId) => ({ modelId }))).map((model) => (
+                      <option key={model.modelId} value={model.modelId}>
+                        {model.modelId}
+                      </option>
+                    ))}
+                  </select>
+                  <small>{group.canonicalReason || "Suggested canonical model"}</small>
                 </td>
-                <td>{row.isDuplicate ? "Yes" : "No"}</td>
-                <td>
-                  {row.voteCount}
-                  {row.requiredVotes ? ` / ${row.requiredVotes}` : ""}
-                </td>
-                <td>{row.techniques.join(", ") || "-"}</td>
                 <td>
                   <div className="scoreChips">
-                    {Object.entries(row.scores || {}).map(([technique, score]) => (
+                    {group.techniques.map((technique) => (
                       <span key={technique} className="scoreChip">
-                        <b>{techniqueLabel(technique)}</b>: {round(score)}
+                        {techniqueLabel(technique)}
                       </span>
                     ))}
-                    {!Object.keys(row.scores || {}).length && <span>-</span>}
                   </div>
+                </td>
+                <td>
+                  <button type="button" className="tableInfoButton" onClick={() => setSelectedGroupId(group.groupId)}>
+                    <Eye size={15} />
+                    Inspect group
+                  </button>
                 </td>
               </tr>
             ))}
+            {!loading && !groupsPage.groups.length && (
+              <tr>
+                <td colSpan={6}>No duplicate groups match the current filter.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={groupsPage.page} totalPages={groupsPage.totalPages} loading={loading} onPageChange={setPage} />
+      {selectedGroupId && groupDetail && (
+        <DuplicateGroupDetailPanel
+          detail={groupDetail}
+          canonicalModelId={canonicalOverrides[groupDetail.group.groupId] || groupDetail.group.canonicalModelId}
+          onCanonicalChange={(modelId) =>
+            setCanonicalOverrides((current) => ({ ...current, [groupDetail.group.groupId]: modelId }))
+          }
+          onInspectModel={onInspectModel}
+          onInspectBoth={onInspectBoth}
+        />
+      )}
+    </div>
+  );
+}
+
+function DuplicateGroupDetailPanel({
+  detail,
+  canonicalModelId,
+  onCanonicalChange,
+  onInspectModel,
+  onInspectBoth,
+}: {
+  detail: DuplicateGroupDetail;
+  canonicalModelId: string;
+  onCanonicalChange: (modelId: string) => void;
+  onInspectModel: (modelId: string) => void;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+}) {
+  return (
+    <div className="duplicateGroupDetail">
+      <div className="duplicateGroupDetailHeader">
+        <div>
+          <h3>{detail.group.groupId}</h3>
+          <p>
+            {detail.group.size} models, {detail.group.approvedInternalPairs} approved internal pair(s),{" "}
+            {detail.group.candidateRejectedInternalPairs} candidate warning(s)
+          </p>
+        </div>
+        <label>
+          Canonical
+          <select value={canonicalModelId} onChange={(event) => onCanonicalChange(event.target.value)}>
+            {detail.modelSummaries.map((model) => (
+              <option key={model.modelId} value={model.modelId}>
+                {model.modelId}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="duplicateGroupModels">
+        {detail.modelSummaries.map((model) => (
+          <button
+            key={model.modelId}
+            type="button"
+            className={model.modelId === canonicalModelId ? "canonicalModelChip active" : "canonicalModelChip"}
+            onClick={() => onInspectModel(model.modelId)}
+          >
+            <strong>{model.modelId}</strong>
+            <span>
+              {model.nodeCount ?? 0} nodes, {model.edgeCount ?? 0} edges
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="duplicateDecisionTable duplicateInternalPairs">
+        <table>
+          <thead>
+            <tr>
+              <th>Pair</th>
+              <th>Status</th>
+              <th>Votes</th>
+              <th>Methods</th>
+              <th>Scores</th>
+              <th>Compare</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.pairs.map((pair) => (
+              <DuplicatePairRow key={`${pair.leftId}-${pair.rightId}`} pair={pair} onInspectBoth={onInspectBoth} />
+            ))}
+            {!detail.pairs.length && (
+              <tr>
+                <td colSpan={6}>This group has no internal candidate pair details.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
     </div>
   );
+}
+
+function DuplicatePairsReview({
+  result,
+  onInspectBoth,
+}: {
+  result: DuplicateResult;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+}) {
+  const jobId = result.jobId || "";
+  const initialPage = useMemo<DuplicatePairsPage>(
+    () =>
+      result.pairsPage || {
+        pairs: result.decisions || [],
+        page: 1,
+        pageSize: 50,
+        total: result.totalDecisions ?? result.decisions.length,
+        totalPages: 1,
+      },
+    [result],
+  );
+  const [page, setPage] = useState(1);
+  const [decision, setDecision] = useState<"all" | "approved" | "rejected">("all");
+  const [query, setQuery] = useState("");
+  const [pairsPage, setPairsPage] = useState<DuplicatePairsPage>(initialPage);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+    setPairsPage(initialPage);
+  }, [initialPage]);
+
+  useEffect(() => {
+    if (!jobId) return;
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const next = await getDuplicatePairs(jobId, { page, pageSize: 50, decision, query: query.trim() });
+        if (!cancelled) setPairsPage(next);
+      } catch (err) {
+        if (!cancelled) setLoadError(errorText(err, "Could not load duplicate pairs."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, page, decision, query]);
+
+  return (
+    <div className="duplicateReview">
+      <div className="duplicateToolbar">
+        <Input
+          value={query}
+          placeholder="Search model IDs or methods"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
+        />
+        <select
+          value={decision}
+          onChange={(event) => {
+            setDecision(event.target.value as "all" | "approved" | "rejected");
+            setPage(1);
+          }}
+        >
+          <option value="all">All decisions</option>
+          <option value="approved">Approved only</option>
+          <option value="rejected">Not approved</option>
+        </select>
+      </div>
+      {loadError && <div className="error">{loadError}</div>}
+      <div className="duplicateDecisionTable">
+        <table>
+          <thead>
+            <tr>
+              <th>Pair</th>
+              <th>Group</th>
+              <th>Status</th>
+              <th>Votes</th>
+              <th>Methods</th>
+              <th>Scores</th>
+              <th>Compare</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pairsPage.pairs.map((pair) => (
+              <DuplicatePairRow key={`${pair.leftId}-${pair.rightId}`} pair={pair} onInspectBoth={onInspectBoth} showGroup />
+            ))}
+            {!loading && !pairsPage.pairs.length && (
+              <tr>
+                <td colSpan={7}>No duplicate pairs match the current filter.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={pairsPage.page} totalPages={pairsPage.totalPages} loading={loading} onPageChange={setPage} />
+    </div>
+  );
+}
+
+function DuplicatePairRow({
+  pair,
+  onInspectBoth,
+  showGroup = false,
+}: {
+  pair: DuplicatePairDecision;
+  onInspectBoth: (leftId: string, rightId: string) => void;
+  showGroup?: boolean;
+}) {
+  return (
+    <tr className={pair.isDuplicate ? "" : "notApprovedPair"}>
+      <td>
+        <div className="pairIds">
+          <span>{pair.leftId}</span>
+          <span>{pair.rightId}</span>
+        </div>
+      </td>
+      {showGroup && <td>{pair.groupId || "-"}</td>}
+      <td>
+        <span className={pair.isDuplicate ? "decisionPill approved" : "decisionPill rejected"}>
+          {pair.isDuplicate ? "Approved" : "Not approved"}
+        </span>
+      </td>
+      <td>
+        {pair.voteCount}
+        {pair.requiredVotes ? ` / ${pair.requiredVotes}` : ""}
+      </td>
+      <td>{pair.techniques.map(techniqueLabel).join(", ") || "-"}</td>
+      <td>
+        <div className="scoreChips">
+          {Object.entries(pair.scores || {}).map(([technique, score]) => (
+            <span key={technique} className="scoreChip">
+              <b>{techniqueLabel(technique)}</b>: {round(score)}
+            </span>
+          ))}
+          {!Object.keys(pair.scores || {}).length && <span>-</span>}
+        </div>
+      </td>
+      <td>
+        <button type="button" className="tableInfoButton" onClick={() => onInspectBoth(pair.leftId, pair.rightId)}>
+          <Eye size={15} />
+          Inspect Both
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  loading,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="tablePagination">
+      <button type="button" disabled={page <= 1 || loading} onClick={() => onPageChange(Math.max(1, page - 1))}>
+        <ChevronLeft size={15} />
+        Previous
+      </button>
+      <span>
+        Page {page} of {totalPages}
+      </span>
+      <button type="button" disabled={page >= totalPages || loading} onClick={() => onPageChange(Math.min(totalPages, page + 1))}>
+        Next
+        <ChevronRight size={15} />
+      </button>
+    </div>
+  );
+}
+
+async function loadAllGroupsForExport(
+  jobId: string,
+  result: DuplicateResult,
+  currentPage: DuplicateGroupsPage,
+): Promise<DuplicateGroup[]> {
+  if (!jobId) return result.groups || currentPage.groups;
+  const first = await getDuplicateGroups(jobId, { page: 1, pageSize: 250 });
+  const groups = [...first.groups];
+  for (let page = 2; page <= first.totalPages; page += 1) {
+    const next = await getDuplicateGroups(jobId, { page, pageSize: 250 });
+    groups.push(...next.groups);
+  }
+  return groups;
+}
+
+function downloadText(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function errorText(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
 }
 
 function DuplicateModelCharts({ modelCounts }: { modelCounts: DuplicateResult["modelCounts"] }) {

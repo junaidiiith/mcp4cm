@@ -553,6 +553,153 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .duplicateDecisionTable table {
   margin-top: 0;
 }
+.duplicateTabs {
+  margin-top: 16px;
+}
+.duplicateResultsHeader {
+  align-items: center;
+  margin-top: 16px;
+}
+.duplicateReview {
+  display: grid;
+  gap: 12px;
+}
+.duplicateToolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.duplicateToolbar input {
+  max-width: 380px;
+}
+.duplicateToolbar select,
+.duplicateGroupTable select,
+.duplicateGroupDetail select {
+  min-height: 38px;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #203040;
+  font-weight: 700;
+}
+.duplicateGroupTable td {
+  vertical-align: top;
+}
+.duplicateGroupTable td strong,
+.duplicateGroupTable td small {
+  display: block;
+}
+.duplicateGroupTable td small {
+  margin-top: 5px;
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 700;
+}
+.qualityPill,
+.decisionPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #dbe4ec;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+.qualityPill.complete,
+.decisionPill.approved {
+  color: #146c43;
+  border-color: #b7ddc8;
+  background: #e8f4ef;
+}
+.qualityPill.linked {
+  color: #236868;
+  border-color: #b9dbda;
+  background: #edf7f6;
+}
+.qualityPill.mixed,
+.decisionPill.rejected {
+  color: #9f1239;
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+.qualityPill.weak {
+  color: #8a5a00;
+  border-color: #eed39d;
+  background: #fff7e6;
+}
+.pairIds {
+  display: grid;
+  gap: 4px;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.notApprovedPair {
+  background: #fffafa;
+}
+.duplicateGroupDetail {
+  border: 1px solid #dbe4ec;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdff;
+}
+.duplicateGroupDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+.duplicateGroupDetailHeader h3 {
+  margin-bottom: 4px;
+}
+.duplicateGroupDetailHeader p {
+  color: #60717f;
+  font-weight: 700;
+}
+.duplicateGroupDetailHeader label {
+  display: grid;
+  gap: 5px;
+  min-width: 280px;
+  font-weight: 800;
+}
+.duplicateGroupModels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.canonicalModelChip {
+  text-align: left;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #203040;
+  cursor: pointer;
+}
+.canonicalModelChip.active {
+  border-color: #2d7d7d;
+  background: #edf7f6;
+}
+.canonicalModelChip strong,
+.canonicalModelChip span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canonicalModelChip span {
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.duplicateInternalPairs {
+  max-height: 360px;
+}
 .decisionCell {
   display: grid;
   gap: 6px;
@@ -854,6 +1001,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .pairCompareModal {
   width: min(1760px, 98vw);
   height: min(94vh, 1200px);
+  max-height: min(94vh, 1200px);
   background: #fff;
   border: 1px solid #dbe4ec;
   border-radius: 10px;
@@ -881,7 +1029,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  padding: 14px;
+  padding: 0;
 }
 .pairComparePane {
   min-width: 0;
@@ -890,10 +1038,13 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   border-radius: 8px;
   background: #f9fcff;
   padding: 10px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .pairComparePaneHeader {
   margin-bottom: 10px;
+  flex: 0 0 auto;
 }
 .pairComparePaneHeader h4 {
   margin: 0;
@@ -1010,6 +1161,13 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .graphPreview {
   display: grid;
   gap: 12px;
+  min-height: 0;
+}
+.graphPreview.compact {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }
 .graphMeta {
   display: flex;
@@ -1018,10 +1176,69 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   font-size: 12px;
   color: #3b4e5c;
 }
+.graphWarnings {
+  border: 1px solid #f0d8a8;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #76510f;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.graphToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.graphToolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3b4e5c;
+}
+.graphToolbar select {
+  height: 32px;
+  border: 1px solid #cbd6df;
+  border-radius: 7px;
+  background: #fff;
+  color: #1f2d38;
+  padding: 0 26px 0 9px;
+  font: inherit;
+}
 .graphCanvas {
   height: 330px;
   border: 1px solid #dbe4ec;
   border-radius: 8px;
+  background: #fff;
+  min-height: 260px;
+}
+.graphPreview.compact .graphCanvas {
+  flex: 1 1 320px;
+  height: auto;
+}
+.graphDetailTabs {
+  min-height: 0;
+  gap: 8px;
+}
+.graphPreview.compact .graphDetailTabs {
+  flex: 0 1 330px;
+  overflow: hidden;
+}
+.graphDetailTabs > [data-state] {
+  min-height: 0;
+}
+.graphPreview.compact .graphDetailTabs > [data-state="active"] {
+  overflow: auto;
+}
+.graphTabsList {
+  align-self: flex-start;
 }
 .graphInspectorPanel {
   border: 1px solid #dbe4ec;
@@ -1030,6 +1247,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   background: #f8fbfd;
   display: grid;
   gap: 8px;
+  min-height: 132px;
 }
 .graphInspectorPanel h4 {
   margin: 0;
@@ -1054,7 +1272,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   border: 1px solid #dbe4ec;
   border-radius: 8px;
   background: #fff;
-  max-height: 220px;
+  max-height: 260px;
   overflow: auto;
 }
 .graphInspectorAttrs div {
@@ -1077,40 +1295,122 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   color: #4b5f6d;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
-.graphTables {
+.graphElementBrowser {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
+  min-height: 0;
 }
-.graphTables h4 {
-  margin-bottom: 6px;
+.graphElementBrowser input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #cbd6df;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
+  color: #1f2d38;
 }
-.tableLike {
+.graphTable {
   border: 1px solid #dbe4ec;
   border-radius: 8px;
-  max-height: 220px;
+  max-height: 300px;
   overflow: auto;
+  background: #fff;
 }
-.tableLike div {
+.graphPreview.compact .graphTable {
+  max-height: 240px;
+}
+.graphTable table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.graphTable th,
+.graphTable td {
   border-top: 1px solid #edf2f7;
   padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.graphTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7fafc;
+  color: #4f5f6d;
+  font-weight: 700;
+}
+.graphTable tbody tr {
+  cursor: pointer;
+}
+.graphTable tbody tr:hover,
+.graphTable tbody tr.active {
+  background: #eaf5f3;
+}
+.graphTable code {
+  font-size: 11px;
+}
+.typeSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -1px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .72);
+}
+.pairGraphCompare {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pairGraphSummary {
+  border: 1px solid #dbe4ec;
+  border-radius: 8px;
+  background: #f7fafc;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.pairGraphSummary div {
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
-.tableLike div:first-child {
-  border-top: none;
-}
-.tableLike b {
+.pairGraphSummary strong {
   font-size: 12px;
 }
-.tableLike span {
+.pairGraphSummary span {
   font-size: 11px;
   color: #566b7a;
 }
-.tableLike small {
-  font-size: 11px;
-  color: #708291;
+.pairGraphLegend {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
 }
+.pairGraphLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.pairGraphLegend i {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.pairGraphLegend .shared { background: #16a34a; }
+.pairGraphLegend .left { background: #2563eb; }
+.pairGraphLegend .right { background: #f97316; }
 .truncHint {
   margin-top: 6px;
   font-size: 11px;
@@ -1455,10 +1755,6 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .accordionTriggerButton:hover {
   border: 0 !important;
 }
-.pairCompareModal {
-  width: min(1700px, 96vw);
-  max-height: min(94vh, 1100px);
-}
 .inspectorDrawer {
   max-width: min(1080px, 96vw);
 }
@@ -1586,7 +1882,6 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   .warningFilters { grid-template-columns: 1fr; }
   .warningListRow { grid-template-columns: 1fr; }
   .warningListRow small { grid-column: 1; }
-  .graphTables { grid-template-columns: 1fr; }
   .pairCompareModal { height: min(96vh, 1400px); }
   .pairCompareGrid { grid-template-columns: 1fr; }
   .dummyPanelHeader {

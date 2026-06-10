@@ -317,7 +317,6 @@ export default function App() {
         selectedTechniques: selectedBackendTechniques,
         mandatoryTechniques: activeMandatory,
         minVotes,
-        resultLimit: thresholds.resultLimit,
         tfidfTokenMode: thresholds.tfidfTokenMode,
         tfidfSimilarityThreshold: thresholds.tfidfSimilarityThreshold,
         thresholds: thresholdPayload,
