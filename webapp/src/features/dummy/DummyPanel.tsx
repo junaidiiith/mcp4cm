@@ -1,6 +1,19 @@
-import { Filter, Info, Loader2, Plus, Sparkles } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Filter,
+  Info,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Search,
+  Sparkles,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -12,10 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { filterFormulaPreviews, filterGroups, filterLabels } from "../../config";
-import type { BusyState, DummyResponse, FilterConfig } from "../../types";
-import { round } from "../../utils";
+import type { BusyState, DummyProgressState, DummyResponse, FilterConfig } from "../../types";
+import { formatDuration, round } from "../../utils";
 
 export function DummyPanel({
   filters,
@@ -24,6 +38,7 @@ export function DummyPanel({
   onRun,
   canRun,
   busy,
+  progress,
   result,
   selectedModelId,
   onSelectModelId,
@@ -34,51 +49,127 @@ export function DummyPanel({
   onRun: () => void;
   canRun: boolean;
   busy: BusyState;
+  progress: DummyProgressState | null;
   result: DummyResponse | null;
   selectedModelId: string | null;
   onSelectModelId: (modelId: string | null) => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
+  const enabledFilters = filters.filter((filter) => filter.enabled).length;
+  const isRunning = busy === "dummy";
+  const hasActiveProgress = progress && progress.status !== "complete";
 
   return (
     <>
       <Card className="panel" id="dummy">
-        <CardHeader className="panelHeader">
-          <h2>
-            <Sparkles size={20} />
-            Dummy Model Cleansing
-          </h2>
-        </CardHeader>
-        <CardContent>
-          <div className="subsectionHeader">
-          <h2>Built-in Filters</h2>
-            <div className="subsectionActions">
-              <Button type="button" variant="secondary" onClick={() => setShowInfo(true)}>
-                <Info size={15} />
-                Info
-              </Button>
-              <Button type="button" variant="secondary" onClick={onResetFilters}>
-                Reset defaults
-              </Button>
+        <CardHeader className="panelHeader dummyPanelHeader">
+          <div className="dummyPanelTitle">
+            <h2>
+              <Sparkles size={20} />
+              Dummy Model Cleansing
+            </h2>
+            <div className="dummyPanelMeta">
+              <Badge variant={enabledFilters ? "success" : "warning"}>
+                {enabledFilters}/{filters.length} filters enabled
+              </Badge>
+              {result && (
+                <span>
+                  Current run: {result.runSummary.removedModels.toLocaleString()} removed,{" "}
+                  {result.runSummary.remainingModels.toLocaleString()} retained
+                </span>
+              )}
             </div>
           </div>
-          <BuiltInFilterEditor filters={filters} onChange={onUpdateFilter} />
-          <div className="actionBar">
-            <Button onClick={onRun} disabled={!canRun || busy === "dummy"}>
-              {busy === "dummy" ? <Loader2 className="spin" size={18} /> : <Filter size={18} />}
+          <div className="dummyPanelActions">
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              onClick={() => setShowInfo(true)}
+              title="Dummy cleansing information"
+              aria-label="Dummy cleansing information"
+            >
+              <Info className="dummyInfoIcon" />
+            </Button>
+            <Button type="button" onClick={onRun} disabled={!canRun || isRunning}>
+              {isRunning ? <Loader2 className="spin" size={18} /> : <Filter size={18} />}
               Run Filters
             </Button>
           </div>
-          <DummyResults
-            result={result}
-            selectedModelId={selectedModelId}
-            onSelectModelId={onSelectModelId}
-          />
+        </CardHeader>
+        <CardContent>
+          {hasActiveProgress && <DummyProgress progress={progress} />}
+          {!hasActiveProgress && (
+            <DummyResults
+              result={result}
+              selectedModelId={selectedModelId}
+              onSelectModelId={onSelectModelId}
+            />
+          )}
+          <Accordion type="single" collapsible className="dummySettingsAccordion">
+            <AccordionItem value="filters">
+              <AccordionTrigger>
+                <div className="dummySettingsTrigger">
+                  <span>
+                    <SlidersHorizontal size={16} />
+                    Filter settings
+                  </span>
+                  <small>{enabledFilters} enabled</small>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="dummySettingsHeader">
+                  <p>Filter configuration is applied fresh to the original uploaded dataset on every run.</p>
+                  <Button type="button" variant="secondary" size="sm" onClick={onResetFilters}>
+                    <RotateCcw size={15} />
+                    Reset defaults
+                  </Button>
+                </div>
+                <BuiltInFilterEditor filters={filters} onChange={onUpdateFilter} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
       {showInfo && <DummyCleansingInfoModal onClose={() => setShowInfo(false)} />}
     </>
   );
+}
+
+function DummyProgress({ progress }: { progress: DummyProgressState }) {
+  const overallProgress = Math.max(0, Math.min(100, Number(progress.progress || 0)));
+  const processed = progress.processedModels || 0;
+  const total = progress.totalModels || 0;
+  const stageLabel = dummyStageLabel(progress.stage);
+  const message = progress.message || (progress.status === "queued" ? "Queued dummy cleansing." : "Running dummy cleansing.");
+  return (
+    <div className="progressPanel">
+      <div className="progressHeader">
+        <div>
+          <h3>{message}</h3>
+          <p>
+            {stageLabel}
+            {total ? `, ${processed.toLocaleString()} of ${total.toLocaleString()} models` : ""}
+            {", "}
+            {formatDuration(progress.elapsedMs || 0)} elapsed
+          </p>
+        </div>
+        <strong>{overallProgress}%</strong>
+      </div>
+      <div className="progressTrack">
+        <div className="progressFill" style={{ width: `${overallProgress}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function dummyStageLabel(stage: DummyProgressState["stage"]) {
+  if (stage === "loading") return "Loading models";
+  if (stage === "filtering") return "Evaluating filters";
+  if (stage === "summarizing") return "Building results";
+  if (stage === "complete") return "Complete";
+  if (stage === "error") return "Error";
+  return "Queued";
 }
 
 function DummyCleansingInfoModal({ onClose }: { onClose: () => void }) {
@@ -131,7 +222,7 @@ function DummyCleansingInfoModal({ onClose }: { onClose: () => void }) {
             <li>Filters run in chain order and are cumulative for the waterfall view.</li>
             <li>`primaryRemovalReason` is the first filter that removes a model.</li>
             <li>`allTriggeredFilters` shows every filter that would remove that model.</li>
-            <li>`findings` keep per-filter metrics, score, threshold, and evidence nodes for traceability.</li>
+            <li>Model details keep per-filter metrics, score, threshold, and evidence nodes for traceability.</li>
           </ul>
         </div>
       </DialogContent>
@@ -157,7 +248,7 @@ function BuiltInFilterEditor({
     .filter((entry) => entry.rows.length > 0);
 
   return (
-    <Accordion type="multiple" defaultValue={groupedFilters.map((entry) => entry.group)} className="dummyAccordion">
+    <Accordion type="multiple" className="dummyAccordion">
       {groupedFilters.map(({ group, rows }) => {
         const activeCount = rows.filter(({ filter }) => filter.enabled).length;
         return (
@@ -355,70 +446,71 @@ function DummyResults({
   selectedModelId: string | null;
   onSelectModelId: (modelId: string | null) => void;
 }) {
-  if (!result) return <EmptyState text="Run dummy filters to see run summary, waterfall, and model traceability." />;
+  const [traceabilityQuery, setTraceabilityQuery] = useState("");
+  const [traceabilityPage, setTraceabilityPage] = useState(1);
+
+  if (!result) return <EmptyState text="Run filters to preview the cleansing outcome for the original dataset." />;
   const summary = result.runSummary;
   const distribution = new Map<string, number>();
   for (const outcome of result.modelOutcomes) {
     if (!outcome.primaryRemovalReason) continue;
     distribution.set(outcome.primaryRemovalReason, (distribution.get(outcome.primaryRemovalReason) || 0) + 1);
   }
+  const traceabilityPageSize = 25;
+  const normalizedQuery = traceabilityQuery.trim().toLowerCase();
+  const filteredOutcomes = normalizedQuery
+    ? result.modelOutcomes.filter((outcome) => outcome.modelId.toLowerCase().includes(normalizedQuery))
+    : result.modelOutcomes;
+  const traceabilityPageCount = Math.max(1, Math.ceil(filteredOutcomes.length / traceabilityPageSize));
+  const currentTraceabilityPage = Math.min(traceabilityPage, traceabilityPageCount);
+  const firstTraceabilityIndex = (currentTraceabilityPage - 1) * traceabilityPageSize;
+  const pagedOutcomes = filteredOutcomes.slice(
+    firstTraceabilityIndex,
+    firstTraceabilityIndex + traceabilityPageSize,
+  );
   const selectedFindings = selectedModelId
     ? result.findings.filter((finding) => finding.modelId === selectedModelId)
     : [];
 
   return (
     <div className="results">
-      <Tabs defaultValue="overview">
-        <div className="resultsHeader">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="waterfall">Waterfall</TabsTrigger>
-            <TabsTrigger value="traceability">Traceability</TabsTrigger>
-            <TabsTrigger value="findings">Model Findings</TabsTrigger>
-          </TabsList>
-          <div className="actionBar">
-            <Button type="button" variant="secondary" onClick={() => exportDummyJson(result)}>
-              Export JSON
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => exportDummyCsv(result)}>
-              Export CSV
-            </Button>
-          </div>
+      <div className="dummyOutcome">
+        <div className="metricGrid dummyMetricGrid">
+          <Metric label="Total models" value={summary.totalModels.toLocaleString()} />
+          <Metric label="Removed" value={summary.removedModels.toLocaleString()} />
+          <Metric label="Retained" value={summary.remainingModels.toLocaleString()} />
+          <Metric label="Removal rate" value={`${Math.round(summary.removalRate * 100)}%`} />
         </div>
+        <RemovalDistribution distribution={distribution} totalModels={summary.totalModels} />
+      </div>
 
-        <TabsContent value="overview">
-          <div className="metricGrid small">
-            <Metric label="Total models" value={summary.totalModels} />
-            <Metric label="Removed" value={summary.removedModels} />
-            <Metric label="Remaining" value={summary.remainingModels} />
-            <Metric label="Removal rate" value={`${Math.round(summary.removalRate * 100)}%`} />
-          </div>
-          <h3>Primary Removal Distribution</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Filter</th>
-                <th>Models</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...distribution.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .map(([filterId, count]) => (
-                  <tr key={filterId}>
-                    <td>{filterId}</td>
-                    <td>{count}</td>
-                  </tr>
-                ))}
-              {!distribution.size && (
-                <tr>
-                  <td colSpan={2}>No models were removed.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </TabsContent>
-
+      <Accordion type="single" collapsible className="dummyDetailsAccordion">
+        <AccordionItem value="details">
+          <AccordionTrigger>
+            <div className="dummySettingsTrigger">
+              <span>Detailed results</span>
+              <small>{result.modelOutcomes.length.toLocaleString()} models</small>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <Tabs defaultValue="waterfall">
+              <div className="resultsHeader">
+                <TabsList>
+                  <TabsTrigger value="waterfall">Waterfall</TabsTrigger>
+                  <TabsTrigger value="traceability">Traceability</TabsTrigger>
+                </TabsList>
+                <div className="dummyExportActions">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => exportDummyJson(result)}>
+                    <Download size={15} />
+                    JSON
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => exportDummyCsv(result)}>
+                    <Download size={15} />
+                    Traceability CSV
+                  </Button>
+                </div>
+              </div>
+              <Separator />
         <TabsContent value="waterfall">
           <h3>Filter Waterfall</h3>
           <table>
@@ -432,7 +524,7 @@ function DummyResults({
             <tbody>
               {result.filterSummaries.map((row) => (
                 <tr key={row.filterId}>
-                  <td>{row.filterId}</td>
+                  <td>{filterTitle(row.filterId)}</td>
                   <td>{row.filteredCount}</td>
                   <td>{row.remainingCount}</td>
                 </tr>
@@ -442,7 +534,21 @@ function DummyResults({
         </TabsContent>
 
         <TabsContent value="traceability">
-          <h3>Model Traceability</h3>
+          <div className="traceabilityToolbar">
+            <h3>Model Traceability</h3>
+            <label className="traceabilitySearch">
+              <Search size={16} />
+              <Input
+                type="search"
+                value={traceabilityQuery}
+                placeholder="Search model ID"
+                onChange={(event) => {
+                  setTraceabilityQuery(event.target.value);
+                  setTraceabilityPage(1);
+                }}
+              />
+            </label>
+          </div>
           <div className="dummyTraceabilityTable">
             <table>
               <thead>
@@ -455,12 +561,12 @@ function DummyResults({
                 </tr>
               </thead>
               <tbody>
-                {result.modelOutcomes.map((outcome) => (
+                {pagedOutcomes.map((outcome) => (
                   <tr key={outcome.modelId}>
                     <td>{outcome.modelId}</td>
                     <td>{outcome.removed ? "Removed" : "Kept"}</td>
-                    <td>{outcome.primaryRemovalReason || "-"}</td>
-                    <td>{outcome.allTriggeredFilters.join(", ") || "-"}</td>
+                    <td>{outcome.primaryRemovalReason ? filterTitle(outcome.primaryRemovalReason) : "-"}</td>
+                    <td>{outcome.allTriggeredFilters.map(filterTitle).join(", ") || "-"}</td>
                     <td>
                       <Button type="button" size="sm" variant="secondary" onClick={() => onSelectModelId(outcome.modelId)}>
                         Open
@@ -470,40 +576,50 @@ function DummyResults({
                 ))}
               </tbody>
             </table>
+            {!pagedOutcomes.length && <EmptyState text="No matching model IDs." />}
+          </div>
+          <div className="traceabilityPagination">
+            <span>
+              {filteredOutcomes.length
+                ? `${(firstTraceabilityIndex + 1).toLocaleString()}-${Math.min(
+                    firstTraceabilityIndex + traceabilityPageSize,
+                    filteredOutcomes.length,
+                  ).toLocaleString()} of ${filteredOutcomes.length.toLocaleString()}`
+                : "0 of 0"}
+            </span>
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                onClick={() => setTraceabilityPage(Math.max(1, currentTraceabilityPage - 1))}
+                disabled={currentTraceabilityPage <= 1}
+                aria-label="Previous traceability page"
+                title="Previous page"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+              <strong>
+                Page {currentTraceabilityPage.toLocaleString()} of {traceabilityPageCount.toLocaleString()}
+              </strong>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                onClick={() => setTraceabilityPage(Math.min(traceabilityPageCount, currentTraceabilityPage + 1))}
+                disabled={currentTraceabilityPage >= traceabilityPageCount}
+                aria-label="Next traceability page"
+                title="Next page"
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </div>
           </div>
         </TabsContent>
-
-        <TabsContent value="findings">
-          {result.findings.length ? (
-            <div className="dummyFindingsList">
-              {result.findings.slice(0, 180).map((finding, index) => (
-                <details className="dummyFindingCard" key={`${finding.modelId}:${finding.filterId}:${index}`}>
-                  <summary>
-                    <span>{finding.modelId}</span>
-                    <span>{finding.filterId}</span>
-                    <span>{finding.decision}</span>
-                    <span>Score {round(finding.score)}</span>
-                  </summary>
-                  <div className="dummyFindingBody">
-                    <p>
-                      <strong>Reason:</strong> {finding.reason}
-                    </p>
-                    <p>
-                      <strong>Evidence:</strong> {finding.evidence.length ? finding.evidence.join(", ") : "-"}
-                    </p>
-                    <p>
-                      <strong>Nodes:</strong> {finding.evidenceNodes.length ? finding.evidenceNodes.join(", ") : "-"}
-                    </p>
-                    <pre>{JSON.stringify(finding.metrics || {}, null, 2)}</pre>
-                  </div>
-                </details>
-              ))}
-            </div>
-          ) : (
-            <EmptyState text="No findings emitted in this run." />
-          )}
-        </TabsContent>
-      </Tabs>
+            </Tabs>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
       {selectedModelId && (
         <DummyModelDetailModal
           modelId={selectedModelId}
@@ -512,6 +628,44 @@ function DummyResults({
         />
       )}
     </div>
+  );
+}
+
+function RemovalDistribution({
+  distribution,
+  totalModels,
+}: {
+  distribution: Map<string, number>;
+  totalModels: number;
+}) {
+  const rows = [...distribution.entries()].sort((a, b) => b[1] - a[1]);
+  const maxCount = Math.max(1, ...rows.map(([, count]) => count));
+
+  return (
+    <section className="dummyDistribution" aria-label="Removal reasons">
+      <div className="dummyDistributionHeader">
+        <h3>Removal Reasons</h3>
+        <span>{rows.length ? `${rows.length} filters removed models` : "No removals"}</span>
+      </div>
+      {rows.length ? (
+        <div className="dummyDistributionList">
+          {rows.slice(0, 6).map(([filterId, count]) => (
+            <div className="dummyDistributionRow" key={filterId}>
+              <div>
+                <strong>{filterTitle(filterId)}</strong>
+                <span>{Math.round((count / Math.max(1, totalModels)) * 100)}% of dataset</span>
+              </div>
+              <i aria-hidden="true">
+                <b style={{ width: `${Math.max(4, (count / maxCount) * 100)}%` }} />
+              </i>
+              <em>{count.toLocaleString()}</em>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState text="No models were removed by the current filter configuration." />
+      )}
+    </section>
   );
 }
 
@@ -543,7 +697,7 @@ function DummyModelDetailModal({
             {findings.map((finding, index) => (
               <details className="dummyFindingCard" key={`${finding.modelId}:${finding.filterId}:${index}`}>
                 <summary>
-                  <span>{finding.filterId}</span>
+                  <span>{filterTitle(finding.filterId)}</span>
                   <span>{finding.decision}</span>
                   <span>Score: {round(finding.score)}</span>
                   <span>Threshold: {round(finding.threshold)}</span>
@@ -567,6 +721,10 @@ function DummyModelDetailModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+function filterTitle(filterId: string) {
+  return filterLabels[filterId]?.[0] || filterId;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -593,20 +751,17 @@ function exportDummyJson(result: DummyResponse) {
 
 function exportDummyCsv(result: DummyResponse) {
   const lines = [
-    "modelId,filterId,decision,reason,score,threshold,evidence",
-    ...result.findings.map((finding) =>
+    "modelId,decision,primaryRemovalReason,allTriggeredFilters",
+    ...result.modelOutcomes.map((outcome) =>
       [
-        csvCell(finding.modelId),
-        csvCell(finding.filterId),
-        csvCell(finding.decision),
-        csvCell(finding.reason),
-        csvCell(String(finding.score)),
-        csvCell(String(finding.threshold)),
-        csvCell(finding.evidence.join(" | ")),
+        csvCell(outcome.modelId),
+        csvCell(outcome.removed ? "Removed" : "Kept"),
+        csvCell(outcome.primaryRemovalReason ? filterTitle(outcome.primaryRemovalReason) : ""),
+        csvCell(outcome.allTriggeredFilters.map(filterTitle).join(" | ")),
       ].join(","),
     ),
   ];
-  downloadText("dummy-findings.csv", lines.join("\n"), "text/csv");
+  downloadText("dummy-traceability.csv", lines.join("\n"), "text/csv");
 }
 
 function downloadText(filename: string, content: string, mimeType: string) {
