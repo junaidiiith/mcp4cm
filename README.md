@@ -53,6 +53,16 @@ python -m mcp4cm.api_server
 
 Then open `http://127.0.0.1:8765`.
 
+## Download Datasets
+
+EA ModelSet and ModelSet can be downloaded and prepared locally with `scripts/prepare_datasets.py`. The script downloads the datasets, extracts the models, and copies them into `data/` in the layout expected by the application.
+
+```bash
+python scripts/prepare_datasets.py
+```
+
+To prepare only a subset, use `--only` (for example `eamodelset`, `modelset`, or fine-grained targets such as `modelset-uml-json`). See [docs/DOWNLOAD_DATASETS.md](docs/DOWNLOAD_DATASETS.md) for all options, source layout, and manual preparation steps.
+
 ## Load Datasets
 
 ```python
