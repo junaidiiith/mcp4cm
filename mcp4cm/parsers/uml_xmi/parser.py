@@ -119,7 +119,7 @@ class ParseOptions:
     include_packages: bool = True
     # Create an explicit root node for uml:Model so derived model anchoring edges
     # have a valid source endpoint in IR/networkx.
-    include_model_root_node: bool = False
+    include_model_root_node: bool = True
 
 
 @dataclass

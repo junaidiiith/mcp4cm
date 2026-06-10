@@ -211,7 +211,7 @@ class UMLXMIAdapter(IRParserAdapter):
     format_name = "xmi"
 
     def create_parser(self, options: ParserOptions):
-        return UMLXMIParser(options=UMLParseOptions(include_model_root_node=bool(options.get("include_model_root_node", False))))
+        return UMLXMIParser(options=UMLParseOptions(include_model_root_node=bool(options.get("include_model_root_node", True))))
 
     def apply_projection(self, graph, options: ParserOptions) -> None:
         expand_uml_feature_nodes(
@@ -372,7 +372,7 @@ register_descriptor(
             OptionSpec("includeAttributes", "include_attributes", True, bool_option),
             OptionSpec("includeOperations", "include_operations", True, bool_option),
             OptionSpec("includeParameters", "include_parameters", True, bool_option),
-            OptionSpec("includeModelRootNode", "include_model_root_node", False, bool_option),
+            OptionSpec("includeModelRootNode", "include_model_root_node", True, bool_option),
         ),
     )
 )

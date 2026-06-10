@@ -43,7 +43,7 @@ code, pre, .warningPath, .inspectorHeader p, .pairCompareHeader p, .pairCompareP
 .uiSidebarProvider {
   --sidebar-width: 17.5rem;
   --sidebar-width-mobile: 18rem;
-  --sidebar-width-icon: 4rem;
+  --sidebar-width-icon: 4.5rem;
   min-height: 100vh;
   display: flex;
   position: relative;
@@ -115,7 +115,16 @@ code, pre, .warningPath, .inspectorHeader p, .pairCompareHeader p, .pairCompareP
   min-width: 0;
 }
 .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
-.brandMark { width: 42px; height: 42px; display: block; border-radius: 8px; }
+.brandMark {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  flex-shrink: 0;
+  display: block;
+  border-radius: 8px;
+  object-fit: contain;
+}
 .brand strong { display: block; font-size: 18px; }
 .brand span { color: #b9d6d6; font-size: 13px; }
 .sidebarMenu { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }

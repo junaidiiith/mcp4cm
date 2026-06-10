@@ -92,7 +92,7 @@ export default function App() {
     includeAttributes: true,
     includeOperations: true,
     includeParameters: true,
-    includeModelRootNode: false,
+    includeModelRootNode: true,
   });
   const [dummyFilterConfigs, setDummyFilterConfigs] = useState(() => clonePreset("uml"));
   const [busy, setBusy] = useState<BusyState>("");
@@ -387,7 +387,7 @@ export default function App() {
         includeAttributes: true,
         includeOperations: true,
         includeParameters: true,
-        includeModelRootNode: false,
+        includeModelRootNode: true,
       });
     }
   }
@@ -413,7 +413,7 @@ export default function App() {
         includeAttributes: true,
         includeOperations: true,
         includeParameters: true,
-        includeModelRootNode: false,
+        includeModelRootNode: true,
       });
     }
   }

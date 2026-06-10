@@ -314,7 +314,7 @@ def read_upload_request() -> dict[str, Any]:
             "includeAttributes": request.form.get("includeAttributes", "true"),
             "includeOperations": request.form.get("includeOperations", "true"),
             "includeParameters": request.form.get("includeParameters", "true"),
-            "includeModelRootNode": request.form.get("includeModelRootNode", "false"),
+            "includeModelRootNode": request.form.get("includeModelRootNode", "true"),
             "files": request.files.getlist("files"),
         }
     return read_json_body()
