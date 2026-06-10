@@ -578,10 +578,13 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 }
 .pieStat {
   display: grid;
-  grid-template-columns: 74px 1fr;
+  grid-template-columns: 86px 1fr;
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.pieChart {
+  width: 86px;
 }
 .pie {
   width: 74px;
@@ -1522,6 +1525,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .visualizationCardHeader p { margin-top: 4px; font-size: 12px; line-height: 1.35; }
 .visualizationCardHeader button { flex: 0 0 auto; width: 32px; height: 32px; min-height: 32px; padding: 0; }
 .chartBody { min-height: 190px; margin-top: 14px; overflow: auto; }
+.eChart { min-width: 0; }
 .visualizationCard.featured .chartBody { min-height: 420px; }
 .visualizationDialog { width: min(1280px, 96vw); max-width: min(1280px, 96vw); max-height: 92vh; overflow: hidden; }
 .visualizationDialogBody { max-height: calc(92vh - 130px); overflow: auto; padding-right: 4px; }

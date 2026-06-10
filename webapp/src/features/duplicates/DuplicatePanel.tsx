@@ -1,5 +1,6 @@
-import type { CSSProperties } from "react";
 import { GitCompare, Layers3, Loader2, Plus, SlidersHorizontal } from "lucide-react";
+import { EChart } from "@/components/charts/EChart";
+import { duplicatePieOption } from "@/components/charts/builders";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -664,15 +665,16 @@ function PieStat({
   label: string;
   value: number;
   total: number;
-  tone: string;
+  tone: "duplicate" | "unique";
 }) {
   const percent = total ? Math.round((value / total) * 100) : 0;
   return (
     <div className="pieStat">
-      <div
-        className={`pie ${tone}`}
-        style={{ "--percent": `${percent}%` } as CSSProperties}
-        aria-label={`${label}: ${value} of ${total}`}
+      <EChart
+        ariaLabel={`${label}: ${value} of ${total}`}
+        className="pieChart"
+        height={86}
+        option={duplicatePieOption({ label, value, total, tone })}
       />
       <div>
         <span>{label}</span>
