@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from mcp4cm import api_server
+from mcp4cm import runtime_store
 from mcp4cm.api_server import (
     DATASETS,
     DUPLICATE_JOBS,
@@ -250,6 +251,140 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     assert statistics.status_code == 200
     assert statistics_data["summary"]["models"] == 1
     assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
+
+
+def test_runtime_dataset_iteration_uses_index_entries_directly(monkeypatch):
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
+    client = create_app().test_client()
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=(
+            BytesIO(
+                json.dumps(
+                    {
+                        "archimateId": "iter-model",
+                        "name": "Iterator model",
+                        "elements": [{"id": "a", "name": "App", "type": "ApplicationComponent"}],
+                        "relationships": [],
+                    }
+                ).encode("utf-8")
+            ),
+            "iter.json",
+        ),
+    )
+    dataset = DATASETS[job["datasetId"]]
+
+    def fail_by_id_loader(*args, **kwargs):
+        raise AssertionError("RuntimeDataset iteration should not reload models through by-id lookup.")
+
+    monkeypatch.setattr(runtime_store, "load_model_from_runtime", fail_by_id_loader)
+
+    records = list(dataset)
+
+    assert [record.model_id for record in records] == ["iter-model"]
+
+
+def test_dummy_filters_persist_after_cleansing_statistics():
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
+    client = create_app().test_client()
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=[
+            (
+                BytesIO(
+                    json.dumps(
+                        {
+                            "archimateId": "kept-model",
+                            "name": "Kept model",
+                            "elements": [
+                                {"id": "a", "name": "Customer portal", "type": "ApplicationComponent"},
+                                {"id": "b", "name": "Order service", "type": "ApplicationComponent"},
+                                {"id": "c", "name": "Billing ledger", "type": "DataObject"},
+                            ],
+                            "relationships": [
+                                {"id": "r1", "sourceId": "a", "targetId": "b", "type": "Flow"},
+                                {"id": "r2", "sourceId": "b", "targetId": "c", "type": "Access"},
+                            ],
+                        }
+                    ).encode("utf-8")
+                ),
+                "kept.json",
+            ),
+            (
+                BytesIO(
+                    json.dumps(
+                        {
+                            "archimateId": "removed-model",
+                            "name": "Removed model",
+                            "elements": [{"id": "x", "name": "Tiny", "type": "ApplicationComponent"}],
+                            "relationships": [],
+                        }
+                    ).encode("utf-8")
+                ),
+                "removed.json",
+            ),
+        ],
+    )
+
+    dataset_id = job["datasetId"]
+    response = client.post(
+        "/api/dummy/jobs",
+        json={
+            "datasetId": dataset_id,
+            "filterConfigs": [
+                {"id": "min_size", "enabled": True, "minNodes": 2, "minEdges": 1},
+                {"id": "too_few_named_elements", "enabled": False},
+                {"id": "short_median_name_length", "enabled": False},
+                {"id": "placeholder_name_ratio", "enabled": False},
+                {"id": "low_vocabulary", "enabled": False},
+                {"id": "type_like_name_ratio", "enabled": False},
+                {"id": "name_repetition_ratio", "enabled": False},
+                {"id": "regex_rule", "enabled": False},
+            ],
+        },
+    )
+    started_job = response.get_json()
+
+    assert response.status_code == 200
+    assert started_job["status"] in {"queued", "running"}
+    assert started_job["totalModels"] == 2
+
+    payload = {}
+    for _ in range(30):
+        job_response = client.get(f"/api/dummy/jobs/{started_job['jobId']}")
+        assert job_response.status_code == 200
+        payload = job_response.get_json()
+        if payload["status"] == "complete":
+            break
+        time.sleep(0.05)
+
+    assert payload["status"] == "complete"
+    assert payload["result"]["runSummary"]["remainingModels"] == 1
+    assert "statistics" not in payload["result"]
+    assert payload["result"]["statisticsJobId"]
+
+    after_statistics_data = {}
+    after_statistics = None
+    for _ in range(30):
+        after_statistics = client.get(f"/api/datasets/{dataset_id}/statistics/after-dummy")
+        after_statistics_data = after_statistics.get_json()
+        if "summary" in after_statistics_data:
+            break
+        time.sleep(0.05)
+
+    assert (api_server.RUNTIME_DIR / dataset_id / "statistics-after-dummy.json").exists()
+    assert after_statistics is not None
+    assert after_statistics.status_code == 200
+    assert after_statistics_data["summary"]["models"] == 1
 
 
 def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields():

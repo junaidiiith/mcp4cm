@@ -1,5 +1,5 @@
 import { Expand, Grid2X2, ListTree, Network, Plus } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,15 +7,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { HistogramBin, StatisticItem, VisualizationPayload } from "../../types";
 import { round } from "../../utils";
 
-export function VisualizationPanel({ data }: { data: VisualizationPayload | null }) {
+type VisualizationSnapshot = "before" | "after";
+
+export function VisualizationPanel({
+  beforeData,
+  afterData,
+  beforeModelCount,
+  afterModelCount,
+}: {
+  beforeData: VisualizationPayload | null;
+  afterData: VisualizationPayload | null;
+  beforeModelCount: number | null;
+  afterModelCount: number | null;
+}) {
   const [activeCategory, setActiveCategory] = useState<VisualizationCategoryId>("quality");
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [expandedChartId, setExpandedChartId] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<VisualizationSnapshot>("before");
+  const data = snapshot === "after" && afterData ? afterData : beforeData;
   const categories = useMemo(() => data ? visualizationCategories(data) : [], [data]);
   const activeCharts = categories.find((category) => category.id === activeCategory)?.charts || categories[0]?.charts || [];
   const selectedChart = activeCharts.find((chart) => chart.id === selectedChartId) || activeCharts[0] || null;
   const expandedChart = categories.flatMap((category) => category.charts).find((chart) => chart.id === expandedChartId) || null;
+  const selectedModelCount = snapshot === "after" ? afterModelCount : beforeModelCount;
+  const modelCountLabel = selectedModelCount === null ? "" : `${selectedModelCount.toLocaleString()} models`;
+
+  useEffect(() => {
+    if (snapshot === "after" && !afterData) setSnapshot("before");
+  }, [afterData, snapshot]);
 
   return (
     <Card className="panel" id="visualizations">
@@ -40,11 +60,36 @@ export function VisualizationPanel({ data }: { data: VisualizationPayload | null
                     <TabsTrigger key={category.id} value={category.id}>{category.label}</TabsTrigger>
                   ))}
                 </TabsList>
-                <Button className="visualizationModeButton" type="button" variant="secondary" size="sm" onClick={() => setShowAll((current) => !current)}>
-                  {showAll ? <ListTree size={16} /> : <Grid2X2 size={16} />}
-                  {showAll ? "Focused" : "Show all"}
-                </Button>
+                <div className="visualizationToolbarActions">
+                  <div className="visualizationSnapshotControl" aria-label="Visualization dataset snapshot">
+                    <button
+                      className={snapshot === "before" ? "active" : ""}
+                      type="button"
+                      onClick={() => setSnapshot("before")}
+                    >
+                      Before
+                    </button>
+                    <button
+                      className={snapshot === "after" ? "active" : ""}
+                      type="button"
+                      disabled={!afterData}
+                      title={afterData ? "After cleansing" : "Run dummy filters to enable after-cleansing visualizations."}
+                      onClick={() => setSnapshot("after")}
+                    >
+                      After
+                    </button>
+                  </div>
+                  <Button className="visualizationModeButton" type="button" variant="secondary" size="sm" onClick={() => setShowAll((current) => !current)}>
+                    {showAll ? <ListTree size={16} /> : <Grid2X2 size={16} />}
+                    {showAll ? "Focused" : "Show all"}
+                  </Button>
+                </div>
               </div>
+              {modelCountLabel && (
+                <div className="visualizationSnapshotStatus">
+                  {snapshot === "after" ? "After cleansing" : "Before cleansing"}: {modelCountLabel}
+                </div>
+              )}
 
               {categories.map((category) => (
                 <TabsContent key={category.id} value={category.id}>

@@ -347,7 +347,7 @@ class CorpusStatisticsAccumulator:
             self.filtered_concept_doc_freq[concept] += 1
         self.unique_name_doc_freq.update(model_names)
 
-    def build_payload(self) -> dict[str, Any]:
+    def build_payload(self, *, skip_topic_model: bool = False, topic_model_skip_reason: str = "") -> dict[str, Any]:
         model_count = len(self.node_counts)
         return {
             "summary": {
@@ -360,11 +360,21 @@ class CorpusStatisticsAccumulator:
             },
             "topTypes": counter_items(self.type_counter),
             "topNames": counter_items(self.name_counter),
-            "visualizations": self._build_visualizations(model_count),
+            "visualizations": self._build_visualizations(
+                model_count,
+                skip_topic_model=skip_topic_model,
+                topic_model_skip_reason=topic_model_skip_reason,
+            ),
             "sampleModels": self.sample_models,
         }
 
-    def _build_visualizations(self, model_count: int) -> dict[str, Any]:
+    def _build_visualizations(
+        self,
+        model_count: int,
+        *,
+        skip_topic_model: bool = False,
+        topic_model_skip_reason: str = "",
+    ) -> dict[str, Any]:
         major_types = [label for label, _ in self.entry_type_counter.most_common(6)]
         type_links: list[dict[str, Any]] = []
         for element_type in major_types:
@@ -392,7 +402,12 @@ class CorpusStatisticsAccumulator:
             )
 
         topic_result: dict[str, Any]
-        if model_count > TOPIC_MODEL_MODEL_LIMIT:
+        if skip_topic_model:
+            topic_result = {
+                "available": False,
+                "reason": topic_model_skip_reason or "Topic modeling skipped for this statistics snapshot.",
+            }
+        elif model_count > TOPIC_MODEL_MODEL_LIMIT:
             topic_result = {
                 "available": False,
                 "reason": f"Topic modeling skipped for datasets with more than {TOPIC_MODEL_MODEL_LIMIT} models.",
