@@ -437,6 +437,26 @@ def load_model_from_runtime(dataset_id: str, model_id: str) -> tuple[ModelRecord
     return record, diagnostics
 
 
+def load_model_entry_from_runtime(dataset_id: str, model_entry: dict[str, Any]) -> tuple[ModelRecord, ModelDiagnostics] | None:
+    dataset_id = str(dataset_id or "")
+    if not dataset_id or not isinstance(model_entry, dict):
+        return None
+    filename = str(model_entry.get("file") or "")
+    if not filename:
+        return None
+    model_path = runtime_dataset_ir_dir(dataset_id) / filename
+    with RUNTIME_LOCK:
+        if not model_path.exists():
+            return None
+        try:
+            model_payload = json.loads(model_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    record = deserialize_model_from_runtime(model_payload)
+    diagnostics = deserialize_diagnostics_from_runtime(model_payload)
+    return record, diagnostics
+
+
 def iter_models_from_runtime(dataset_id: str) -> Iterator[ModelRecord]:
     dataset_meta = get_dataset_meta(dataset_id)
     if dataset_meta is None:
@@ -444,10 +464,7 @@ def iter_models_from_runtime(dataset_id: str) -> Iterator[ModelRecord]:
     for model_entry in dataset_meta.get("models") or []:
         if not isinstance(model_entry, dict):
             continue
-        model_id = str(model_entry.get("modelId") or "")
-        if not model_id:
-            continue
-        loaded = load_model_from_runtime(dataset_id, model_id)
+        loaded = load_model_entry_from_runtime(dataset_id, model_entry)
         if loaded is not None:
             yield loaded[0]
 

@@ -1,6 +1,7 @@
 import { API_URL } from "./config";
 import type {
   AfterDummyStatisticsResponse,
+  DummyProgressState,
   DuplicateProgressState,
   ModelInspectPayload,
   ParsedModelSummary,
@@ -42,6 +43,19 @@ export async function pollDuplicateJob(
     if (onUpdate) onUpdate(job);
     if (job.status === "complete") return job;
     if (job.status === "error") throw new Error(job.error || job.message || "Duplicate detection failed");
+  }
+}
+
+export async function pollDummyJob(
+  jobId: string,
+  onUpdate?: (job: DummyProgressState) => void,
+): Promise<DummyProgressState> {
+  for (;;) {
+    await delay(700);
+    const job = await getJson<DummyProgressState>(`/api/dummy/jobs/${jobId}`);
+    if (onUpdate) onUpdate(job);
+    if (job.status === "complete") return job;
+    if (job.status === "error") throw new Error(job.error || job.message || "Dummy cleansing failed");
   }
 }
 

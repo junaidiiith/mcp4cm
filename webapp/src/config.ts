@@ -12,7 +12,6 @@ export const techniques: TechniqueOption[] = [
 ];
 
 export const filterLabels: Record<string, [string, string]> = {
-  empty_graph: ["Empty graph", "Remove models with zero nodes."],
   min_size: ["Minimum size", "Remove models below node/edge thresholds."],
   too_few_named_elements: ["Naming density", "Minimum number of semantic names required."],
   short_median_name_length: ["Short median name", "Median semantic name length must meet the minimum."],
@@ -24,7 +23,6 @@ export const filterLabels: Record<string, [string, string]> = {
 };
 
 export const filterGroups: Record<string, string> = {
-  empty_graph: "Size",
   min_size: "Size",
   too_few_named_elements: "Naming Density",
   short_median_name_length: "Naming Density",
@@ -36,7 +34,6 @@ export const filterGroups: Record<string, string> = {
 };
 
 export const filterFormulaPreviews: Record<string, string> = {
-  empty_graph: "nodeCount == 0",
   min_size: "nodeCount < minNodes OR edgeCount < minEdges",
   too_few_named_elements: "semanticNameCount < minNames",
   short_median_name_length: "median(semanticNameLength) < minMedianLength",
@@ -48,7 +45,6 @@ export const filterFormulaPreviews: Record<string, string> = {
 };
 
 const canonicalPreset: FilterConfig[] = [
-  { id: "empty_graph", enabled: true },
   { id: "min_size", enabled: true, minNodes: 5, minEdges: 4 },
   { id: "too_few_named_elements", enabled: true, minNames: 5 },
   { id: "short_median_name_length", enabled: true, minMedianLength: 4 },

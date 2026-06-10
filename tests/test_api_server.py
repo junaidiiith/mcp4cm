@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from mcp4cm import api_server
+from mcp4cm import runtime_store
 from mcp4cm.api_server import (
     DATASETS,
     DUPLICATE_JOBS,
@@ -252,6 +253,41 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
 
 
+def test_runtime_dataset_iteration_uses_index_entries_directly(monkeypatch):
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    clear_runtime()
+    client = create_app().test_client()
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=(
+            BytesIO(
+                json.dumps(
+                    {
+                        "archimateId": "iter-model",
+                        "name": "Iterator model",
+                        "elements": [{"id": "a", "name": "App", "type": "ApplicationComponent"}],
+                        "relationships": [],
+                    }
+                ).encode("utf-8")
+            ),
+            "iter.json",
+        ),
+    )
+    dataset = DATASETS[job["datasetId"]]
+
+    def fail_by_id_loader(*args, **kwargs):
+        raise AssertionError("RuntimeDataset iteration should not reload models through by-id lookup.")
+
+    monkeypatch.setattr(runtime_store, "load_model_from_runtime", fail_by_id_loader)
+
+    records = list(dataset)
+
+    assert [record.model_id for record in records] == ["iter-model"]
+
+
 def test_dummy_filters_persist_after_cleansing_statistics():
     DATASETS.clear()
     UPLOAD_SESSIONS.clear()
@@ -301,11 +337,10 @@ def test_dummy_filters_persist_after_cleansing_statistics():
 
     dataset_id = job["datasetId"]
     response = client.post(
-        "/api/dummy",
+        "/api/dummy/jobs",
         json={
             "datasetId": dataset_id,
             "filterConfigs": [
-                {"id": "empty_graph", "enabled": False},
                 {"id": "min_size", "enabled": True, "minNodes": 2, "minEdges": 1},
                 {"id": "too_few_named_elements", "enabled": False},
                 {"id": "short_median_name_length", "enabled": False},
@@ -317,12 +352,25 @@ def test_dummy_filters_persist_after_cleansing_statistics():
             ],
         },
     )
-    payload = response.get_json()
+    started_job = response.get_json()
 
     assert response.status_code == 200
-    assert payload["runSummary"]["remainingModels"] == 1
-    assert "statistics" not in payload
-    assert payload["statisticsJobId"]
+    assert started_job["status"] in {"queued", "running"}
+    assert started_job["totalModels"] == 2
+
+    payload = {}
+    for _ in range(30):
+        job_response = client.get(f"/api/dummy/jobs/{started_job['jobId']}")
+        assert job_response.status_code == 200
+        payload = job_response.get_json()
+        if payload["status"] == "complete":
+            break
+        time.sleep(0.05)
+
+    assert payload["status"] == "complete"
+    assert payload["result"]["runSummary"]["remainingModels"] == 1
+    assert "statistics" not in payload["result"]
+    assert payload["result"]["statisticsJobId"]
 
     after_statistics_data = {}
     after_statistics = None

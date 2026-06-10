@@ -18,7 +18,6 @@ DEFAULT_NAME_REPETITION_THRESHOLD = 0.50
 DEFAULT_REGEX_MIN_MATCHES = 1
 
 FILTER_ORDER: tuple[str, ...] = (
-    "empty_graph",
     "min_size",
     "too_few_named_elements",
     "short_median_name_length",
@@ -124,7 +123,6 @@ class DummyEvaluationResult:
 
 def default_filter_configs() -> list[dict[str, Any]]:
     return [
-        {"id": "empty_graph", "enabled": True},
         {"id": "min_size", "enabled": True, "minNodes": DEFAULT_MIN_NODES, "minEdges": DEFAULT_MIN_EDGES},
         {"id": "too_few_named_elements", "enabled": True, "minNames": DEFAULT_MIN_NAMES},
         {
@@ -305,8 +303,6 @@ def summarize_findings(
 
 def evaluate_filter(record: ModelRecord, derived_nodes: list[DerivedNode], config: dict[str, Any]) -> DummyFinding:
     filter_id = str(config.get("id") or "")
-    if filter_id == "empty_graph":
-        return _eval_empty_graph(record, filter_id)
     if filter_id == "min_size":
         return _eval_min_size(record, filter_id, config)
     if filter_id == "too_few_named_elements":
@@ -324,27 +320,6 @@ def evaluate_filter(record: ModelRecord, derived_nodes: list[DerivedNode], confi
     if filter_id == "regex_rule":
         return _eval_regex_rule(record, derived_nodes, filter_id, config)
     return _kept_finding(record.model_id, filter_id, "unknown_filter", 0.0, 1.0)
-
-
-def _eval_empty_graph(record: ModelRecord, filter_id: str) -> DummyFinding:
-    node_count = record.node_count
-    if node_count == 0:
-        return _removed_finding(
-            record.model_id,
-            filter_id,
-            "node_count_is_zero",
-            score=0.0,
-            threshold=0.0,
-            metrics={"nodeCount": node_count, "edgeCount": record.edge_count},
-        )
-    return _kept_finding(
-        record.model_id,
-        filter_id,
-        "graph_has_nodes",
-        score=float(node_count),
-        threshold=0.0,
-        metrics={"nodeCount": node_count, "edgeCount": record.edge_count},
-    )
 
 
 def _eval_min_size(record: ModelRecord, filter_id: str, config: dict[str, Any]) -> DummyFinding:

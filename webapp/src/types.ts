@@ -308,6 +308,20 @@ export interface DummyResponse {
   rows?: DummyRow[];
 }
 
+export interface DummyProgressState {
+  jobId: string;
+  datasetId: string;
+  status: "queued" | "running" | "complete" | "error";
+  stage: "queued" | "loading" | "filtering" | "summarizing" | "complete" | "error";
+  progress: number;
+  processedModels: number;
+  totalModels: number;
+  message: string;
+  elapsedMs: number;
+  result?: DummyResponse | null;
+  error?: string;
+}
+
 export type AfterDummyStatisticsResponse =
   | StatisticsPayload
   | {
@@ -318,10 +332,6 @@ export type AfterDummyStatisticsResponse =
 
 interface BaseFilterConfig {
   enabled: boolean;
-}
-
-export interface EmptyGraphFilterConfig extends BaseFilterConfig {
-  id: "empty_graph";
 }
 
 export interface MinSizeFilterConfig extends BaseFilterConfig {
@@ -369,7 +379,6 @@ export interface RegexRuleFilterConfig extends BaseFilterConfig {
 }
 
 export type FilterConfig =
-  | EmptyGraphFilterConfig
   | MinSizeFilterConfig
   | TooFewNamedElementsFilterConfig
   | ShortMedianNameLengthFilterConfig

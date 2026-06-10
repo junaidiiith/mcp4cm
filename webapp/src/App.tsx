@@ -19,6 +19,7 @@ import {
   errorMessage,
   getDatasetAfterDummyStatistics,
   getDatasetStatistics,
+  pollDummyJob,
   pollDuplicateJob,
   pollUploadParseJob,
   postForm,
@@ -27,6 +28,7 @@ import {
 import { backendTechniquesFor } from "./utils";
 import type {
   BusyState,
+  DummyProgressState,
   DuplicateProgressState,
   DuplicateResult,
   DummyResponse,
@@ -76,6 +78,7 @@ export default function App() {
   const [uploadParseJob, setUploadParseJob] = useState<UploadParseJob | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState(0);
   const [dummyResponse, setDummyResponse] = useState<DummyResponse | null>(null);
+  const [dummyProgress, setDummyProgress] = useState<DummyProgressState | null>(null);
   const [selectedOutcomeModelId, setSelectedOutcomeModelId] = useState<string | null>(null);
   const [duplicateResult, setDuplicateResult] = useState<DuplicateResult | null>(null);
   const [duplicateProgress, setDuplicateProgress] = useState<DuplicateProgressState | null>(null);
@@ -190,6 +193,7 @@ export default function App() {
     setUploadParseJob(null);
     setUploadedFiles(0);
     setDummyResponse(null);
+    setDummyProgress(null);
     afterDummyStatsRequestRef.current += 1;
     setAfterDummyStats(null);
     setSelectedOutcomeModelId(null);
@@ -235,9 +239,17 @@ export default function App() {
   async function runDummyFilters() {
     setError("");
     setBusy("dummy");
+    setDummyResponse(null);
+    setDummyProgress(null);
     setAfterDummyStats(null);
     try {
-      const response = await postJson<DummyResponse>("/api/dummy", { datasetId, filterConfigs: dummyFilterConfigs });
+      const startedJob = await postJson<DummyProgressState>("/api/dummy/jobs", { datasetId, filterConfigs: dummyFilterConfigs });
+      setDummyProgress(startedJob);
+      const finishedJob = await pollDummyJob(startedJob.jobId, setDummyProgress);
+      const response = finishedJob.result;
+      if (!response) {
+        throw new Error("Dummy cleansing finished without a result.");
+      }
       setDummyResponse(response);
       setAfterDummyStats(response.statistics || null);
       setSelectedOutcomeModelId(null);
@@ -359,6 +371,7 @@ export default function App() {
     setDummyFilterConfigs(clonePreset(nextLanguage));
     setFiles([]);
     setDummyResponse(null);
+    setDummyProgress(null);
     afterDummyStatsRequestRef.current += 1;
     setAfterDummyStats(null);
     setSelectedOutcomeModelId(null);
@@ -389,6 +402,7 @@ export default function App() {
     setDatasetId("");
     setStats(null);
     setDummyResponse(null);
+    setDummyProgress(null);
     afterDummyStatsRequestRef.current += 1;
     setAfterDummyStats(null);
     setSelectedOutcomeModelId(null);
@@ -410,6 +424,7 @@ export default function App() {
       current.map((filter, i) => (i === index ? ({ ...filter, ...patch } as FilterConfig) : filter)),
     );
     setDummyResponse(null);
+    setDummyProgress(null);
     afterDummyStatsRequestRef.current += 1;
     setAfterDummyStats(null);
     setSelectedOutcomeModelId(null);
@@ -418,6 +433,7 @@ export default function App() {
   function resetDummyFilters() {
     setDummyFilterConfigs(clonePreset(language));
     setDummyResponse(null);
+    setDummyProgress(null);
     afterDummyStatsRequestRef.current += 1;
     setAfterDummyStats(null);
     setSelectedOutcomeModelId(null);
@@ -496,6 +512,7 @@ export default function App() {
               onRun={runDummyFilters}
               canRun={canRun}
               busy={busy}
+              progress={dummyProgress}
               result={dummyResponse}
               selectedModelId={selectedOutcomeModelId}
               onSelectModelId={setSelectedOutcomeModelId}
