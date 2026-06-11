@@ -45,8 +45,6 @@ class ModelRecord:
     @property
     def names(self) -> list[str]:
         names: list[str] = []
-        if self.name:
-            names.append(self.name)
         for _, attrs in self.graph.nodes(data=True):
             value = attrs.get("name")
             if value:
@@ -58,6 +56,10 @@ class ModelRecord:
         values: list[str] = []
         for _, attrs in self.graph.nodes(data=True):
             value = attrs.get("type") or attrs.get("eClass")
+            if value:
+                values.append(str(value))
+        for _, _, attrs in self.graph.edges(data=True):
+            value = attrs.get("type") or attrs.get("relationship") or attrs.get("label")
             if value:
                 values.append(str(value))
         return values

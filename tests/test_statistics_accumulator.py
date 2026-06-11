@@ -51,13 +51,18 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     graph.add_node("placeholder", type="Package", name="todo")
     graph.add_node("repeated_a", type="Task", name="Review")
     graph.add_node("repeated_b", type="Task", name="Review")
+    graph.add_edge("semantic", "repeated_a", type="ControlFlow")
 
     accumulator = CorpusStatisticsAccumulator()
     accumulator.add(ModelRecord(model_id="m1", language="bpmn", graph=graph))
-    visualizations = accumulator.build_payload()["visualizations"]
+    payload = accumulator.build_payload()
+    visualizations = payload["visualizations"]
 
     classification_counts = {item["key"]: item["count"] for item in visualizations["nameClassificationOverview"]}
     assert classification_counts == {"semantic": 3, "missing": 1, "placeholder": 1, "type_like": 1}
+    assert payload["topTypes"][0] == {"label": "Task", "count": 4}
+    assert {"label": "ControlFlow", "count": 1} in payload["topTypes"]
+    assert "control flow" not in {item["label"] for item in payload["topNames"]}
     assert visualizations["missingNameRatioSummary"]["above30"] == 0
     assert visualizations["semanticNameCountHistogram"][1]["count"] == 1
     assert visualizations["elementTypeQualityMatrix"][0]["total"] == 4

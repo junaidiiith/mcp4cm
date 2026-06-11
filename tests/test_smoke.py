@@ -139,7 +139,7 @@ def test_duplicate_hash_modes_use_names_and_name_types():
     assert detect_duplicates_by_node_name_type_hash(dataset) == []
 
 
-def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
+def test_duplicate_hash_ignores_raw_extracted_xmi_vocabulary_when_available():
     parser = ArchimateJsonParser()
     first = parser.parse({"elements": [{"id": "a", "name": "Graph A", "type": "Class"}], "relationships": []}, model_id="first")
     second = parser.parse({"elements": [{"id": "b", "name": "Graph B", "type": "Class"}], "relationships": []}, model_id="second")
@@ -152,8 +152,8 @@ def test_duplicate_hash_prefers_extracted_xmi_vocabulary_when_available():
 
     dataset = Dataset([first, second, reordered], "uml")
 
-    assert len(detect_duplicates_by_node_name_hash(dataset)) == 1
-    assert len(detect_duplicates_by_node_name_type_hash(dataset)) == 1
+    assert detect_duplicates_by_node_name_hash(dataset) == []
+    assert detect_duplicates_by_node_name_type_hash(dataset) == []
 
 
 def test_duplicate_hash_reports_progress():
@@ -216,6 +216,36 @@ def test_tfidf_duplicate_modes_and_graph_similarity():
     assert [(pair.left_id, pair.right_id) for pair in graph_similarity_pairs(dataset, threshold=0.99)] == [
         ("first", "second")
     ]
+
+
+def test_tfidf_names_types_bag_includes_edge_types():
+    parser = ArchimateJsonParser()
+    first = parser.parse(
+        {
+            "elements": [
+                {"id": "a", "name": "Order", "type": "BusinessObject"},
+                {"id": "b", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [{"id": "r1", "sourceId": "b", "targetId": "a", "type": "Association"}],
+        },
+        model_id="first",
+    )
+    second = parser.parse(
+        {
+            "elements": [
+                {"id": "x", "name": "Order", "type": "BusinessObject"},
+                {"id": "y", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [{"id": "r2", "sourceId": "y", "targetId": "x", "type": "Flow"}],
+        },
+        model_id="second",
+    )
+    dataset = Dataset([first, second], "archimate")
+
+    assert [(pair.left_id, pair.right_id) for pair in tfidf_duplicate_by_names(dataset, threshold=0.99)] == [
+        ("first", "second")
+    ]
+    assert tfidf_duplicate_by_names_and_types(dataset, threshold=0.99) == []
 
 
 def test_pairwise_duplicate_algorithms_report_progress():

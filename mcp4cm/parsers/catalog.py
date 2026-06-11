@@ -22,7 +22,6 @@ from mcp4cm.parsers.ir import IR
 from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
 from mcp4cm.parsers.uml_xmi.parser import ParseOptions as UMLParseOptions
 from mcp4cm.parsers.uml_xmi.parser import UMLXMIParser
-from mcp4cm.xmi_names import extract_xmi_names
 
 
 @dataclass(frozen=True)
@@ -172,10 +171,6 @@ class IRParserAdapter(ParserAdapterBase):
             "parserLanguage": ir.language,
             **dict(ir.data or {}),
         }
-        if self.metadata_language == "uml" and self.format_name in {"xmi", "xml-pyecore"}:
-            extracted_names = extract_xmi_names(path)
-            metadata["extracted_names"] = list(extracted_names.names)
-            metadata["extracted_typed_names"] = list(extracted_names.typed_names)
         record_name = None
         if isinstance(ir.data, dict):
             extracted_name = str(ir.data.get("name") or "").strip()

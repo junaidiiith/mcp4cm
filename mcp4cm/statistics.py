@@ -47,9 +47,6 @@ def model_statistics(record: ModelRecord) -> dict[str, Any]:
 
 
 def node_names(record: ModelRecord) -> list[str]:
-    extracted_names = record.metadata.get("extracted_names") if isinstance(record.metadata, dict) else None
-    if isinstance(extracted_names, list):
-        return [str(name) for name in extracted_names if str(name).strip()]
     return [str(attrs.get("name")) for _, attrs in record.graph.nodes(data=True) if attrs.get("name")]
 
 
@@ -83,18 +80,14 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
 
 
 def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
-    typed_names = record.metadata.get("extracted_typed_names") if isinstance(record.metadata, dict) else None
-    if isinstance(typed_names, list):
-        pairs = [split_typed_name(str(value)) for value in typed_names]
-    else:
-        pairs = [
-            (
-                normalize_identifier(attrs.get("type") or attrs.get("eClass") or "unknown"),
-                normalize_identifier(attrs.get("name")),
-            )
-            for _, attrs in record.graph.nodes(data=True)
-            if "name" in attrs
-        ]
+    pairs = [
+        (
+            normalize_identifier(attrs.get("type") or attrs.get("eClass") or "unknown"),
+            normalize_identifier(attrs.get("name")),
+        )
+        for _, attrs in record.graph.nodes(data=True)
+        if "name" in attrs
+    ]
     return [
         {
             "type": element_type or "unknown",
@@ -105,11 +98,6 @@ def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
         }
         for element_type, name in pairs
     ]
-
-
-def split_typed_name(value: str) -> tuple[str, str]:
-    element_type, separator, name = value.partition(":")
-    return (element_type.strip() or "unknown", name.strip() if separator else element_type.strip())
 
 
 def is_type_placeholder_name(element_type: str, name: str) -> bool:

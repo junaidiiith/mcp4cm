@@ -567,10 +567,6 @@ def hashable_name_tokens(
     include_types: bool,
     deduplicate_name_tokens: bool = False,
 ) -> list[str]:
-    extracted_tokens = _extracted_name_tokens(record, include_types=include_types)
-    if extracted_tokens is not None:
-        return sorted(set(extracted_tokens)) if deduplicate_name_tokens else extracted_tokens
-
     tokens: list[str] = []
     for _, attrs in record.graph.nodes(data=True):
         name = normalize(attrs.get("name"))
@@ -589,10 +585,6 @@ def hashable_name_tokens(
 
 
 def record_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[str]:
-    extracted_tokens = _extracted_tfidf_tokens(record, token_mode=token_mode)
-    if extracted_tokens is not None:
-        return extracted_tokens
-
     if token_mode == "names":
         return node_names(record)
 
@@ -603,6 +595,7 @@ def record_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[st
             tokens.append(name)
             if node_type:
                 tokens.append(node_type)
+        tokens.extend(edge_types(record))
         return tokens
 
     if token_mode == "typed_name_pairs":
@@ -623,29 +616,7 @@ def node_name_type_pairs(record: ModelRecord) -> list[tuple[str, str]]:
     return pairs
 
 
-def _extracted_name_tokens(record: ModelRecord, *, include_types: bool) -> list[str] | None:
-    key = "extracted_typed_names" if include_types else "extracted_names"
-    values = record.metadata.get(key) if isinstance(record.metadata, dict) else None
-    if not isinstance(values, list):
-        return None
-    return [str(value) for value in values if str(value).strip()]
-
-
-def _extracted_tfidf_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[str] | None:
-    names = _extracted_name_tokens(record, include_types=False)
-    typed_names = _extracted_name_tokens(record, include_types=True)
-    if names is None or typed_names is None:
-        return None
-    if token_mode == "names":
-        return names
-    if token_mode in {"names_types_bag", "typed_name_pairs"}:
-        return typed_names
-    raise ValueError(f"Unsupported TF-IDF token mode: {token_mode}")
-
-
 def hash_name_tokens(record: ModelRecord, tokens: Iterable[str], *, include_types: bool) -> str:
-    if _extracted_name_tokens(record, include_types=include_types) is not None:
-        return hash_tokens_in_order(tokens)
     return hash_tokens(tokens)
 
 
