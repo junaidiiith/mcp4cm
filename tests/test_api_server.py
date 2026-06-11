@@ -1054,8 +1054,6 @@ def test_flask_duplicate_pairs_counts_candidate_pairs_not_only_vote_approved_pai
     assert data["candidatePairs"] == 1
     assert data["approvedPairs"] == 0
     assert data["totalDecisions"] == 1
-    assert data["returnedDecisions"] == 1
-    assert data["truncated"] is False
     assert data["decisions"][0]["isDuplicate"] is False
 
 

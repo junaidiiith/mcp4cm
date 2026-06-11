@@ -10,8 +10,10 @@ import type { ModelInspectPayload } from "@/types";
 
 Cytoscape.use(coseBilkent);
 
-type GraphLayoutName = "cose" | "cose-bilkent";
+type GraphLayoutName = "cose" | "cose-bilkent" | "grid";
 type CompareState = "shared" | "left-only" | "right-only";
+
+const LARGE_GRAPH_NODE_THRESHOLD = 1000;
 
 export interface GraphCompareAnnotations {
   nodeStates?: Record<string, CompareState>;
@@ -110,6 +112,8 @@ export default function ModelGraphPreview({
   const [showLabels, setShowLabels] = useState(false);
   const [nodeQuery, setNodeQuery] = useState("");
   const [edgeQuery, setEdgeQuery] = useState("");
+  const isLargeGraph = payload.model.nodeCount >= LARGE_GRAPH_NODE_THRESHOLD;
+  const effectiveLayoutName: GraphLayoutName = isLargeGraph ? "grid" : layoutName;
 
   const degreeByNode = useMemo(() => {
     const degrees = new Map<string, number>();
@@ -204,12 +208,12 @@ export default function ModelGraphPreview({
 
   const layout = useMemo<cytoscape.LayoutOptions>(
     () => ({
-      name: layoutName,
+      name: effectiveLayoutName,
       fit: true,
       animate: false,
       padding: mode === "compare" ? 16 : 24,
     }),
-    [layoutName, mode],
+    [effectiveLayoutName, mode],
   );
 
   const stylesheet = useMemo<cytoscape.StylesheetJsonBlock[]>(
@@ -313,6 +317,7 @@ export default function ModelGraphPreview({
 
   useEffect(() => {
     setSelectedElement(null);
+    setLayoutName("cose");
     setNodeQuery("");
     setEdgeQuery("");
   }, [payload.model.id]);
@@ -395,11 +400,21 @@ export default function ModelGraphPreview({
       <div className="graphToolbar">
         <label>
           Layout
-          <select value={layoutName} onChange={(event) => setLayoutName(event.target.value as GraphLayoutName)}>
+          <select
+            value={effectiveLayoutName}
+            disabled={isLargeGraph}
+            onChange={(event) => setLayoutName(event.target.value as GraphLayoutName)}
+          >
             <option value="cose">cose</option>
             <option value="cose-bilkent">cose-bilkent</option>
+            <option value="grid">grid</option>
           </select>
         </label>
+        {isLargeGraph && (
+          <span className="graphToolbarHint">
+            Grid layout is used automatically for graphs with {LARGE_GRAPH_NODE_THRESHOLD}+ nodes.
+          </span>
+        )}
         <label>
           Labels
           <select value={showLabels ? "all" : "off"} onChange={(event) => setShowLabels(event.target.value === "all")}>

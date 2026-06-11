@@ -92,7 +92,6 @@ export const defaultThresholds: Thresholds = {
   ngramRangeMin: 1,
   ngramRangeMax: 1,
   stopwordsMode: "none",
-  resultLimit: 500,
   graphSimilarity: 0.85,
   graphWeights: {
     nodeNameJaccard: 0.25,

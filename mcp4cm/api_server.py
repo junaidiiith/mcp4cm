@@ -315,6 +315,7 @@ def read_upload_request() -> dict[str, Any]:
             "includeOperations": request.form.get("includeOperations", "true"),
             "includeParameters": request.form.get("includeParameters", "true"),
             "includeModelRootNode": request.form.get("includeModelRootNode", "true"),
+            "resolveExternalRefs": request.form.get("resolveExternalRefs", "true"),
             "files": request.files.getlist("files"),
         }
     return read_json_body()
@@ -1104,9 +1105,6 @@ def duplicate_result_response_preview(result: dict[str, Any]) -> dict[str, Any]:
     pairs_page = build_duplicate_pairs_page(result, page=1, page_size=50, decision="all", query="", group_id="")
     groups_page = build_duplicate_groups_page(result, page=1, page_size=25, query="")
     preview["decisions"] = pairs_page["pairs"]
-    preview["returnedDecisions"] = len(pairs_page["pairs"])
-    preview["truncated"] = pairs_page["total"] > len(pairs_page["pairs"])
-    preview["truncationLimit"] = pairs_page["pageSize"]
     preview["pairsPage"] = pairs_page
     preview["groupsPage"] = groups_page
     preview["groups"] = groups_page["groups"]
@@ -1693,8 +1691,6 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     decisions.sort(key=lambda item: (item["isDuplicate"], item["voteCount"]), reverse=True)
     approved_pairs = sum(1 for decision in decisions if decision["isDuplicate"])
     total_decisions = len(decisions)
-    returned_decisions = total_decisions
-    truncated = False
     model_summaries = model_summary_lookup(projected_dataset)
     groups, pair_group_lookup = build_duplicate_groups(decisions, model_summaries)
     for decision in decisions:
@@ -1747,9 +1743,6 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "largestGroupSize": largest_group_size,
         "groupSummary": group_summary,
         "totalDecisions": total_decisions,
-        "returnedDecisions": returned_decisions,
-        "truncated": truncated,
-        "truncationLimit": None,
         "decisions": decisions,
         "groups": groups,
         "pairGroupLookup": pair_group_lookup,

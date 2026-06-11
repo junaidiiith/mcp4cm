@@ -251,11 +251,14 @@ class EcoreFileAdapter(IRParserAdapter):
     metadata_language = "ecore"
     format_name = "ecore"
 
-    def create_parser(self, options: ParserOptions):
-        _ = options
+    def __init__(self):
         from mcp4cm.parsers.ecore_ecore.parser import EcoreParser as EcoreFileParser
 
-        return EcoreFileParser()
+        self.parser = EcoreFileParser()
+
+    def create_parser(self, options: ParserOptions):
+        self.parser.set_enable_scoped_uri_mappings(bool(options.get("resolve_external_refs", True)))
+        return self.parser
 
 
 class BPMNSignavioAdapter(IRParserAdapter):
@@ -401,6 +404,9 @@ register_descriptor(
         parser_id="ecore-ecore",
         extensions=(".ecore",),
         adapter_factory=EcoreFileAdapter,
+        option_specs=(
+            OptionSpec("resolveExternalRefs", "resolve_external_refs", True, bool_option),
+        ),
     )
 )
 register_descriptor(

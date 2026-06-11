@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import type {
   BusyState,
+  EcoreParseOptions,
   FormatOption,
   Language,
   RepresentationProfile,
@@ -25,6 +26,8 @@ export function UploadPanel({
   selectedFormat,
   representationEnabled,
   representation,
+  ecoreOptions,
+  ecoreOptionsEnabled,
   busy,
   datasetId,
   uploadParseJob,
@@ -34,6 +37,7 @@ export function UploadPanel({
   onFormatChange,
   onFilesChange,
   onRepresentationChange,
+  onEcoreOptionsChange,
   onParse,
 }: {
   language: Language;
@@ -44,6 +48,8 @@ export function UploadPanel({
   selectedFormat: FormatOption;
   representationEnabled: boolean;
   representation: RepresentationProfile;
+  ecoreOptions: EcoreParseOptions;
+  ecoreOptionsEnabled: boolean;
   busy: BusyState;
   datasetId: string;
   uploadParseJob: UploadParseJob | null;
@@ -53,6 +59,7 @@ export function UploadPanel({
   onFormatChange: (format: UploadFormat) => void;
   onFilesChange: (files: File[]) => void;
   onRepresentationChange: (patch: Partial<RepresentationProfile>) => void;
+  onEcoreOptionsChange: (patch: Partial<EcoreParseOptions>) => void;
   onParse: () => void;
 }) {
   const directoryInputAttributes: DirectoryInputAttributes = directoryMode
@@ -141,6 +148,21 @@ export function UploadPanel({
                     onChange={(event) => onRepresentationChange({ includeModelRootNode: event.target.checked })}
                   />
                   Create model root node
+                </label>
+              </div>
+            </div>
+          )}
+          {ecoreOptionsEnabled && (
+            <div className="stepCard">
+              <h3>Parse Options</h3>
+              <div className="representationChecks">
+                <label className="inlineCheck">
+                  <input
+                    type="checkbox"
+                    checked={ecoreOptions.resolveExternalRefs}
+                    onChange={(event) => onEcoreOptionsChange({ resolveExternalRefs: event.target.checked })}
+                  />
+                  Resolve external Ecore references
                 </label>
               </div>
             </div>

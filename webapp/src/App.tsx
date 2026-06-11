@@ -32,6 +32,7 @@ import type {
   DuplicateProgressState,
   DuplicateResult,
   DummyResponse,
+  EcoreParseOptions,
   FilterConfig,
   Language,
   ParsedModelSummary,
@@ -57,7 +58,7 @@ import {
 type UploadSessionPayload = {
   language: Language;
   format: UploadFormat;
-} & Partial<RepresentationProfile>;
+} & Partial<RepresentationProfile> & Partial<EcoreParseOptions>;
 
 interface UploadSessionResponse {
   uploadId: string;
@@ -94,6 +95,9 @@ export default function App() {
     includeParameters: true,
     includeModelRootNode: true,
   });
+  const [ecoreOptions, setEcoreOptions] = useState<EcoreParseOptions>({
+    resolveExternalRefs: false,
+  });
   const [dummyFilterConfigs, setDummyFilterConfigs] = useState(() => clonePreset("uml"));
   const [busy, setBusy] = useState<BusyState>("");
   const [error, setError] = useState("");
@@ -113,6 +117,7 @@ export default function App() {
   const selectedFormat = formatOptions.find((option) => option.value === format) || formatOptions[0];
   const directoryMode = selectedFormat.directoryPreferred;
   const representationEnabled = language === "uml" && format === "xmi";
+  const ecoreOptionsEnabled = language === "ecore" && format === "ecore";
   const warningsList = uploadSummary?.warningsList || [];
   const statsLoading =
     !stats &&
@@ -175,6 +180,9 @@ export default function App() {
       payload.includeOperations = representation.includeOperations;
       payload.includeParameters = representation.includeParameters;
       payload.includeModelRootNode = representation.includeModelRootNode;
+    }
+    if (ecoreOptionsEnabled) {
+      payload.resolveExternalRefs = ecoreOptions.resolveExternalRefs;
     }
     return payload;
   }
@@ -466,6 +474,8 @@ export default function App() {
               selectedFormat={selectedFormat}
               representationEnabled={representationEnabled}
               representation={representation}
+              ecoreOptions={ecoreOptions}
+              ecoreOptionsEnabled={ecoreOptionsEnabled}
               busy={busy}
               datasetId={datasetId}
               uploadParseJob={uploadParseJob}
@@ -480,6 +490,12 @@ export default function App() {
               }}
               onRepresentationChange={(patch) =>
                 setRepresentation((current) => ({
+                  ...current,
+                  ...patch,
+                }))
+              }
+              onEcoreOptionsChange={(patch) =>
+                setEcoreOptions((current) => ({
                   ...current,
                   ...patch,
                 }))

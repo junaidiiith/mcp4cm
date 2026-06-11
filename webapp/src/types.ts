@@ -28,7 +28,6 @@ export interface Thresholds {
   ngramRangeMin: number;
   ngramRangeMax: number;
   stopwordsMode: "none" | "english";
-  resultLimit: number;
   graphSimilarity: number;
   graphWeights: GraphWeights;
   useDirectedMetrics: boolean;
@@ -79,6 +78,10 @@ export interface RepresentationProfile {
   includeOperations: boolean;
   includeParameters: boolean;
   includeModelRootNode: boolean;
+}
+
+export interface EcoreParseOptions {
+  resolveExternalRefs: boolean;
 }
 
 export interface WarningEntry {
@@ -241,9 +244,6 @@ export interface DuplicateResult {
   largestGroupSize?: number;
   votedDuplicatePairs?: number;
   totalDecisions?: number;
-  returnedDecisions?: number;
-  truncated?: boolean;
-  truncationLimit?: number | null;
   elapsedMs: number;
   jobId?: string;
   datasetId?: string;

@@ -49,6 +49,16 @@ def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warn
     assert stats.elements_skipped == 2
 
 
+def test_ecore_parser_descriptor_accepts_external_resolution_option():
+    descriptor = resolve_parser("ecore", "ecore")
+
+    enabled = descriptor.normalize_options({"resolveExternalRefs": "true"})
+    disabled = descriptor.normalize_options({"resolveExternalRefs": "false"})
+
+    assert enabled.values["resolve_external_refs"] is True
+    assert disabled.values["resolve_external_refs"] is False
+
+
 def test_xmi_name_extraction_is_normalized_and_kept_in_memory(tmp_path):
     model_path = tmp_path / "names.xmi"
     model_path.write_text(
