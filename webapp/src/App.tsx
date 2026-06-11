@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Check, FileUp, Filter, GitCompare, Loader2, Network } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import {
@@ -17,6 +17,7 @@ import { clonePreset, defaultFormatForLanguage, defaultThresholds, formatOptions
 import {
   delay,
   errorMessage,
+  getDatasetStatus,
   getDatasetAfterDummyStatistics,
   getDatasetStatistics,
   pollDummyJob,
@@ -138,7 +139,23 @@ export default function App() {
 
   useEffect(() => {
     const savedDatasetId = window.localStorage.getItem(LAST_DATASET_ID_KEY);
-    if (savedDatasetId) setDatasetId(savedDatasetId);
+    if (!savedDatasetId) return;
+    let cancelled = false;
+    getDatasetStatus(savedDatasetId)
+      .then((status) => {
+        if (cancelled) return;
+        if (status.available && status.statisticsAvailable) {
+          setDatasetId(savedDatasetId);
+        } else {
+          window.localStorage.removeItem(LAST_DATASET_ID_KEY);
+        }
+      })
+      .catch(() => {
+        // Keep the saved dataset ID on transient backend failures.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -195,6 +212,7 @@ export default function App() {
     }
 
     setBusy("parse");
+    window.localStorage.removeItem(LAST_DATASET_ID_KEY);
     setDatasetId("");
     setStats(null);
     setUploadSummary(null);
@@ -355,6 +373,11 @@ export default function App() {
   function closeModelInspector() {
     setSelectedModel(null);
   }
+
+  const openGraphInspector = useCallback((modelId: string) => {
+    setPairInspectBoth(null);
+    setPairInspectModelId(modelId);
+  }, []);
 
   function toggleSelection(id: string) {
     setSelected((current) => {
@@ -518,6 +541,7 @@ export default function App() {
               afterData={afterDummyStats?.visualizations || null}
               beforeModelCount={stats?.summary.models || null}
               afterModelCount={afterDummyStats?.summary.models || null}
+              onInspectModel={openGraphInspector}
             />
 
             <DummyPanel
@@ -547,10 +571,7 @@ export default function App() {
               onThresholdsChange={setThresholds}
               onMinVotesChange={setMinVotes}
               onRun={runDuplicateDetection}
-              onInspectModel={(modelId) => {
-                setPairInspectBoth(null);
-                setPairInspectModelId(modelId);
-              }}
+              onInspectModel={openGraphInspector}
               onInspectBoth={(leftId, rightId) => {
                 setPairInspectModelId(null);
                 setPairInspectBoth({ leftId, rightId });

@@ -3,8 +3,11 @@ import json
 import shutil
 import time
 
+import networkx as nx
+
 from mcp4cm import api_server
 from mcp4cm.api_server import DATASETS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS, create_app
+from mcp4cm.core import ModelRecord
 from mcp4cm.statistics import CorpusStatisticsAccumulator
 
 
@@ -38,6 +41,32 @@ def test_corpus_statistics_accumulator_builds_without_graph_reload():
     assert payload["summary"]["models"] == 1200
     assert payload["visualizations"]["topicModel"]["available"] is False
     assert len(payload["visualizations"]["modelVocabularyScatter"]) == 1200
+
+
+def test_corpus_statistics_accumulator_builds_quality_visualizations():
+    graph = nx.DiGraph()
+    graph.add_node("semantic", type="Task", name="Approve invoice")
+    graph.add_node("missing", type="Task", name="")
+    graph.add_node("type_like", type="Class", name="Class1")
+    graph.add_node("placeholder", type="Package", name="todo")
+    graph.add_node("repeated_a", type="Task", name="Review")
+    graph.add_node("repeated_b", type="Task", name="Review")
+
+    accumulator = CorpusStatisticsAccumulator()
+    accumulator.add(ModelRecord(model_id="m1", language="bpmn", graph=graph))
+    visualizations = accumulator.build_payload()["visualizations"]
+
+    classification_counts = {item["key"]: item["count"] for item in visualizations["nameClassificationOverview"]}
+    assert classification_counts == {"semantic": 3, "missing": 1, "placeholder": 1, "type_like": 1}
+    assert visualizations["missingNameRatioSummary"]["above30"] == 0
+    assert visualizations["semanticNameCountHistogram"][1]["count"] == 1
+    assert visualizations["elementTypeQualityMatrix"][0]["total"] == 4
+    task_row = next(row for row in visualizations["elementTypeQualityMatrix"] if row["type"] == "task")
+    assert task_row["total"] == 4
+    assert task_row["missing"] == 1
+    assert visualizations["modelQualityWatchlists"]["fewSemanticNames"][0]["id"] == "m1"
+    assert visualizations["modelQualityWatchlists"]["highMissingRatio"][0]["id"] == "m1"
+    assert visualizations["modelQualityWatchlists"]["highNameDominance"][0]["dominantName"] == "review"
 
 
 def test_upload_parse_uses_accumulator_for_statistics():

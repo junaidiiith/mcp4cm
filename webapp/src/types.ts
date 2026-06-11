@@ -160,7 +160,12 @@ export interface HistogramBin {
 
 export interface VisualizationPayload {
   missingNameRatioHistogram: HistogramBin[];
-  missingNamesByType: StatisticItem[];
+  missingNameRatioBands: HistogramBin[];
+  missingNameRatioSummary: RatioSummary;
+  nameClassificationOverview: Array<StatisticItem & { key: string }>;
+  elementTypeQualityMatrix: TypeQualityRow[];
+  semanticNameCountHistogram: StatisticItem[];
+  modelQualityWatchlists: ModelQualityWatchlists;
   topConcepts: StatisticItem[];
   topConceptDocumentFrequency: StatisticItem[];
   topConceptsWithoutTypePlaceholders: StatisticItem[];
@@ -190,6 +195,39 @@ export interface VisualizationPayload {
   fewNamesHistogram: HistogramBin[];
   topNamesPerModel: StatisticItem[];
   languageDistribution: StatisticItem[];
+}
+
+export interface RatioSummary {
+  models: number;
+  zero: number;
+  median: number;
+  p90: number;
+  above30: number;
+  above70: number;
+}
+
+export interface TypeQualityRow {
+  type: string;
+  total: number;
+  semantic: number;
+  missing: number;
+  placeholder: number;
+  typeLike: number;
+}
+
+export interface ModelQualityWatchlists {
+  fewSemanticNames: ModelQualityRow[];
+  highMissingRatio: ModelQualityRow[];
+  highNameDominance: ModelQualityRow[];
+}
+
+export interface ModelQualityRow {
+  id: string;
+  nameSlots: number;
+  semanticNames: number;
+  missingRatio: number;
+  dominantName: string;
+  dominantNameRatio: number;
 }
 
 export interface ModelInspectPayload {

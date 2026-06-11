@@ -1,4 +1,4 @@
-import { Expand, Grid2X2, ListTree, Network, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Expand, Grid2X2, Info, ListTree, Network, Plus } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -14,11 +14,13 @@ export function VisualizationPanel({
   afterData,
   beforeModelCount,
   afterModelCount,
+  onInspectModel,
 }: {
   beforeData: VisualizationPayload | null;
   afterData: VisualizationPayload | null;
   beforeModelCount: number | null;
   afterModelCount: number | null;
+  onInspectModel: (modelId: string) => void;
 }) {
   const [activeCategory, setActiveCategory] = useState<VisualizationCategoryId>("quality");
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
@@ -26,7 +28,8 @@ export function VisualizationPanel({
   const [expandedChartId, setExpandedChartId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<VisualizationSnapshot>("before");
   const data = snapshot === "after" && afterData ? afterData : beforeData;
-  const categories = useMemo(() => data ? visualizationCategories(data) : [], [data]);
+  const afterDataAvailable = Boolean(afterData);
+  const categories = useMemo(() => data ? visualizationCategories(data, onInspectModel) : [], [data, onInspectModel]);
   const activeCharts = categories.find((category) => category.id === activeCategory)?.charts || categories[0]?.charts || [];
   const selectedChart = activeCharts.find((chart) => chart.id === selectedChartId) || activeCharts[0] || null;
   const expandedChart = categories.flatMap((category) => category.charts).find((chart) => chart.id === expandedChartId) || null;
@@ -36,6 +39,24 @@ export function VisualizationPanel({
   useEffect(() => {
     if (snapshot === "after" && !afterData) setSnapshot("before");
   }, [afterData, snapshot]);
+
+  useEffect(() => {
+    if (!categories.length) {
+      if (selectedChartId) setSelectedChartId(null);
+      return;
+    }
+
+    const category = categories.find((item) => item.id === activeCategory);
+    if (!category) {
+      setActiveCategory(categories[0].id);
+      setSelectedChartId(categories[0].charts[0]?.id || null);
+      return;
+    }
+
+    if (!selectedChartId || !category.charts.some((chart) => chart.id === selectedChartId)) {
+      setSelectedChartId(category.charts[0]?.id || null);
+    }
+  }, [activeCategory, categories, selectedChartId]);
 
   return (
     <Card className="panel" id="visualizations">
@@ -61,7 +82,11 @@ export function VisualizationPanel({
                   ))}
                 </TabsList>
                 <div className="visualizationToolbarActions">
-                  <div className="visualizationSnapshotControl" aria-label="Visualization dataset snapshot">
+                  <div
+                    className="visualizationSnapshotControl"
+                    aria-label="Visualization dataset snapshot"
+                    key={afterDataAvailable ? "after-available" : "after-unavailable"}
+                  >
                     <button
                       className={snapshot === "before" ? "active" : ""}
                       type="button"
@@ -72,8 +97,8 @@ export function VisualizationPanel({
                     <button
                       className={snapshot === "after" ? "active" : ""}
                       type="button"
-                      disabled={!afterData}
-                      title={afterData ? "After cleansing" : "Run dummy filters to enable after-cleansing visualizations."}
+                      disabled={!afterDataAvailable}
+                      title={afterDataAvailable ? "After cleansing" : "Run dummy filters to enable after-cleansing visualizations."}
                       onClick={() => setSnapshot("after")}
                     >
                       After
@@ -154,7 +179,10 @@ interface VisualizationCategory {
   charts: VisualizationChartDefinition[];
 }
 
-function visualizationCategories(data: VisualizationPayload): VisualizationCategory[] {
+function visualizationCategories(
+  data: VisualizationPayload,
+  onInspectModel: (modelId: string) => void,
+): VisualizationCategory[] {
   return [
     {
       id: "quality",
@@ -163,14 +191,32 @@ function visualizationCategories(data: VisualizationPayload): VisualizationCateg
         {
           id: "missing-name-ratio",
           title: "Distribution of Missing-Name Ratio per Model",
-          description: "Share of name slots recorded as empty name.",
-          render: () => <Histogram bins={data.missingNameRatioHistogram} ratioAxis />,
+          description: "Share of parsed name slots recorded as empty.",
+          render: () => <RatioQualityChart bins={data.missingNameRatioBands || data.missingNameRatioHistogram} summary={data.missingNameRatioSummary} />,
         },
         {
-          id: "missing-names-by-type",
-          title: "Missing Names by Element Type",
-          description: "Number of missing names grouped by normalized element type.",
-          render: () => <LimitedHorizontalBars items={data.missingNamesByType} ariaLabel="Missing names by element type count" />,
+          id: "name-classification-overview",
+          title: "Name Classification Overview",
+          description: "All parsed name slots grouped by their classifications.",
+          render: () => <NameClassificationOverview items={data.nameClassificationOverview || []} />,
+        },
+        {
+          id: "name-classification-by-type",
+          title: "Name Classification by Type",
+          description: "Semantic, missing, placeholder, and type-like names by element type.",
+          render: () => <TypeQualityTable rows={data.elementTypeQualityMatrix || []} />,
+        },
+        {
+          id: "semantic-name-count-distribution",
+          title: "Semantic Name Count Distribution",
+          description: "Model counts grouped by semantic name counts.",
+          render: () => <LabeledHistogram items={data.semanticNameCountHistogram || []} />,
+        },
+        {
+          id: "at-risk-models",
+          title: "Models at Risk",
+          description: "Models at risk for low semantic naming, high missingness, and repeated names.",
+          render: () => <ModelQualityWatchlists watchlists={data.modelQualityWatchlists} onInspectModel={onInspectModel} />,
         },
       ],
     },
@@ -346,6 +392,284 @@ function LimitedHorizontalBars({ items, ariaLabel }: { items: StatisticItem[]; a
   );
 }
 
+const qualitySegments = [
+  { key: "semantic", label: "Semantic", className: "semantic" },
+  { key: "missing", label: "Missing", className: "missing" },
+  { key: "placeholder", label: "Placeholder", className: "placeholder" },
+  { key: "typeLike", label: "Type-like", className: "typeLike" },
+] as const;
+
+function NameClassificationOverview({ items }: { items: Array<StatisticItem & { key?: string }> }) {
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  const segmentItems = qualitySegments.map((segment) => {
+    const item = items.find((entry) => entry.key === segment.key || entry.label.toLowerCase() === segment.label.toLowerCase());
+    return { ...segment, count: item?.count || 0 };
+  });
+  if (!total) return <EmptyChart />;
+  return (
+    <div className="qualityOverview">
+      <StackedMeter
+        segments={segmentItems.map((item) => ({
+          label: item.label,
+          value: item.count,
+          className: item.className,
+        }))}
+      />
+      <div className="qualityStatGrid">
+        {segmentItems.map((item) => (
+          <div className="qualityStat" key={item.key}>
+            <span>{item.label}</span>
+            <strong>{item.count.toLocaleString()}</strong>
+            <small>{percentage(item.count / total)}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type TypeQualityCountKey = "semantic" | "missing" | "placeholder" | "typeLike";
+type TypeQualitySortKey =
+  | "type"
+  | "total"
+  | TypeQualityCountKey
+  | `${TypeQualityCountKey}Rate`;
+type SortDirection = "asc" | "desc";
+
+const typeQualityColumns: Array<{ key: TypeQualitySortKey; label: string }> = [
+  { key: "type", label: "Element Type" },
+  { key: "total", label: "Total Slots" },
+  { key: "semantic", label: "Semantic Count" },
+  { key: "semanticRate", label: "Semantic %" },
+  { key: "missing", label: "Missing Count" },
+  { key: "missingRate", label: "Missing %" },
+  { key: "placeholder", label: "Placeholder Count" },
+  { key: "placeholderRate", label: "Placeholder %" },
+  { key: "typeLike", label: "Type-like Count" },
+  { key: "typeLikeRate", label: "Type-like %" },
+];
+
+function TypeQualityTable({ rows }: { rows: VisualizationPayload["elementTypeQualityMatrix"] }) {
+  const [sortKey, setSortKey] = useState<TypeQualitySortKey>("semantic");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const sortedRows = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    return [...rows].sort((left, right) => {
+      if (sortKey === "type") return left.type.localeCompare(right.type) * direction;
+      const diff = typeQualitySortValue(left, sortKey) - typeQualitySortValue(right, sortKey);
+      if (diff !== 0) return diff * direction;
+      return left.type.localeCompare(right.type);
+    });
+  }, [rows, sortDirection, sortKey]);
+  const onSort = (key: TypeQualitySortKey) => {
+    if (key === sortKey) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection(key === "type" ? "asc" : "desc");
+    }
+  };
+  if (!rows.length) return <EmptyChart />;
+  return (
+    <div className="typeQualityTableFrame">
+      <table className="typeQualityTable">
+        <thead>
+          <tr>
+            {typeQualityColumns.map((column) => (
+              <th key={column.key} aria-sort={sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                <button
+                  className={sortKey === column.key ? "active" : ""}
+                  type="button"
+                  onClick={() => onSort(column.key)}
+                >
+                  {column.label}
+                  {sortKey === column.key
+                    ? sortDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    : <ArrowUpDown size={12} />}
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sortedRows.map((row) => (
+            <tr key={row.type}>
+              <td title={row.type}><strong>{row.type}</strong></td>
+              <td>{row.total.toLocaleString()}</td>
+              <td>{row.semantic.toLocaleString()}</td>
+              <QualityRateCell value={row.semantic} total={row.total} kind="semantic" />
+              <td>{row.missing.toLocaleString()}</td>
+              <QualityRateCell value={row.missing} total={row.total} kind="missing" />
+              <td>{row.placeholder.toLocaleString()}</td>
+              <QualityRateCell value={row.placeholder} total={row.total} kind="placeholder" />
+              <td>{row.typeLike.toLocaleString()}</td>
+              <QualityRateCell value={row.typeLike} total={row.total} kind="typeLike" />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function typeQualitySortValue(row: VisualizationPayload["elementTypeQualityMatrix"][number], key: TypeQualitySortKey) {
+  if (key === "total") return row.total;
+  if (key === "type") return 0;
+  if (key === "semanticRate") return row.semantic / Math.max(row.total, 1);
+  if (key === "missingRate") return row.missing / Math.max(row.total, 1);
+  if (key === "placeholderRate") return row.placeholder / Math.max(row.total, 1);
+  if (key === "typeLikeRate") return row.typeLike / Math.max(row.total, 1);
+  return row[key];
+}
+
+function QualityRateCell({
+  value,
+  total,
+  kind,
+}: {
+  value: number;
+  total: number;
+  kind: "semantic" | "missing" | "placeholder" | "typeLike";
+}) {
+  const rate = value / Math.max(total, 1);
+  return (
+    <td>
+      <div className="qualityRateCell">
+        <span>{percentage(rate)}</span>
+        <i><b className={`qualitySegment ${kind}`} style={{ width: `${value / Math.max(total, 1) * 100}%` }} /></i>
+      </div>
+    </td>
+  );
+}
+
+function StackedMeter({ segments }: { segments: Array<{ label: string; value: number; className: string }> }) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (!total) return <div className="stackedMeter empty" />;
+  return (
+    <div className="stackedMeter">
+      {segments.filter((segment) => segment.value > 0).map((segment) => (
+        <span
+          className={`qualitySegment ${segment.className}`}
+          key={segment.label}
+          style={{ width: `${segment.value / total * 100}%` }}
+          title={`${segment.label}: ${segment.value.toLocaleString()} (${percentage(segment.value / total)})`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function RatioQualityChart({
+  bins,
+  summary,
+  label = "Missing-name ratio",
+}: {
+  bins: HistogramBin[];
+  summary?: VisualizationPayload["missingNameRatioSummary"];
+  label?: string;
+}) {
+  return (
+    <div className="ratioQualityChart">
+      {summary && (
+        <div className="qualityStatGrid compact">
+          <SummaryStat label="0%" value={summary.zero} suffix="models" />
+          <SummaryStat label="Median" value={percentage(summary.median)} />
+          <SummaryStat label="P90" value={percentage(summary.p90)} />
+          <SummaryStat label=">= 70%" value={summary.above70} suffix="models" />
+        </div>
+      )}
+      <RatioHistogram bins={bins} label={label} />
+    </div>
+  );
+}
+
+function SummaryStat({ label, value, suffix }: { label: string; value: string | number; suffix?: string }) {
+  return <div className="qualityStat"><span>{label}</span><strong>{typeof value === "number" ? value.toLocaleString() : value}</strong>{suffix && <small>{suffix}</small>}</div>;
+}
+
+function LabeledHistogram({ items }: { items: StatisticItem[] }) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  if (!items.length) return <EmptyChart />;
+  return (
+    <div className="labeledHistogram">
+      {items.map((item) => (
+        <div className="labeledHistogramBar" key={item.label}>
+          <span>{item.label}</span>
+          <i title={`${item.label}: ${item.count.toLocaleString()} model(s)`}><b style={{ width: `${item.count / max * 100}%` }} /></i>
+          <strong>{item.count.toLocaleString()}</strong>
+          <small>{percentage(item.count / Math.max(total, 1))}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ModelQualityWatchlists({
+  watchlists,
+  onInspectModel,
+}: {
+  watchlists?: VisualizationPayload["modelQualityWatchlists"];
+  onInspectModel: (modelId: string) => void;
+}) {
+  if (!watchlists) return <EmptyChart />;
+  return (
+    <div className="modelWatchlists">
+      <ModelWatchlist
+        title="Few Semantic Names"
+        rows={watchlists.fewSemanticNames}
+        metric={(row) => `${row.semanticNames}/${row.nameSlots} semantic`}
+        onInspectModel={onInspectModel}
+      />
+      <ModelWatchlist
+        title="Highest Missing Ratio"
+        rows={watchlists.highMissingRatio}
+        metric={(row) => `${percentage(row.missingRatio)} missing`}
+        onInspectModel={onInspectModel}
+      />
+      <ModelWatchlist
+        title="Highest Name Repetition"
+        rows={watchlists.highNameDominance}
+        metric={(row) => row.dominantName ? `${percentage(row.dominantNameRatio)} "${row.dominantName}"` : "No dominant name"}
+        onInspectModel={onInspectModel}
+      />
+    </div>
+  );
+}
+
+function ModelWatchlist({
+  title,
+  rows,
+  metric,
+  onInspectModel,
+}: {
+  title: string;
+  rows: VisualizationPayload["modelQualityWatchlists"]["fewSemanticNames"];
+  metric: (row: VisualizationPayload["modelQualityWatchlists"]["fewSemanticNames"][number]) => string;
+  onInspectModel: (modelId: string) => void;
+}) {
+  return (
+    <section className="modelWatchlist">
+      <h5>{title}</h5>
+      {!rows.length ? <p className="visualizationNote">No matching models.</p> : rows.map((row) => (
+        <div className="modelWatchlistRow" key={`${title}:${row.id}`}>
+          <strong title={row.id}>{row.id}</strong>
+          <span>{metric(row)}</span>
+          <button
+            type="button"
+            className="tableInfoButton modelWatchlistInspectButton"
+            aria-label={`Inspect ${row.id}`}
+            title={`Inspect ${row.id}`}
+            onClick={() => onInspectModel(row.id)}
+          >
+            <Info size={15} />
+          </button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function Histogram({ bins, useDisplayCount = false, ratioAxis = false }: { bins: HistogramBin[]; useDisplayCount?: boolean; ratioAxis?: boolean }) {
   const max = Math.max(...bins.map((bin) => useDisplayCount ? bin.displayCount : bin.count), 1);
   if (!bins.length) return <EmptyChart />;
@@ -358,17 +682,15 @@ function Histogram({ bins, useDisplayCount = false, ratioAxis = false }: { bins:
   </div>;
 }
 
-function RatioHistogram({ bins }: { bins: HistogramBin[] }) {
+function RatioHistogram({ bins, label = "Missing-name ratio" }: { bins: HistogramBin[]; label?: string }) {
+  if (!bins.length) return <EmptyChart />;
   const width = 760, height = 280;
   const margin = { top: 24, right: 12, bottom: 52, left: 58 };
   const plotWidth = width - margin.left - margin.right, plotHeight = height - margin.top - margin.bottom;
   const max = Math.max(...bins.map((bin) => bin.count), 1);
   const barWidth = plotWidth / bins.length;
-  const populatedBins = bins.filter((bin) => bin.count > 0);
   const yTicks = Array.from(new Set(Array.from({ length: 5 }, (_, index) => Math.round(max * index / 4))));
   const xTickIndexes = Array.from(new Set(Array.from({ length: 7 }, (_, index) => Math.round(bins.length * index / 6))));
-  const percentage = (value: number) => `${round(value * 100)}%`;
-  const binWidth = bins.length ? bins[0].end - bins[0].start : 0;
   return <div className="ratioHistogram">
     <svg className="ratioHistogramPlot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Missing-name ratio distribution with model counts by ratio range">
       {yTicks.map((tick) => {
@@ -391,11 +713,14 @@ function RatioHistogram({ bins }: { bins: HistogramBin[] }) {
         const x = margin.left + index * barWidth;
         return <g key={`x:${index}`}><line className="histogramTickLine" x1={x} x2={x} y1={margin.top + plotHeight} y2={margin.top + plotHeight + 5} /><text className="histogramTick" x={x} y={height - 28} textAnchor="middle">{percentage(value)}</text></g>;
       })}
-      <text className="histogramAxisLabel" x={margin.left + plotWidth / 2} y={height - 4} textAnchor="middle">Missing-name ratio</text>
+      <text className="histogramAxisLabel" x={margin.left + plotWidth / 2} y={height - 4} textAnchor="middle">{label}</text>
       <text className="histogramAxisLabel" transform={`translate(14 ${margin.top + plotHeight / 2}) rotate(-90)`} textAnchor="middle">Number of models</text>
     </svg>
-    <p className="histogramSummary">Each bar spans {percentage(binWidth)}. {populatedBins.length} populated ratio range(s); highest range contains {max} model(s).</p>
   </div>;
+}
+
+function percentage(value: number) {
+  return `${round(value * 100)}%`;
 }
 
 function Treemap({ items }: { items: StatisticItem[] }) {

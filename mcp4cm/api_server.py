@@ -125,6 +125,10 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
             )
         )
 
+    @app.route("/api/datasets/<dataset_id>/status", methods=["GET"])
+    def dataset_status_route(dataset_id: str):
+        return jsonify(get_dataset_status(dataset_id))
+
     @app.route("/api/datasets/<dataset_id>/statistics", methods=["GET"])
     def dataset_statistics_route(dataset_id: str):
         return jsonify(get_dataset_statistics(dataset_id))
@@ -1969,6 +1973,25 @@ def get_dataset_statistics(dataset_id: str) -> dict[str, Any]:
     if statistics is None:
         raise ValueError("Statistics are unavailable for this dataset.")
     return statistics
+
+
+def get_dataset_status(dataset_id: str) -> dict[str, Any]:
+    dataset_id = str(dataset_id or "")
+    meta = get_dataset_meta(dataset_id)
+    if meta is None:
+        return {
+            "datasetId": dataset_id,
+            "available": False,
+            "statisticsAvailable": False,
+            "recordCount": 0,
+        }
+    return {
+        "datasetId": dataset_id,
+        "available": True,
+        "statisticsAvailable": load_dataset_statistics(dataset_id) is not None,
+        "recordCount": int(meta.get("recordCount") or 0),
+        "datasetType": str(meta.get("datasetType") or "runtime"),
+    }
 
 
 def get_dataset_after_dummy_statistics(dataset_id: str) -> dict[str, Any]:

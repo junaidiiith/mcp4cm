@@ -253,6 +253,53 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
 
 
+def test_dataset_status_reports_runtime_availability_without_raising():
+    DATASETS.clear()
+    UPLOAD_SESSIONS.clear()
+    UPLOAD_PARSE_JOBS.clear()
+    DUPLICATE_JOBS.clear()
+    clear_runtime()
+
+    client = create_app().test_client()
+    missing = client.get("/api/datasets/missing/status")
+
+    assert missing.status_code == 200
+    assert missing.get_json() == {
+        "datasetId": "missing",
+        "available": False,
+        "statisticsAvailable": False,
+        "recordCount": 0,
+    }
+
+    _, _, job = upload_and_parse_via_job(
+        client,
+        language="archimate",
+        files=(
+            BytesIO(
+                json.dumps(
+                    {
+                        "archimateId": "status-model",
+                        "name": "Runtime status model",
+                        "elements": [{"id": "a", "name": "App", "type": "ApplicationComponent"}],
+                        "relationships": [],
+                    }
+                ).encode("utf-8")
+            ),
+            "model.json",
+        ),
+    )
+    dataset_id = job["datasetId"]
+    status = client.get(f"/api/datasets/{dataset_id}/status")
+    status_data = status.get_json()
+
+    assert status.status_code == 200
+    assert status_data["datasetId"] == dataset_id
+    assert status_data["available"] is True
+    assert status_data["statisticsAvailable"] is True
+    assert status_data["recordCount"] == 1
+    assert status_data["datasetType"] == "archimate"
+
+
 def test_runtime_dataset_iteration_uses_index_entries_directly(monkeypatch):
     DATASETS.clear()
     UPLOAD_SESSIONS.clear()

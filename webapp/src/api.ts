@@ -156,6 +156,18 @@ export async function getDatasetStatistics(datasetId: string): Promise<Statistic
   return getJson<StatisticsPayload>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics`);
 }
 
+export interface DatasetRuntimeStatus {
+  datasetId: string;
+  available: boolean;
+  statisticsAvailable: boolean;
+  recordCount: number;
+  datasetType?: string;
+}
+
+export async function getDatasetStatus(datasetId: string): Promise<DatasetRuntimeStatus> {
+  return getJson<DatasetRuntimeStatus>(`/api/datasets/${encodeURIComponent(datasetId)}/status`);
+}
+
 export async function getDatasetAfterDummyStatistics(datasetId: string): Promise<AfterDummyStatisticsResponse> {
   return getJson<AfterDummyStatisticsResponse>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics/after-dummy`);
 }

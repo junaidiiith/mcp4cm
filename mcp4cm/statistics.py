@@ -8,6 +8,7 @@ from statistics import mean, median
 from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
+from mcp4cm.dummy import is_placeholder_name
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, normalize_identifier
 
 
@@ -55,8 +56,13 @@ def node_names(record: ModelRecord) -> list[str]:
 def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     entries = typed_name_entries(record)
     names = [entry["name"] for entry in entries if not entry["missing"]]
+    semantic_names = [entry["name"] for entry in entries if entry["classification"] == "semantic"]
     tokens = [token for name in names for token in name.split()]
     missing_names = sum(1 for entry in entries if entry["missing"])
+    classification_counts = Counter(str(entry["classification"]) for entry in entries)
+    name_counts = Counter(names)
+    dominant_name, dominant_count = name_counts.most_common(1)[0] if name_counts else ("", 0)
+    named_count = len(names)
     return {
         "id": str(record.model_id),
         "entries": entries,
@@ -64,6 +70,11 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
         "missingNames": missing_names,
         "namedElements": len(entries) - missing_names,
         "missingNameRatio": missing_names / len(entries) if entries else 0,
+        "semanticNameCount": len(semantic_names),
+        "classificationCounts": classification_counts,
+        "dominantName": dominant_name,
+        "dominantNameCount": dominant_count,
+        "dominantNameRatio": dominant_count / named_count if named_count else 0,
         "uniqueNames": len(set(names)),
         "tokens": len(tokens),
         "uniqueTokens": len(set(tokens)),
@@ -90,6 +101,7 @@ def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
             "name": name,
             "missing": name == EMPTY_NAME_SENTINEL or not name,
             "typePlaceholder": is_type_placeholder_name(element_type, name),
+            "classification": classify_name_entry(element_type, name),
         }
         for element_type, name in pairs
     ]
@@ -108,6 +120,16 @@ def is_type_placeholder_name(element_type: str, name: str) -> bool:
     if normalized_name == normalized_type:
         return True
     return bool(re.fullmatch(rf"{re.escape(normalized_type.replace(' ', ''))}\d+", normalized_name.replace(" ", "")))
+
+
+def classify_name_entry(element_type: str, name: str) -> str:
+    if name == EMPTY_NAME_SENTINEL or not name:
+        return "missing"
+    if is_type_placeholder_name(element_type, name):
+        return "type_like"
+    if is_placeholder_name(normalize_identifier(name)):
+        return "placeholder"
+    return "semantic"
 
 
 def counter_items(counter: Counter[str], limit: int | None = None) -> list[dict[str, Any]]:
@@ -135,6 +157,123 @@ def histogram(values: list[float | int], *, bins: int, minimum: float | None = N
         }
         for index, count in enumerate(counts)
     ]
+
+
+def ratio_bands(values: list[float], *, bands: tuple[float, ...] = (0, 0.01, 0.1, 0.3, 0.7, 1.0)) -> list[dict[str, Any]]:
+    if not values:
+        return []
+    counts = [0] * (len(bands) - 1)
+    for value in values:
+        for index in range(len(bands) - 1):
+            lower, upper = bands[index], bands[index + 1]
+            if lower <= value <= upper if index == len(bands) - 2 else lower <= value < upper:
+                counts[index] += 1
+                break
+    return [
+        {
+            "start": bands[index],
+            "end": bands[index + 1],
+            "count": count,
+            "displayCount": count,
+        }
+        for index, count in enumerate(counts)
+    ]
+
+
+def semantic_name_count_bands(values: list[int]) -> list[dict[str, Any]]:
+    labels = [("0", 0, 1), ("1-4", 1, 5), ("5-9", 5, 10), ("10-24", 10, 25), ("25+", 25, math.inf)]
+    return [
+        {"label": label, "count": sum(1 for value in values if lower <= value < upper)}
+        for label, lower, upper in labels
+    ]
+
+
+def ratio_summary(values: list[float]) -> dict[str, float | int]:
+    if not values:
+        return {"models": 0, "zero": 0, "median": 0, "p90": 0, "above30": 0, "above70": 0}
+    ordered = sorted(values)
+    return {
+        "models": len(values),
+        "zero": sum(1 for value in values if value == 0),
+        "median": percentile_float(ordered, 0.5),
+        "p90": percentile_float(ordered, 0.9),
+        "above30": sum(1 for value in values if value >= 0.3),
+        "above70": sum(1 for value in values if value >= 0.7),
+    }
+
+
+def percentile_float(values: list[float], fraction: float) -> float:
+    position = (len(values) - 1) * fraction
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return round(values[lower], 6)
+    return round(values[lower] + (values[upper] - values[lower]) * (position - lower), 6)
+
+
+def classification_items(counter: Counter[str]) -> list[dict[str, Any]]:
+    labels = (("semantic", "Semantic"), ("missing", "Missing"), ("placeholder", "Placeholder"), ("type_like", "Type-like"))
+    return [{"label": label, "key": key, "count": int(counter.get(key, 0))} for key, label in labels]
+
+
+def type_quality_items(
+    type_counters: dict[str, Counter[str]],
+    total_counter: Counter[str],
+    *,
+    sort_counter: Counter[str] | None = None,
+    sort_classification: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    rows = []
+    labels = list(total_counter.keys())
+    if sort_classification:
+        labels.sort(
+            key=lambda label: (
+                type_counters.get(label, Counter()).get(sort_classification, 0),
+                total_counter.get(label, 0),
+                label,
+            ),
+            reverse=True,
+        )
+    elif sort_counter:
+        labels.sort(key=lambda label: (sort_counter.get(label, 0), total_counter.get(label, 0), label), reverse=True)
+    else:
+        labels = [label for label, _ in total_counter.most_common()]
+    if limit is not None:
+        labels = labels[:limit]
+    for element_type in labels:
+        counts = type_counters.get(element_type, Counter())
+        total = total_counter.get(element_type, sum(counts.values()))
+        rows.append(
+            {
+                "type": element_type,
+                "total": int(total),
+                "semantic": int(counts.get("semantic", 0)),
+                "missing": int(counts.get("missing", 0)),
+                "placeholder": int(counts.get("placeholder", 0)),
+                "typeLike": int(counts.get("type_like", 0)),
+            }
+        )
+    return rows
+
+
+def model_quality_watchlists(rows: list[dict[str, Any]], *, limit: int = 12) -> dict[str, list[dict[str, Any]]]:
+    return {
+        "fewSemanticNames": sorted(
+            rows,
+            key=lambda item: (item["semanticNames"], -item["missingRatio"], item["id"]),
+        )[:limit],
+        "highMissingRatio": sorted(
+            rows,
+            key=lambda item: (item["missingRatio"], item["nameSlots"], item["id"]),
+            reverse=True,
+        )[:limit],
+        "highNameDominance": sorted(
+            [row for row in rows if row["dominantName"]],
+            key=lambda item: (item["dominantNameRatio"], item["nameSlots"], item["id"]),
+            reverse=True,
+        )[:limit],
+    }
 
 
 def boxplot_summary(values: list[int]) -> dict[str, float]:
@@ -260,7 +399,10 @@ class CorpusStatisticsAccumulator:
         self.type_counter: Counter[str] = Counter()
         self.name_counter: Counter[str] = Counter()
         self.entry_type_counter: Counter[str] = Counter()
-        self.missing_by_type: Counter[str] = Counter()
+        self.classification_counter: Counter[str] = Counter()
+        self.type_quality_counter: dict[str, Counter[str]] = {}
+        self.semantic_name_counts: list[int] = []
+        self.model_quality_rows: list[dict[str, Any]] = []
         self.concept_counter: Counter[str] = Counter()
         self.filtered_concept_counter: Counter[str] = Counter()
         self.concept_doc_freq: Counter[str] = Counter()
@@ -288,9 +430,24 @@ class CorpusStatisticsAccumulator:
 
         row = _model_visualization_row(record)
         self.name_slot_counts.append(int(row["nameSlots"]))
+        self.semantic_name_counts.append(int(row["semanticNameCount"]))
         self.name_count_values.append(len(node_names(record)))
         if row["nameSlots"]:
             self.missing_ratios.append(float(row["missingNameRatio"]))
+        for classification, count in row["classificationCounts"].items():
+            self.classification_counter[str(classification)] += int(count)
+
+        if row["nameSlots"] or record.node_count:
+            self.model_quality_rows.append(
+                {
+                    "id": str(record.model_id),
+                    "nameSlots": int(row["nameSlots"]),
+                    "semanticNames": int(row["semanticNameCount"]),
+                    "missingRatio": round(float(row["missingNameRatio"]), 4),
+                    "dominantName": str(row["dominantName"]),
+                    "dominantNameRatio": round(float(row["dominantNameRatio"]), 4),
+                }
+            )
 
         if len(self.scatter_rows) < SCATTER_POINT_LIMIT:
             self.scatter_rows.append(
@@ -325,9 +482,11 @@ class CorpusStatisticsAccumulator:
         model_names: set[str] = set()
         for entry in row["entries"]:
             element_type = str(entry["type"])
+            classification = str(entry["classification"])
             self.entry_type_counter[element_type] += 1
+            type_quality = self.type_quality_counter.setdefault(element_type, Counter())
+            type_quality[classification] += 1
             if entry["missing"]:
-                self.missing_by_type[element_type] += 1
                 continue
             concept = str(entry["name"])
             self.concept_counter[concept] += 1
@@ -423,7 +582,16 @@ class CorpusStatisticsAccumulator:
 
         return {
             "missingNameRatioHistogram": histogram(self.missing_ratios, bins=30, minimum=0, maximum=1),
-            "missingNamesByType": counter_items(self.missing_by_type),
+            "missingNameRatioBands": ratio_bands(self.missing_ratios),
+            "missingNameRatioSummary": ratio_summary(self.missing_ratios),
+            "nameClassificationOverview": classification_items(self.classification_counter),
+            "elementTypeQualityMatrix": type_quality_items(
+                self.type_quality_counter,
+                self.entry_type_counter,
+                sort_classification="semantic",
+            ),
+            "semanticNameCountHistogram": semantic_name_count_bands(self.semantic_name_counts),
+            "modelQualityWatchlists": model_quality_watchlists(self.model_quality_rows),
             "topConcepts": counter_items(self.concept_counter),
             "topConceptDocumentFrequency": counter_items(self.concept_doc_freq),
             "topConceptsWithoutTypePlaceholders": counter_items(self.filtered_concept_counter),

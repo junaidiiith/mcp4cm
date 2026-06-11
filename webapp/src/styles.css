@@ -1847,6 +1847,109 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .horizontalBarRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #415765; }
 .horizontalBarRow i { height: 12px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
 .horizontalBarRow i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0f766e, #6bc5bd); }
+.qualityOverview { display: grid; gap: 14px; }
+.qualityStatGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.qualityStatGrid.compact { margin-bottom: 12px; }
+.qualityStat {
+  min-width: 0;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  background: #fff;
+  padding: 9px 10px;
+}
+.qualityStat span, .qualityStat small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #60717f; font-size: 11px; font-weight: 700; }
+.qualityStat strong { display: block; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #203945; font-size: 17px; line-height: 1.1; }
+.stackedMeter { display: flex; width: 100%; height: 18px; overflow: hidden; border-radius: 5px; background: #edf2f7; box-shadow: inset 0 0 0 1px #d8e2ea; }
+.stackedMeter.empty { min-height: 18px; }
+.qualitySegment { display: block; min-width: 2px; height: 100%; }
+.qualitySegment.semantic { background: #168a72; }
+.qualitySegment.missing { background: #d44d5c; }
+.qualitySegment.placeholder { background: #d7922c; }
+.qualitySegment.typeLike { background: #6977b8; }
+.typeQualityTableFrame { max-height: 430px; overflow: auto; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; }
+.typeQualityTable { width: 100%; min-width: 1120px; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+.typeQualityTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid #dbe4ec;
+  background: #f7fafc;
+  padding: 0;
+  text-align: right;
+  color: #526675;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.typeQualityTable th:first-child { text-align: left; }
+.typeQualityTable th button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+}
+.typeQualityTable th:first-child button { justify-content: flex-start; }
+.typeQualityTable th button:hover, .typeQualityTable th button.active { background: #edf8f7; color: #243d49; }
+.typeQualityTable th button svg { flex: 0 0 auto; color: #60717f; }
+.typeQualityTable td { border-bottom: 1px solid #edf2f7; padding: 7px 9px; text-align: right; vertical-align: middle; }
+.typeQualityTable td:first-child { max-width: 220px; text-align: left; }
+.typeQualityTable td:first-child strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #243d49; }
+.typeQualityTable td.focused { background: #f8fbfc; }
+.qualityRateCell { display: grid; grid-template-columns: 44px minmax(46px, 1fr); gap: 7px; align-items: center; }
+.qualityRateCell span { color: #60717f; font-weight: 800; }
+.qualityRateCell i { height: 6px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
+.qualityRateCell i b { height: 100%; min-width: 0; }
+.labeledHistogram { display: grid; gap: 9px; max-width: 780px; }
+.labeledHistogramBar {
+  display: grid;
+  grid-template-columns: 56px minmax(160px, 1fr) 72px 52px;
+  gap: 10px;
+  align-items: center;
+  color: #526675;
+  font-size: 11px;
+  font-weight: 700;
+}
+.labeledHistogramBar span, .labeledHistogramBar strong, .labeledHistogramBar small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labeledHistogramBar span { color: #243d49; font-size: 12px; }
+.labeledHistogramBar strong { color: #243d49; text-align: right; }
+.labeledHistogramBar small { color: #60717f; text-align: right; }
+.labeledHistogramBar i { height: 13px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
+.labeledHistogramBar i b { display: block; height: 100%; border-radius: inherit; background: #2d7d7d; }
+.modelWatchlists { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 12px; min-width: 860px; }
+.modelWatchlist { min-width: 0; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; padding: 10px; }
+.modelWatchlist h5 { margin: 0 0 8px; color: #243d49; font-size: 12px; line-height: 1.2; }
+.modelWatchlistRow {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(76px, auto) auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid #edf2f7;
+  padding: 7px 0;
+  color: #526675;
+  font-size: 11px;
+}
+.modelWatchlistRow strong, .modelWatchlistRow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modelWatchlistRow strong { color: #243d49; }
+.modelWatchlistRow span { text-align: right; font-weight: 700; }
+.modelWatchlistRow .tableInfoButton {
+  justify-self: end;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.modelWatchlistInspectButton {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+}
 .histogram { display: flex; align-items: end; gap: 2px; height: 180px; padding: 8px 4px 0; border-bottom: 1px solid #aebdca; }
 .histogram span { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; background: #2d7d7d; transition: opacity .15s ease; }
 .histogram span:hover { opacity: .65; }

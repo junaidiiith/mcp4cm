@@ -185,8 +185,8 @@ export default function ModelGraphPreview({
       data: {
         id: node.id,
         nodeId: node.id,
-        label: node.name || "Unknown",
-        type: node.type || "Unknown",
+        label: node.name || "",
+        type: node.type || "",
         color: node.color,
         size: node.size,
         compareState: node.compareState || "",
@@ -198,7 +198,7 @@ export default function ModelGraphPreview({
         edgeIndex: index,
         source: edge.source,
         target: edge.target,
-        type: edge.type || "Unknown",
+        type: edge.type || "",
         color: colorForType(edge.type),
         compareState: edge.compareState || "",
       },
@@ -344,7 +344,7 @@ export default function ModelGraphPreview({
     const query = nodeQuery.trim().toLowerCase();
     if (!query) return nodes;
     return nodes.filter((node) =>
-      [node.name || "Unknown", node.type || "Unknown", node.id, String(node.degree)].some((value) =>
+      [node.name, node.type, node.id, String(node.degree)].some((value) =>
         lowerIncludes(value, query),
       ),
     );
@@ -354,7 +354,7 @@ export default function ModelGraphPreview({
     const query = edgeQuery.trim().toLowerCase();
     if (!query) return edges;
     return edges.filter((edge) =>
-      [edge.source, edge.target, edge.type || "Unknown", edge.id].some((value) => lowerIncludes(value, query)),
+      [edge.source, edge.target, edge.type, edge.id].some((value) => lowerIncludes(value, query)),
     );
   }, [edgeQuery, edges]);
 
@@ -500,8 +500,8 @@ export default function ModelGraphPreview({
                       className={selectedElement?.kind === "node" && selectedElement.id === node.id ? "active" : ""}
                       onClick={() => selectNode(node)}
                     >
-                      <td><strong>{node.name || "Unknown"}</strong></td>
-                      <td><span className="typeSwatch" style={{ background: node.color }} />{node.type || "Unknown"}</td>
+                      <td><strong>{node.name}</strong></td>
+                      <td><span className="typeSwatch" style={{ background: node.color }} />{node.type}</td>
                       <td>{node.degree}</td>
                       <td><code>{node.id}</code></td>
                     </tr>
@@ -536,7 +536,7 @@ export default function ModelGraphPreview({
                       onClick={() => selectEdge(edge)}
                     >
                       <td><code>{edge.source}</code></td>
-                      <td><span className="typeSwatch" style={{ background: colorForType(edge.type) }} />{edge.type || "Unknown"}</td>
+                      <td><span className="typeSwatch" style={{ background: colorForType(edge.type) }} />{edge.type}</td>
                       <td><code>{edge.target}</code></td>
                       <td><code>{edge.id}</code></td>
                     </tr>
