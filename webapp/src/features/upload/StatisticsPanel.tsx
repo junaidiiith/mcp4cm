@@ -41,7 +41,11 @@ export function StatisticsPanel({
       <CardContent>
         {uploadSummary && <UploadSummaryPanel summary={uploadSummary} />}
         {(uploadSummary?.records || 0) > 0 && datasetId ? (
-          <ParsedModelsTable datasetId={datasetId} onInspect={onInspect} />
+          <ParsedModelsTable
+            datasetId={datasetId}
+            warningsByType={uploadSummary?.warningsByType}
+            onInspect={onInspect}
+          />
         ) : null}
         {stats ? (
           <Statistics stats={stats} />
@@ -139,9 +143,11 @@ function StatisticsLoading({ job }: { job: UploadParseJob | null }) {
 
 function ParsedModelsTable({
   datasetId,
+  warningsByType,
   onInspect,
 }: {
   datasetId: string;
+  warningsByType?: Record<string, number>;
   onInspect: (row: ParsedModelSummary) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -198,15 +204,13 @@ function ParsedModelsTable({
     };
   }, [datasetId, page, query, typeFilter, sort]);
 
-  const types = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const row of models) {
-      for (const [type, count] of Object.entries(row.types || {})) {
-        counts[type] = (counts[type] || 0) + Number(count || 0);
-      }
-    }
-    return Object.entries(counts).sort(([, left], [, right]) => right - left);
-  }, [models]);
+  const types = useMemo(
+    () =>
+      Object.entries(warningsByType || {})
+        .filter(([, count]) => Number(count) > 0)
+        .sort(([, left], [, right]) => Number(right) - Number(left)),
+    [warningsByType],
+  );
 
   const toggleSort = (key: "nodeCount" | "edgeCount") => {
     setSort((current) => ({
