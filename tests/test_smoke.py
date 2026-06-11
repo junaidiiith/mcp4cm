@@ -15,7 +15,7 @@ from mcp4cm.duplicates import (
     tfidf_duplicate_by_names_and_types,
     vote_duplicate_pairs,
 )
-from mcp4cm.loading import load_eamodelset
+from mcp4cm.loading import load_eamodelset, load_modelset
 import pytest
 from mcp4cm.parsers.ir import Edge, IR, Node
 from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
@@ -338,6 +338,25 @@ def uml_record(names, *, model_id="uml", node_type="Class"):
     )
 
 
+def test_modelset_json_parser_accepts_top_level_graph_payload():
+    record = ModelSetJsonParser("uml").parse(
+        {
+            "directed": True,
+            "multigraph": True,
+            "nodes": [
+                {"id": 1, "name": "User", "eClass": "Actor"},
+                {"id": 2, "name": "Login", "eClass": "UseCase"},
+            ],
+            "links": [{"source": 1, "target": 2, "type": "Association"}],
+        },
+        model_id="top-level",
+    )
+
+    assert record.node_count == 2
+    assert record.edge_count == 1
+    assert "User" in record.names
+
+
 def test_dummy_cleansing_v2_filter_chain_and_traceability():
     record = ModelSetJsonParser("uml").parse(
         {
@@ -438,6 +457,35 @@ def test_eamodelset_loading_filters_by_natural_language(tmp_path):
 
     assert len(dataset) == 1
     assert dataset[0].model_id == "english"
+
+
+def test_eamodelset_loading_accepts_flat_json_exports(tmp_path):
+    (tmp_path / "english.json").write_text(
+        '{"archimateId": "english", "name": "English", "language": "en", '
+        '"elements": [{"id": "a", "name": "App", "type": "ApplicationComponent"}], "relationships": []}',
+        encoding="utf-8",
+    )
+
+    dataset = load_eamodelset(tmp_path, language="en")
+
+    assert len(dataset) == 1
+    assert dataset[0].model_id == "english"
+    assert dataset[0].node_count == 1
+
+
+def test_modelset_loading_discovers_nested_json_exports(tmp_path):
+    model_dir = tmp_path / "repo" / "project.ecore"
+    model_dir.mkdir(parents=True)
+    (model_dir / "model.json").write_text(
+        '{"directed": true, "nodes": [{"id": 1, "name": "Wheel", "eClass": "EClass"}], "links": []}',
+        encoding="utf-8",
+    )
+
+    dataset = load_modelset(tmp_path, language="ecore", format="json")
+
+    assert len(dataset) == 1
+    assert dataset[0].model_id == "model"
+    assert dataset[0].node_count == 1
 
 
 def test_language_filter_accepts_multiple_values(tmp_path):

@@ -40,7 +40,7 @@ npm run dev
 
 During development, the React app calls Flask at `http://127.0.0.1:8765`. In a production-style build served by Flask, it calls same-origin `/api/*` routes.
 
-Large uploads are sent as `multipart/form-data` so the browser does not read the full dataset into JavaScript memory. For very large datasets, prefer `.jsonl` or `.ndjson`; Flask streams those files line by line while parsing.
+Large uploads are sent as `multipart/form-data` so the browser does not read the full dataset into JavaScript memory.
 
 To serve the built React app from Flask instead:
 
@@ -63,26 +63,28 @@ python scripts/prepare_datasets.py
 
 To prepare only a subset, use `--only` (for example `eamodelset`, `modelset`, or fine-grained targets such as `modelset-uml-json`). See [docs/DOWNLOAD_DATASETS.md](docs/DOWNLOAD_DATASETS.md) for all options, source layout, and manual preparation steps.
 
+## Parsers
+
+MCP4CM supports UML, Ecore, ArchiMate, and BPMN inputs through parser keys such as `uml/xmi`, `uml/json`, `ecore/ecore`, `ecore/json`, `archimate/json`, `archimate/xmi`, and `bpmn/signavio`. Parsers normalize source files into `ModelRecord` objects backed by NetworkX graphs, so statistics, dummy detection, duplicate detection, and visualization can run across formats.
+
+See [docs/PARSERS.md](docs/PARSERS.md) for supported formats, input examples, dataset sources, parser options, and loading examples.
+
 ## Load Datasets
 
 ```python
 from mcp4cm import DatasetType, load_dataset
 
-modelset = load_dataset(DatasetType.MODELSET, "data/modelset")
-uml = load_dataset(DatasetType.MODELSET_UML, "data/modelset")
-ecore = load_dataset(DatasetType.MODELSET_ECORE, "data/modelset")
-archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset")
+uml = load_dataset(DatasetType.MODELSET_UML, "data/modelset-uml-json", format="json")
+ecore = load_dataset(DatasetType.MODELSET_ECORE, "data/modelset-ecore-json", format="json")
+archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset-json", format="json")
 ```
 
 Filter by language while loading:
 
 ```python
 # ArchiMate natural language from model.json, for example "en", "de", "es".
-english_archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset", language="en")
-selected_archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset", language={"en", "de"})
-
-# For combined MODELSET loading, this can also select the modeling language.
-uml_only = load_dataset(DatasetType.MODELSET, "data/modelset", language="uml")
+english_archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset-json", format="json", language="en")
+selected_archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset-json", format="json", language={"en", "de"})
 ```
 
 Each dataset contains `ModelRecord` objects with a normalized `networkx` graph plus source metadata.
@@ -123,12 +125,12 @@ custom_findings = detect_dummy_models(uml, filter_configs=configs)
 Show how many models each dummy filter removes:
 
 ```python
-from mcp4cm import DatasetType, load_dataset
+from mcp4cm import Dataset, DatasetType, load_dataset
 from mcp4cm.dummy import default_filter_configs, summarize_filters, summarize_filters_by_language
 
-uml = load_dataset(DatasetType.MODELSET_UML, "data/modelset")
-ecore = load_dataset(DatasetType.MODELSET_ECORE, "data/modelset")
-archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset", language="en")
+uml = load_dataset(DatasetType.MODELSET_UML, "data/modelset-uml-json", format="json")
+ecore = load_dataset(DatasetType.MODELSET_ECORE, "data/modelset-ecore-json", format="json")
+archimate = load_dataset(DatasetType.EAMODELSET, "data/eamodelset-json", format="json", language="en")
 
 configs = default_filter_configs()
 
@@ -145,8 +147,8 @@ for row in summarize_filters(archimate, filter_configs=configs):
     print(row.filter_id, row.filtered_count, row.remaining_count)
 
 # Combined MODELSET: summarize per language using default filter configs.
-modelset = load_dataset(DatasetType.MODELSET, "data/modelset")
-for language, rows in summarize_filters_by_language(modelset).items():
+combined = Dataset([*uml.records, *ecore.records], "modelset")
+for language, rows in summarize_filters_by_language(combined).items():
     print(language)
     for row in rows:
         print(row.filter_id, row.filtered_count, row.remaining_count)
@@ -211,11 +213,13 @@ Current parser keys are:
 
 - `uml/json`
 - `uml/xmi`
-- `uml/xmi-pyecore`
+- `uml/xml-pyecore`
 - `ecore/json`
 - `ecore/ecore`
 - `archimate/json`
 - `archimate/xmi`
 - `bpmn/signavio`
 
-Add a parser adapter package under `mcp4cm/parsers/`, register a `ParserDescriptor`, and return a `ParsedModelResult` containing a `ModelRecord` plus `ModelDiagnostics`. JSON graph parsers may build `ModelRecord` directly; source-file parsers can emit IR and convert it through the shared graph utilities.
+Add a parser package under `mcp4cm/parsers/`, register a `ParserDescriptor`, and return a `ParsedModelResult` containing a `ModelRecord` plus `ModelDiagnostics`. JSON graph parsers may build `ModelRecord` directly; source-file parsers can emit IR and convert it through the shared graph utilities.
+
+See [docs/NEW_PARSER_INTEGRATION.md](docs/NEW_PARSER_INTEGRATION.md) for the developer checklist.

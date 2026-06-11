@@ -13,7 +13,11 @@ class ModelSetJsonParser:
         self.language = language
 
     def parse(self, raw: Mapping[str, Any], *, model_id: str | None = None) -> ModelRecord:
-        graph_payload = raw.get("graph") or "{}"
+        graph_payload = raw.get("graph")
+        if graph_payload is None and any(key in raw for key in ("nodes", "links", "edges")):
+            graph_payload = raw
+        if graph_payload is None:
+            graph_payload = "{}"
         if isinstance(graph_payload, str):
             graph_payload = json.loads(graph_payload)
 

@@ -48,7 +48,7 @@ def load_modelset(
     filter_language: str | Iterable[str] | None = None,
 ) -> Dataset:
     source = Path(path)
-    filepaths = sorted(source.glob("*.json")) if source.is_dir() else [source]
+    filepaths = sorted(source.rglob("*.json")) if source.is_dir() else [source]
     parsed = parse_files(filepaths, language=language, format=format)
     records = [record for record in parsed.records if _matches_language(record, filter_language)]
     diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
@@ -64,7 +64,7 @@ def load_eamodelset(
 ) -> Dataset:
     root = Path(root)
     filter_language = natural_language if natural_language is not None else language
-    filepaths = sorted(root.glob("*/model.json"))
+    filepaths = sorted([*root.glob("*.json"), *root.glob("*/model.json")])
     parsed = parse_files(filepaths, language="archimate", format=format)
     records = [record for record in parsed.records if _matches_language(record, filter_language)]
     diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
