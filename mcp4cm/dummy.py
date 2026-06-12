@@ -6,17 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.name_classification import (
-    PLACEHOLDER_KEYWORDS,
-    PLACEHOLDER_PATTERNS,
-    classify_name_slot,
-    compact_identifier,
-    is_placeholder_name,
-    is_type_like_name,
-    normalize_name,
-    normalize_type,
-    tokenize_name,
-)
+from mcp4cm.name_classification import iter_name_slots
 
 DEFAULT_MIN_NODES = 5
 DEFAULT_MIN_EDGES = 4
@@ -598,23 +588,18 @@ def _eval_regex_rule(
 
 
 def derive_nodes(record: ModelRecord) -> list[DerivedNode]:
-    nodes: list[DerivedNode] = []
-    for node_id, attrs in record.graph.nodes(data=True):
-        raw_name = str(attrs.get("name") or "")
-        node_type = str(attrs.get("type") or attrs.get("eClass") or "")
-        result = classify_name_slot(raw_name, node_type)
-        nodes.append(
-            DerivedNode(
-                node_id=str(node_id),
-                raw_name=raw_name,
-                node_type=node_type,
-                normalized_name=result.normalized_name,
-                normalized_type=result.normalized_type,
-                classification=result.classification,
-                tokens=result.tokens,
-            )
+    return [
+        DerivedNode(
+            node_id=node_id,
+            raw_name=result.raw_name,
+            node_type=result.raw_type,
+            normalized_name=result.normalized_name,
+            normalized_type=result.normalized_type,
+            classification=result.classification,
+            tokens=result.tokens,
         )
-    return nodes
+        for node_id, result in iter_name_slots(record)
+    ]
 
 def named_nodes(nodes: list[DerivedNode]) -> list[DerivedNode]:
     return [node for node in nodes if node.classification != "missing"]

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 import re
 from typing import Literal
 
+from mcp4cm.core import ModelRecord
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, normalize_identifier
 
 NameClassification = Literal["missing", "type_like", "placeholder", "semantic"]
@@ -53,6 +55,13 @@ class NameSlotClassification:
     normalized_type: str
     classification: NameClassification
     tokens: tuple[str, ...]
+
+
+def iter_name_slots(record: ModelRecord) -> Iterator[tuple[str, NameSlotClassification]]:
+    for node_id, attrs in record.graph.nodes(data=True):
+        raw_name = str(attrs.get("name") or "")
+        raw_type = str(attrs.get("type") or "")
+        yield str(node_id), classify_name_slot(raw_name, raw_type)
 
 
 def classify_name_slot(raw_name: object, raw_type: object = "") -> NameSlotClassification:

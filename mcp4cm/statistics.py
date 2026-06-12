@@ -7,7 +7,7 @@ from statistics import mean, median
 from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.name_classification import classify_name_slot
+from mcp4cm.name_classification import iter_name_slots
 
 
 def dataset_summary(dataset: Dataset) -> dict[str, Any]:
@@ -78,19 +78,14 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
 
 
 def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
-    entries = []
-    for _, attrs in record.graph.nodes(data=True):
-        if "name" not in attrs:
-            continue
-        result = classify_name_slot(attrs.get("name"), attrs.get("type") or attrs.get("eClass") or "unknown")
-        entries.append(
-            {
-                "type": result.normalized_type or "unknown",
-                "name": result.normalized_name,
-                "classification": result.classification,
-            }
-        )
-    return entries
+    return [
+        {
+            "type": result.normalized_type or "unknown",
+            "name": result.normalized_name,
+            "classification": result.classification,
+        }
+        for _, result in iter_name_slots(record)
+    ]
 
 
 def counter_items(counter: Counter[str], limit: int | None = None) -> list[dict[str, Any]]:
