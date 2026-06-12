@@ -6,6 +6,17 @@ from dataclasses import dataclass
 from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
+from mcp4cm.name_classification import (
+    PLACEHOLDER_KEYWORDS,
+    PLACEHOLDER_PATTERNS,
+    classify_name_slot,
+    compact_identifier,
+    is_placeholder_name,
+    is_type_like_name,
+    normalize_name,
+    normalize_type,
+    tokenize_name,
+)
 
 DEFAULT_MIN_NODES = 5
 DEFAULT_MIN_EDGES = 4
@@ -27,43 +38,6 @@ FILTER_ORDER: tuple[str, ...] = (
     "name_repetition_ratio",
     "regex_rule",
 )
-
-PLACEHOLDER_KEYWORDS = {
-    "dummy",
-    "test",
-    "todo",
-    "sample",
-    "example",
-    "foo",
-    "bar",
-    "temp",
-    "tmp",
-    "asdf",
-    "placeholder",
-    "untitled",
-    "no name",
-    "new model",
-    "model",
-    "class",
-    "my class",
-    "entity",
-    "node",
-    "package",
-    "component",
-    "attribute",
-    "control flow",
-    "empty name",
-    "att",
-}
-
-PLACEHOLDER_PATTERNS = (
-    re.compile(r"^my\s+class\s*\d*$", re.IGNORECASE),
-    re.compile(r"^att(\s+[A-Za-z]|\s+\d+|[a-z0-9])?$", re.IGNORECASE),
-    re.compile(r"^(class|entity|node|model|package|component|attribute|type)[\s_-]*\d*$", re.IGNORECASE),
-    re.compile(r"^[A-Za-z]\d$", re.IGNORECASE),
-    re.compile(r"^[A-Za-z]\s[A-Za-z]$", re.IGNORECASE),
-)
-
 
 @dataclass(frozen=True, slots=True)
 class DerivedNode:
@@ -628,51 +602,19 @@ def derive_nodes(record: ModelRecord) -> list[DerivedNode]:
     for node_id, attrs in record.graph.nodes(data=True):
         raw_name = str(attrs.get("name") or "")
         node_type = str(attrs.get("type") or attrs.get("eClass") or "")
-        normalized_name = normalize_name(raw_name)
-        normalized_type = normalize_name(split_camel_case(node_type))
-        if not normalized_name:
-            classification = "missing"
-        elif is_type_like_name(normalized_name, normalized_type):
-            classification = "type_like"
-        elif is_placeholder_name(normalized_name):
-            classification = "placeholder"
-        else:
-            classification = "semantic"
+        result = classify_name_slot(raw_name, node_type)
         nodes.append(
             DerivedNode(
                 node_id=str(node_id),
                 raw_name=raw_name,
                 node_type=node_type,
-                normalized_name=normalized_name,
-                normalized_type=normalized_type,
-                classification=classification,
-                tokens=tuple(sorted(tokenize_name(normalized_name))),
+                normalized_name=result.normalized_name,
+                normalized_type=result.normalized_type,
+                classification=result.classification,
+                tokens=result.tokens,
             )
         )
     return nodes
-
-
-def is_type_like_name(normalized_name: str, normalized_type: str) -> bool:
-    compact_name = compact_identifier(normalized_name)
-    compact_type = compact_identifier(normalized_type)
-    if not compact_name or not compact_type:
-        return False
-    if compact_name == compact_type:
-        return True
-    if compact_name.startswith(compact_type):
-        suffix = compact_name[len(compact_type) :]
-        return bool(suffix) and suffix.isdigit()
-    return False
-
-
-def is_placeholder_name(normalized_name: str) -> bool:
-    if normalized_name in PLACEHOLDER_KEYWORDS:
-        return True
-    for pattern in PLACEHOLDER_PATTERNS:
-        if pattern.match(normalized_name):
-            return True
-    return False
-
 
 def named_nodes(nodes: list[DerivedNode]) -> list[DerivedNode]:
     return [node for node in nodes if node.classification != "missing"]
@@ -736,19 +678,3 @@ def _median(values: list[int]) -> float:
     if length % 2 == 1:
         return float(values[mid])
     return (values[mid - 1] + values[mid]) / 2
-
-
-def normalize_name(value: str) -> str:
-    return re.sub(r"\s+", " ", str(value or "").strip().lower())
-
-
-def split_camel_case(value: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", " ", str(value)).replace("_", " ").replace("-", " ")
-
-
-def tokenize_name(value: str) -> set[str]:
-    return {match.group(0).lower() for match in re.finditer(r"[A-Za-z][A-Za-z0-9_]*", value)}
-
-
-def compact_identifier(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9]", "", value).lower()

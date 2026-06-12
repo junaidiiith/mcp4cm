@@ -8,7 +8,8 @@ import networkx as nx
 from mcp4cm import api_server
 from mcp4cm.api_server import DATASETS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS, create_app
 from mcp4cm.core import ModelRecord
-from mcp4cm.statistics import CorpusStatisticsAccumulator
+from mcp4cm.dummy import derive_nodes
+from mcp4cm.statistics import CorpusStatisticsAccumulator, typed_name_entries
 
 
 def clear_runtime():
@@ -69,9 +70,41 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     task_row = next(row for row in visualizations["elementTypeQualityMatrix"] if row["type"] == "task")
     assert task_row["total"] == 4
     assert task_row["missing"] == 1
+    vocabulary_summary = visualizations["vocabularySummary"]
+    assert vocabulary_summary["uniqueNames"] == 4
+    assert vocabulary_summary["totalOccurrences"] == 5
+    assert vocabulary_summary["semanticNames"] == 2
+    assert vocabulary_summary["placeholderOrTypeLikeNames"] == 2
+    assert vocabulary_summary["singletonNames"] == 4
+    review_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "review")
+    assert review_row["occurrences"] == 2
+    assert review_row["documentFrequency"] == 1
+    assert review_row["occurrencesPerUsedModel"] == 2
+    assert review_row["classification"] == "semantic"
+    class_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "class1")
+    assert class_row["classification"] == "typeLike"
+    assert visualizations["nameReuseDistribution"][0] == {"label": "1", "count": 4}
     assert visualizations["modelQualityWatchlists"]["fewSemanticNames"][0]["id"] == "m1"
     assert visualizations["modelQualityWatchlists"]["highMissingRatio"][0]["id"] == "m1"
     assert visualizations["modelQualityWatchlists"]["highNameDominance"][0]["dominantName"] == "review"
+
+
+def test_statistics_and_dummy_use_shared_name_classification():
+    graph = nx.DiGraph()
+    graph.add_node("semantic", type="Task", name="ApproveInvoice")
+    graph.add_node("missing", type="Task", name="")
+    graph.add_node("type_like", type="Class", name="Class1")
+    graph.add_node("placeholder", type="Package", name="todo")
+    record = ModelRecord(model_id="m1", language="uml", graph=graph)
+
+    statistics_entries = {entry["name"]: entry["classification"] for entry in typed_name_entries(record)}
+    dummy_nodes = {node.normalized_name: node.classification for node in derive_nodes(record)}
+
+    assert statistics_entries == dummy_nodes
+    assert statistics_entries["approve invoice"] == "semantic"
+    assert statistics_entries["class1"] == "type_like"
+    assert statistics_entries["todo"] == "placeholder"
+    assert statistics_entries[""] == "missing"
 
 
 def test_upload_parse_uses_accumulator_for_statistics():

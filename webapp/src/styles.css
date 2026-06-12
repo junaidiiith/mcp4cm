@@ -1848,6 +1848,77 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .horizontalBarRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #415765; }
 .horizontalBarRow i { height: 12px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
 .horizontalBarRow i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0f766e, #6bc5bd); }
+.vocabularySummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.vocabularyRanking { display: grid; gap: 10px; }
+.vocabularyRankingToolbar, .heatmapToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.vocabularyRankingToolbar .chartLimit, .heatmapToolbar .chartLimit { margin-bottom: 0; }
+.vocabularyFilterControl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  background: #f3f7fa;
+}
+.vocabularyFilterControl button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 5px 8px;
+  color: #526675;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.vocabularyFilterControl button:hover, .vocabularyFilterControl button.active {
+  background: #fff;
+  color: #243d49;
+  box-shadow: 0 1px 2px rgba(15, 35, 45, .08);
+}
+.vocabularyTableFrame { max-height: 430px; overflow: auto; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; }
+.vocabularyTable { min-width: 980px; }
+.vocabularyTable th:last-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid #dbe4ec;
+  background: #f7fafc;
+  padding: 8px 9px;
+  text-align: right;
+  color: #526675;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.vocabularyMetricCell { display: grid; grid-template-columns: 66px minmax(46px, 1fr); gap: 8px; align-items: center; }
+.vocabularyMetricCell span { color: #243d49; font-weight: 800; }
+.vocabularyMetricCell i { height: 7px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
+.vocabularyMetricCell i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2b6f68, #78c7be); }
+.vocabularyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  max-width: 100%;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.vocabularyBadge.semantic { background: #dcf3ed; color: #176b58; }
+.vocabularyBadge.placeholder { background: #faead3; color: #8a5615; }
+.vocabularyBadge.typeLike { background: #e7e9f7; color: #4c568d; }
+.vocabularyBadge.mixed { background: #eef2f7; color: #526675; }
+.vocabularyBadge.unknown { background: #f4f4f5; color: #71717a; }
 .qualityOverview { display: grid; gap: 14px; }
 .qualityStatGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .qualityStatGrid.compact { margin-bottom: 12px; }
@@ -1970,11 +2041,47 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .conceptTreemap section { border: 1px solid #cbdfe0; border-radius: 6px; padding: 7px; background: #edf8f7; font-size: 11px; }
 .conceptTreemap section div { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
 .conceptTreemap span { min-width: 52px; padding: 4px; border-radius: 4px; background: #c6e6e3; overflow: hidden; text-overflow: ellipsis; }
-.heatmap { display: grid; gap: 2px; min-width: 900px; }
-.heatmapHeader, .heatmapRow { display: grid; grid-template-columns: 130px repeat(25, minmax(24px, 1fr)); gap: 2px; }
-.heatmapHeader span { writing-mode: vertical-rl; height: 86px; font-size: 10px; overflow: hidden; }
-.heatmapRow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.heatmapRow span { min-height: 22px; border-radius: 2px; background: #edf2f7; }
+.heatmapPanel { display: grid; gap: 10px; }
+.heatmapLegend { display: grid; grid-template-columns: auto 90px auto; gap: 7px; align-items: center; color: #60717f; font-size: 11px; font-weight: 800; }
+.heatmapLegend i { height: 10px; border-radius: 999px; background: linear-gradient(90deg, hsl(176 26% 96%), hsl(176 50% 54%)); box-shadow: inset 0 0 0 1px #d6e3e8; }
+.heatmap {
+  display: grid;
+  gap: 3px;
+  min-width: 900px;
+  align-items: stretch;
+}
+.heatmap > b, .heatmapToken {
+  min-height: 42px;
+  padding: 6px;
+  border-bottom: 1px solid #dbe4ec;
+  color: #526675;
+  font-size: 10px;
+  font-weight: 800;
+}
+.heatmapToken {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+}
+.heatmapRow b {
+  min-height: 28px;
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #243d49;
+  font-size: 11px;
+}
+.heatmapCell {
+  min-height: 28px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(31, 61, 72, .04);
+}
+.heatmapCell:hover { box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .45); }
 .typeConceptLinks { display: grid; gap: 4px; }
 .typeConceptLinks div { display: grid; grid-template-columns: 130px minmax(80px, 1fr) minmax(110px, 1fr) 40px; gap: 8px; align-items: center; font-size: 11px; }
 .typeConceptLinks i { height: 8px; border-radius: 999px; overflow: hidden; background: #e6edf3; }

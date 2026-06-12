@@ -225,28 +225,16 @@ function visualizationCategories(
       label: "Vocabulary",
       charts: [
         {
-          id: "frequent-names",
-          title: "Most Frequent Names",
-          description: "Name occurrences across the complete corpus.",
-          render: () => <LimitedHorizontalBars items={data.topConcepts} ariaLabel="Most frequent names count" />,
+          id: "vocabulary-summary",
+          title: "Vocabulary Summary",
+          description: "Corpus-level counts for parsed names and reuse.",
+          render: () => <VocabularySummary summary={data.vocabularySummary} />,
         },
         {
-          id: "name-document-frequency",
-          title: "Names by Document Frequency",
-          description: "Number of models containing each name.",
-          render: () => <LimitedHorizontalBars items={data.topConceptDocumentFrequency} ariaLabel="Names by document frequency count" />,
-        },
-        {
-          id: "filtered-frequent-names",
-          title: "Top Names Excluding Type-Based Placeholders",
-          description: "Generic names such as class and class1 are excluded.",
-          render: () => <LimitedHorizontalBars items={data.topConceptsWithoutTypePlaceholders} ariaLabel="Names excluding type-based placeholders count" />,
-        },
-        {
-          id: "filtered-name-document-frequency",
-          title: "Document Frequency Excluding Type-Based Placeholders",
-          description: "Number of models containing each filtered name.",
-          render: () => <LimitedHorizontalBars items={data.topConceptDocumentFrequencyWithoutTypePlaceholders} ariaLabel="Document frequency excluding type-based placeholders count" />,
+          id: "vocabulary-ranking",
+          title: "Vocabulary Ranking",
+          description: "Names ranked by occurrence, model coverage, and classification.",
+          render: () => <VocabularyRanking rows={data.vocabularyRanking || []} />,
         },
         {
           id: "type-vocabulary-heatmap",
@@ -255,10 +243,10 @@ function visualizationCategories(
           render: () => <Heatmap data={data.vocabularyHeatmap} />,
         },
         {
-          id: "top-names-per-model",
-          title: "Top 20 Names by Model Frequency",
-          description: "Each name contributes at most once per model.",
-          render: () => <HorizontalBars items={data.topNamesPerModel} />,
+          id: "name-reuse-distribution",
+          title: "Name Reuse Distribution",
+          description: "How many distinct names appear in one model versus many models.",
+          render: () => <LabeledHistogram items={data.nameReuseDistribution || []} />,
         },
       ],
     },
@@ -390,6 +378,187 @@ function LimitedHorizontalBars({ items, ariaLabel }: { items: StatisticItem[]; a
       </div>
     </>
   );
+}
+
+function VocabularySummary({ summary }: { summary?: VisualizationPayload["vocabularySummary"] }) {
+  if (!summary) return <EmptyChart />;
+  return (
+    <div className="vocabularySummary">
+      <SummaryStat label="Unique Names" value={summary.uniqueNames} />
+      <SummaryStat label="Occurrences" value={summary.totalOccurrences} />
+      <SummaryStat label="Semantic Names" value={summary.semanticNames} />
+      <SummaryStat label="Placeholder / Type-like" value={summary.placeholderOrTypeLikeNames} />
+      <SummaryStat label="Singleton Names" value={summary.singletonNames} />
+      <SummaryStat
+        label="Most Reused"
+        value={summary.mostReusedName || "None"}
+        suffix={summary.mostReusedName ? `${summary.mostReusedDocumentFrequency.toLocaleString()} models` : undefined}
+      />
+    </div>
+  );
+}
+
+type VocabularyFilter = "all" | "semantic" | "placeholder" | "typeLike" | "nonSemantic" | "excludeNonSemantic";
+type VocabularySortKey =
+  | "name"
+  | "occurrences"
+  | "documentFrequency"
+  | "coverage"
+  | "occurrencesPerModel"
+  | "occurrencesPerUsedModel";
+
+const vocabularyFilters: Array<{ key: VocabularyFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "semantic", label: "Semantic" },
+  { key: "placeholder", label: "Placeholder" },
+  { key: "typeLike", label: "Type-like" },
+  { key: "nonSemantic", label: "Placeholder + Type-like" },
+  { key: "excludeNonSemantic", label: "Exclude Placeholder / Type-like" },
+];
+
+const vocabularyColumns: Array<{ key: VocabularySortKey; label: string }> = [
+  { key: "name", label: "Name" },
+  { key: "occurrences", label: "Occurrences" },
+  { key: "documentFrequency", label: "Models" },
+  { key: "coverage", label: "Coverage" },
+  { key: "occurrencesPerModel", label: "Occ/model" },
+  { key: "occurrencesPerUsedModel", label: "Occ/used model" },
+];
+
+function VocabularyRanking({ rows }: { rows: VisualizationPayload["vocabularyRanking"] }) {
+  const [filter, setFilter] = useState<VocabularyFilter>("all");
+  const [sortKey, setSortKey] = useState<VocabularySortKey>("occurrences");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [limit, setLimit] = useState(50);
+  const filteredRows = useMemo(() => rows.filter((row) => vocabularyFilterMatches(row, filter)), [filter, rows]);
+  const sortedRows = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    return [...filteredRows].sort((left, right) => {
+      if (sortKey === "name") return left.name.localeCompare(right.name) * direction;
+      const diff = left[sortKey] - right[sortKey];
+      if (diff !== 0) return diff * direction;
+      return left.name.localeCompare(right.name);
+    });
+  }, [filteredRows, sortDirection, sortKey]);
+  const visibleRows = sortedRows.slice(0, limit);
+  const maxOccurrences = Math.max(...filteredRows.map((row) => row.occurrences), 1);
+  const maxDocumentFrequency = Math.max(...filteredRows.map((row) => row.documentFrequency), 1);
+  const onSort = (key: VocabularySortKey) => {
+    if (key === sortKey) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection(key === "name" ? "asc" : "desc");
+    }
+  };
+  if (!rows.length) return <EmptyChart />;
+  return (
+    <div className="vocabularyRanking">
+      <div className="vocabularyRankingToolbar">
+        <div className="vocabularyFilterControl" aria-label="Vocabulary classification filter">
+          {vocabularyFilters.map((item) => (
+            <button
+              className={filter === item.key ? "active" : ""}
+              key={item.key}
+              type="button"
+              onClick={() => setFilter(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <label className="chartLimit">
+          Rows
+          <input
+            aria-label="Vocabulary ranking row count"
+            type="number"
+            min={1}
+            value={limit}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isInteger(value)) setLimit(Math.max(value, 1));
+            }}
+          />
+        </label>
+      </div>
+      {!visibleRows.length ? <EmptyChart /> : (
+        <div className="vocabularyTableFrame">
+          <table className="typeQualityTable vocabularyTable">
+            <thead>
+              <tr>
+                {vocabularyColumns.map((column) => (
+                  <th key={column.key} aria-sort={sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                    <button
+                      className={sortKey === column.key ? "active" : ""}
+                      type="button"
+                      onClick={() => onSort(column.key)}
+                    >
+                      {column.label}
+                      {sortKey === column.key
+                        ? sortDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        : <ArrowUpDown size={12} />}
+                    </button>
+                  </th>
+                ))}
+                <th>Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => (
+                <tr key={row.name}>
+                  <td title={row.name}><strong>{row.name}</strong></td>
+                  <td><VocabularyMetricCell value={row.occurrences} max={maxOccurrences} /></td>
+                  <td><VocabularyMetricCell value={row.documentFrequency} max={maxDocumentFrequency} /></td>
+                  <td>{percentage(row.coverage)}</td>
+                  <td>{round(row.occurrencesPerModel)}</td>
+                  <td>{round(row.occurrencesPerUsedModel)}</td>
+                  <td><VocabularyClassification row={row} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function vocabularyFilterMatches(row: VisualizationPayload["vocabularyRanking"][number], filter: VocabularyFilter) {
+  if (filter === "semantic") return row.classification === "semantic";
+  if (filter === "placeholder") return row.placeholder > 0;
+  if (filter === "typeLike") return row.typeLike > 0;
+  if (filter === "nonSemantic") return row.placeholder > 0 || row.typeLike > 0;
+  if (filter === "excludeNonSemantic") return row.placeholder === 0 && row.typeLike === 0;
+  return true;
+}
+
+function VocabularyMetricCell({ value, max }: { value: number; max: number }) {
+  return (
+    <div className="vocabularyMetricCell">
+      <span>{round(value).toLocaleString()}</span>
+      <i><b style={{ width: `${value / Math.max(max, 1) * 100}%` }} /></i>
+    </div>
+  );
+}
+
+function VocabularyClassification({ row }: { row: VisualizationPayload["vocabularyRanking"][number] }) {
+  const label = vocabularyClassificationLabel(row.classification);
+  return (
+    <span
+      className={`vocabularyBadge ${row.classification}`}
+      title={`Semantic ${row.semantic.toLocaleString()}, placeholder ${row.placeholder.toLocaleString()}, type-like ${row.typeLike.toLocaleString()}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function vocabularyClassificationLabel(classification: VisualizationPayload["vocabularyRanking"][number]["classification"]) {
+  if (classification === "typeLike") return "Type-like";
+  if (classification === "semantic") return "Semantic";
+  if (classification === "placeholder") return "Placeholder";
+  if (classification === "mixed") return "Mixed";
+  return "Unknown";
 }
 
 const qualitySegments = [
@@ -739,8 +908,78 @@ function ConceptTreemap({ links }: { links: VisualizationPayload["typeConceptLin
 }
 
 function Heatmap({ data }: { data: VisualizationPayload["vocabularyHeatmap"] }) {
+  const [tokenLimit, setTokenLimit] = useState(Math.min(18, data.tokens.length));
+  const [typeLimit, setTypeLimit] = useState(Math.min(10, data.rows.length));
   if (!data.tokens.length || !data.rows.length) return <EmptyChart />;
-  return <div className="heatmap"><div className="heatmapHeader"><b /><>{data.tokens.map((token) => <span key={token}>{token}</span>)}</></div>{data.rows.map((row) => <div className="heatmapRow" key={row.label}><b>{row.label}</b>{row.values.map((value, index) => <span key={`${row.label}:${data.tokens[index]}`} style={{ background: `rgba(15, 118, 110, ${Math.min(value * 8, 1)})` }} title={`${row.label} / ${data.tokens[index]}: ${round(value * 100)}%`} />)}</div>)}</div>;
+  const tokens = data.tokens.slice(0, tokenLimit);
+  const rows = data.rows.slice(0, typeLimit);
+  const max = Math.max(...rows.flatMap((row) => row.values.slice(0, tokenLimit)), 0.01);
+  return (
+    <div className="heatmapPanel">
+      <div className="heatmapToolbar">
+        <label className="chartLimit">
+          Tokens
+          <input
+            aria-label="Vocabulary heatmap token count"
+            type="number"
+            min={1}
+            max={data.tokens.length}
+            value={tokenLimit}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isInteger(value)) setTokenLimit(Math.min(Math.max(value, 1), data.tokens.length));
+            }}
+          />
+        </label>
+        <label className="chartLimit">
+          Types
+          <input
+            aria-label="Vocabulary heatmap type count"
+            type="number"
+            min={1}
+            max={data.rows.length}
+            value={typeLimit}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isInteger(value)) setTypeLimit(Math.min(Math.max(value, 1), data.rows.length));
+            }}
+          />
+        </label>
+        <div className="heatmapLegend" aria-label="Heatmap color legend">
+          <span>Low</span>
+          <i />
+          <span>High</span>
+        </div>
+      </div>
+      <div className="heatmap" style={{ gridTemplateColumns: `150px repeat(${tokens.length}, minmax(42px, 1fr))` }}>
+        <b />
+        {tokens.map((token) => <span className="heatmapToken" key={token} title={token}>{token}</span>)}
+        {rows.map((row) => (
+          <div className="heatmapRow" style={{ display: "contents" }} key={row.label}>
+            <b title={row.label}>{row.label}</b>
+            {tokens.map((token, index) => {
+              const value = row.values[index] || 0;
+              return (
+                <span
+                  className="heatmapCell"
+                  key={`${row.label}:${token}`}
+                  style={{ backgroundColor: heatmapColor(value / max) }}
+                  title={`${row.label} / ${token}: ${round(value * 100)}% relative frequency`}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function heatmapColor(intensity: number) {
+  const value = Math.max(0, Math.min(1, intensity));
+  const lightness = 96 - value * 42;
+  const saturation = 26 + value * 24;
+  return `hsl(176  ${saturation}% ${lightness}%)`;
 }
 
 function TypeConceptLinks({ links }: { links: VisualizationPayload["typeConceptLinks"] }) {

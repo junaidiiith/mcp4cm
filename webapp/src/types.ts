@@ -170,6 +170,17 @@ export interface VisualizationPayload {
   topConceptDocumentFrequency: StatisticItem[];
   topConceptsWithoutTypePlaceholders: StatisticItem[];
   topConceptDocumentFrequencyWithoutTypePlaceholders: StatisticItem[];
+  vocabularySummary: {
+    uniqueNames: number;
+    totalOccurrences: number;
+    semanticNames: number;
+    placeholderOrTypeLikeNames: number;
+    singletonNames: number;
+    mostReusedName: string;
+    mostReusedDocumentFrequency: number;
+  };
+  vocabularyRanking: VocabularyRankingRow[];
+  nameReuseDistribution: StatisticItem[];
   elementTypeTreemap: StatisticItem[];
   vocabularyHeatmap: { tokens: string[]; rows: Array<{ label: string; values: number[] }> };
   typeConceptLinks: Array<{ type: string; concept: string; count: number }>;
@@ -195,6 +206,19 @@ export interface VisualizationPayload {
   fewNamesHistogram: HistogramBin[];
   topNamesPerModel: StatisticItem[];
   languageDistribution: StatisticItem[];
+}
+
+export interface VocabularyRankingRow {
+  name: string;
+  occurrences: number;
+  documentFrequency: number;
+  coverage: number;
+  occurrencesPerModel: number;
+  occurrencesPerUsedModel: number;
+  semantic: number;
+  placeholder: number;
+  typeLike: number;
+  classification: "semantic" | "placeholder" | "typeLike" | "mixed" | "unknown";
 }
 
 export interface RatioSummary {

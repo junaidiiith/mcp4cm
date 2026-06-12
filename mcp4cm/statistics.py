@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from collections import Counter
 import math
-import re
 import warnings
 from statistics import mean, median
 from typing import Any
 
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.dummy import is_placeholder_name
-from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, normalize_identifier
+from mcp4cm.name_classification import classify_name_slot
 
 
 def dataset_summary(dataset: Dataset) -> dict[str, Any]:
@@ -80,44 +78,21 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
 
 
 def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
-    pairs = [
-        (
-            normalize_identifier(attrs.get("type") or attrs.get("eClass") or "unknown"),
-            normalize_identifier(attrs.get("name")),
+    entries = []
+    for _, attrs in record.graph.nodes(data=True):
+        if "name" not in attrs:
+            continue
+        result = classify_name_slot(attrs.get("name"), attrs.get("type") or attrs.get("eClass") or "unknown")
+        entries.append(
+            {
+                "type": result.normalized_type or "unknown",
+                "name": result.normalized_name,
+                "missing": result.missing,
+                "typePlaceholder": result.type_like,
+                "classification": result.classification,
+            }
         )
-        for _, attrs in record.graph.nodes(data=True)
-        if "name" in attrs
-    ]
-    return [
-        {
-            "type": element_type or "unknown",
-            "name": name,
-            "missing": name == EMPTY_NAME_SENTINEL or not name,
-            "typePlaceholder": is_type_placeholder_name(element_type, name),
-            "classification": classify_name_entry(element_type, name),
-        }
-        for element_type, name in pairs
-    ]
-
-
-def is_type_placeholder_name(element_type: str, name: str) -> bool:
-    if not element_type or not name or name == EMPTY_NAME_SENTINEL:
-        return False
-    normalized_type = normalize_identifier(element_type)
-    normalized_name = normalize_identifier(name)
-    if normalized_name == normalized_type:
-        return True
-    return bool(re.fullmatch(rf"{re.escape(normalized_type.replace(' ', ''))}\d+", normalized_name.replace(" ", "")))
-
-
-def classify_name_entry(element_type: str, name: str) -> str:
-    if name == EMPTY_NAME_SENTINEL or not name:
-        return "missing"
-    if is_type_placeholder_name(element_type, name):
-        return "type_like"
-    if is_placeholder_name(normalize_identifier(name)):
-        return "placeholder"
-    return "semantic"
+    return entries
 
 
 def counter_items(counter: Counter[str], limit: int | None = None) -> list[dict[str, Any]]:
@@ -202,6 +177,89 @@ def percentile_float(values: list[float], fraction: float) -> float:
 def classification_items(counter: Counter[str]) -> list[dict[str, Any]]:
     labels = (("semantic", "Semantic"), ("missing", "Missing"), ("placeholder", "Placeholder"), ("type_like", "Type-like"))
     return [{"label": label, "key": key, "count": int(counter.get(key, 0))} for key, label in labels]
+
+
+def vocabulary_ranking_items(
+    occurrence_counter: Counter[str],
+    document_frequency_counter: Counter[str],
+    classification_counters: dict[str, Counter[str]],
+    *,
+    model_count: int,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    rows = []
+    for name, occurrences in occurrence_counter.most_common(limit):
+        doc_frequency = int(document_frequency_counter.get(name, 0))
+        counts = classification_counters.get(name, Counter())
+        semantic = int(counts.get("semantic", 0))
+        placeholder = int(counts.get("placeholder", 0))
+        type_like = int(counts.get("type_like", 0))
+        rows.append(
+            {
+                "name": name,
+                "occurrences": int(occurrences),
+                "documentFrequency": doc_frequency,
+                "coverage": round(doc_frequency / model_count, 6) if model_count else 0,
+                "occurrencesPerModel": round(occurrences / model_count, 6) if model_count else 0,
+                "occurrencesPerUsedModel": round(occurrences / doc_frequency, 6) if doc_frequency else 0,
+                "semantic": semantic,
+                "placeholder": placeholder,
+                "typeLike": type_like,
+                "classification": vocabulary_classification_label(semantic, placeholder, type_like),
+            }
+        )
+    return rows
+
+
+def vocabulary_classification_label(semantic: int, placeholder: int, type_like: int) -> str:
+    counts = {"semantic": semantic, "placeholder": placeholder, "typeLike": type_like}
+    non_zero = [key for key, value in counts.items() if value > 0]
+    if not non_zero:
+        return "unknown"
+    if len(non_zero) > 1:
+        return "mixed"
+    return non_zero[0]
+
+
+def vocabulary_summary(
+    occurrence_counter: Counter[str],
+    document_frequency_counter: Counter[str],
+    classification_counters: dict[str, Counter[str]],
+) -> dict[str, Any]:
+    semantic_names = sum(1 for counts in classification_counters.values() if counts.get("semantic", 0) > 0)
+    placeholder_or_type_like_names = sum(
+        1
+        for counts in classification_counters.values()
+        if counts.get("placeholder", 0) > 0 or counts.get("type_like", 0) > 0
+    )
+    most_reused_name, most_reused_count = document_frequency_counter.most_common(1)[0] if document_frequency_counter else ("", 0)
+    return {
+        "uniqueNames": len(occurrence_counter),
+        "totalOccurrences": int(sum(occurrence_counter.values())),
+        "semanticNames": semantic_names,
+        "placeholderOrTypeLikeNames": placeholder_or_type_like_names,
+        "singletonNames": sum(1 for count in document_frequency_counter.values() if count == 1),
+        "mostReusedName": most_reused_name,
+        "mostReusedDocumentFrequency": int(most_reused_count),
+    }
+
+
+def name_reuse_distribution(document_frequency_counter: Counter[str], model_count: int) -> list[dict[str, Any]]:
+    if not document_frequency_counter:
+        return []
+    dynamic_upper = max(100, model_count)
+    bands = [
+        ("1", 1, 2),
+        ("2-5", 2, 6),
+        ("6-20", 6, 21),
+        ("21-100", 21, 101),
+        ("101+", 101, dynamic_upper + 1),
+    ]
+    values = list(document_frequency_counter.values())
+    return [
+        {"label": label, "count": sum(1 for value in values if lower <= value < upper)}
+        for label, lower, upper in bands
+    ]
 
 
 def type_quality_items(
@@ -395,6 +453,7 @@ class CorpusStatisticsAccumulator:
         self.filtered_concept_counter: Counter[str] = Counter()
         self.concept_doc_freq: Counter[str] = Counter()
         self.filtered_concept_doc_freq: Counter[str] = Counter()
+        self.concept_classification_counter: dict[str, Counter[str]] = {}
         self.type_concept_counter: dict[str, Counter[str]] = {}
         self.type_token_counter: dict[str, Counter[str]] = {}
         self.scatter_rows: list[dict[str, Any]] = []
@@ -478,6 +537,8 @@ class CorpusStatisticsAccumulator:
                 continue
             concept = str(entry["name"])
             self.concept_counter[concept] += 1
+            concept_classifications = self.concept_classification_counter.setdefault(concept, Counter())
+            concept_classifications[classification] += 1
             model_names.add(concept)
             type_concepts = self.type_concept_counter.setdefault(element_type, Counter())
             type_concepts[concept] += 1
@@ -584,6 +645,18 @@ class CorpusStatisticsAccumulator:
             "topConceptDocumentFrequency": counter_items(self.concept_doc_freq),
             "topConceptsWithoutTypePlaceholders": counter_items(self.filtered_concept_counter),
             "topConceptDocumentFrequencyWithoutTypePlaceholders": counter_items(self.filtered_concept_doc_freq),
+            "vocabularySummary": vocabulary_summary(
+                self.concept_counter,
+                self.concept_doc_freq,
+                self.concept_classification_counter,
+            ),
+            "vocabularyRanking": vocabulary_ranking_items(
+                self.concept_counter,
+                self.concept_doc_freq,
+                self.concept_classification_counter,
+                model_count=model_count,
+            ),
+            "nameReuseDistribution": name_reuse_distribution(self.concept_doc_freq, model_count),
             "elementTypeTreemap": counter_items(self.entry_type_counter, 40),
             "vocabularyHeatmap": {"tokens": heatmap_tokens, "rows": heatmap_rows},
             "typeConceptLinks": type_links,
