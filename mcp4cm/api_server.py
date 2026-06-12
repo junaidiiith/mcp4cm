@@ -62,6 +62,7 @@ from mcp4cm.runtime_store import (
     spill_model_to_runtime,
 )
 from mcp4cm.statistics import CorpusStatisticsAccumulator, model_summary_fields
+from mcp4cm.utils import elapsed_ms, pair_count, pair_key, pair_lookup_key, parse_bool, progress_percent
 
 DATASETS: dict[str, Dataset | RuntimeDataset] = {}
 DUPLICATE_JOBS: dict[str, dict[str, Any]] = {}
@@ -139,7 +140,7 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
 
     @app.route("/api/datasets/<dataset_id>/models/<model_id>/inspect", methods=["GET"])
     def inspect_model_route(dataset_id: str, model_id: str):
-        include_attrs = parse_form_bool(request.args.get("includeAttrs"), True)
+        include_attrs = parse_bool(request.args.get("includeAttrs"), default=True)
         return jsonify(
             inspect_dataset_model(
                 dataset_id=dataset_id,
@@ -363,14 +364,6 @@ def pids_on_port(port: int) -> list[int]:
     return pids
 
 
-def parse_form_bool(value: Any, default: bool = True) -> bool:
-    if value in (None, ""):
-        return default
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {"1", "true", "yes", "on"}
-
-
 def validate_language_and_format(language: str, data_format: str) -> None:
     resolve_parser(language, data_format)
 
@@ -526,7 +519,7 @@ def get_upload_parse_job(upload_id: str, job_id: str) -> dict[str, Any]:
 
 def upload_job_elapsed_ms(job: dict[str, Any], *, finished_at: float | None = None) -> int:
     started_at = float(job.get("startedAt") or time.time())
-    return round(((finished_at or time.time()) - started_at) * 1000)
+    return elapsed_ms(started_at, finished_at)
 
 
 def run_upload_parse_job(upload_id: str, job_id: str) -> None:
@@ -539,7 +532,7 @@ def run_upload_parse_job(upload_id: str, job_id: str) -> None:
             job.update(patch)
 
     def parse_phase_progress(processed: int, total: int) -> dict[str, Any]:
-        percent = round((processed / max(1, total)) * 100)
+        percent = progress_percent(processed, total, zero_total=0)
         return {
             "stage": "parse",
             "parseProcessedFiles": processed,
@@ -867,7 +860,7 @@ def dummy_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> int:
     with DUMMY_JOBS_LOCK:
         job = DUMMY_JOBS.get(job_id) or {}
         started_at = float(job.get("startedAt") or time.time())
-    return round(((finished_at or time.time()) - started_at) * 1000)
+    return elapsed_ms(started_at, finished_at)
 
 
 def dummy_response_payload(evaluation, statistics_job_id: str = "") -> dict[str, Any]:
@@ -1101,7 +1094,7 @@ def duplicate_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> i
     with DUPLICATE_JOBS_LOCK:
         job = DUPLICATE_JOBS.get(job_id) or {}
         started_at = float(job.get("startedAt") or time.time())
-    return round(((finished_at or time.time()) - started_at) * 1000)
+    return elapsed_ms(started_at, finished_at)
 
 
 def duplicate_result_response_preview(result: dict[str, Any]) -> dict[str, Any]:
@@ -1250,11 +1243,6 @@ def parse_positive_int(value: Any, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
-def pair_lookup_key(left_id: str, right_id: str) -> str:
-    left, right = pair_key(left_id, right_id)
-    return f"{left}\u0000{right}"
-
-
 def build_duplicate_groups(
     decisions: list[dict[str, Any]],
     model_summaries: dict[str, dict[str, Any]],
@@ -1322,7 +1310,7 @@ def build_duplicate_groups(
                     except (TypeError, ValueError):
                         pass
 
-        possible_pairs = len(model_ids) * (len(model_ids) - 1) // 2
+        possible_pairs = pair_count(len(model_ids))
         missing_pairs = max(possible_pairs - approved_internal - rejected_internal, 0)
         density = approved_internal / possible_pairs if possible_pairs else 0
         canonical_model_id = propose_canonical_model(model_ids, model_summaries)
@@ -1581,9 +1569,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
             if technique == "hash":
                 groups = detect_duplicates_by_name_hash(
                     projected_dataset,
-                    include_types=parse_form_bool(thresholds.get("hashIncludeTypes"), False),
+                    include_types=parse_bool(thresholds.get("hashIncludeTypes"), default=False),
                     min_named_nodes=int(thresholds.get("minNamedNodes", 0)),
-                    deduplicate_name_tokens=parse_form_bool(thresholds.get("deduplicateNameTokens"), False),
+                    deduplicate_name_tokens=parse_bool(thresholds.get("deduplicateNameTokens"), default=False),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = group_pairs(groups)
@@ -1615,8 +1603,8 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                     projected_dataset,
                     threshold=float(thresholds.get("graphSimilarity", 0.85)),
                     weights=graph_similarity_weights(thresholds),
-                    use_directed_metrics=parse_form_bool(thresholds.get("useDirectedMetrics"), False),
-                    normalize_parallel_edges=parse_form_bool(thresholds.get("normalizeParallelEdges"), False),
+                    use_directed_metrics=parse_bool(thresholds.get("useDirectedMetrics"), default=False),
+                    normalize_parallel_edges=parse_bool(thresholds.get("normalizeParallelEdges"), default=False),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
@@ -1654,9 +1642,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                 pairs = graph_isomorphism_pairs(
                     projected_dataset,
                     mode=parse_isomorphism_mode(thresholds.get("isomorphismMode", "names")),
-                    match_edge_types=parse_form_bool(thresholds.get("matchEdgeTypes"), True),
-                    ignore_direction=parse_form_bool(thresholds.get("ignoreDirection"), False),
-                    match_parallel_edge_multiplicity=parse_form_bool(thresholds.get("matchParallelEdgeMultiplicity"), True),
+                    match_edge_types=parse_bool(thresholds.get("matchEdgeTypes"), default=True),
+                    ignore_direction=parse_bool(thresholds.get("ignoreDirection"), default=False),
+                    match_parallel_edge_multiplicity=parse_bool(thresholds.get("matchParallelEdgeMultiplicity"), default=True),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
@@ -1724,9 +1712,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "selectedTechniques": list(selected_order),
         "mandatoryTechniques": sorted(mandatory),
         "minVotes": min_votes,
-        "hashIncludeTypes": parse_form_bool(thresholds.get("hashIncludeTypes"), False),
+        "hashIncludeTypes": parse_bool(thresholds.get("hashIncludeTypes"), default=False),
         "minNamedNodes": int(thresholds.get("minNamedNodes", 0)),
-        "deduplicateNameTokens": parse_form_bool(thresholds.get("deduplicateNameTokens"), False),
+        "deduplicateNameTokens": parse_bool(thresholds.get("deduplicateNameTokens"), default=False),
         "tfidfTokenMode": parse_tfidf_token_mode(body, thresholds),
         "tfidfSimilarityThreshold": tfidf_threshold,
         "tfidfMaxFeatures": int(thresholds.get("tfidfMaxFeatures", 50_000)),
@@ -2100,10 +2088,6 @@ def inspect_dataset_model(
     }
 
 
-def pair_key(left_id: str, right_id: str) -> tuple[str, str]:
-    return tuple(sorted((left_id, right_id)))  # type: ignore[return-value]
-
-
 def add_votes(
     votes: dict[tuple[str, str], dict[str, float]],
     pairs: list[tuple[str, str, float]],
@@ -2241,7 +2225,7 @@ def raw_duplicate_techniques(body: dict[str, Any]) -> list[Any]:
 def parse_tfidf_token_mode(body: dict[str, Any], thresholds: dict[str, Any]) -> str:
     raw = body.get("tfidfTokenMode", thresholds.get("tfidfTokenMode"))
     if raw is None:
-        include_types = parse_form_bool(thresholds.get("tfidfIncludeTypes"), False)
+        include_types = parse_bool(thresholds.get("tfidfIncludeTypes"), default=False)
         return "names_types_bag" if include_types else "names"
     normalized = str(raw).strip().lower()
     aliases = {

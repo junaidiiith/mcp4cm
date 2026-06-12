@@ -13,7 +13,7 @@ from mcp4cm.name_classification import iter_name_slots
 def dataset_summary(dataset: Dataset) -> dict[str, Any]:
     node_counts = [record.node_count for record in dataset]
     edge_counts = [record.edge_count for record in dataset]
-    model_name_counts = [len(node_names(record)) for record in dataset]
+    model_name_counts = [len(record.names) for record in dataset]
     return {
         "models": len(dataset),
         "languages": dict(Counter(record.language for record in dataset)),
@@ -29,7 +29,7 @@ def type_counts(dataset: Dataset) -> Counter[str]:
 
 
 def name_counts(dataset: Dataset) -> Counter[str]:
-    return Counter(name.strip() for record in dataset for name in node_names(record) if name.strip())
+    return Counter(name.strip() for record in dataset for name in record.names if name.strip())
 
 
 def model_statistics(record: ModelRecord) -> dict[str, Any]:
@@ -39,13 +39,9 @@ def model_statistics(record: ModelRecord) -> dict[str, Any]:
         "labels": record.labels,
         "nodes": record.node_count,
         "edges": record.edge_count,
-        "names": len(node_names(record)),
+        "names": len(record.names),
         "types": dict(Counter(record.types)),
     }
-
-
-def node_names(record: ModelRecord) -> list[str]:
-    return [str(attrs.get("name")) for _, attrs in record.graph.nodes(data=True) if attrs.get("name")]
 
 
 def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
@@ -151,20 +147,22 @@ def ratio_summary(values: list[float]) -> dict[str, float | int]:
     return {
         "models": len(values),
         "zero": sum(1 for value in values if value == 0),
-        "median": percentile_float(ordered, 0.5),
-        "p90": percentile_float(ordered, 0.9),
+        "median": percentile(ordered, 0.5, round_digits=6),
+        "p90": percentile(ordered, 0.9, round_digits=6),
         "above30": sum(1 for value in values if value >= 0.3),
         "above70": sum(1 for value in values if value >= 0.7),
     }
 
 
-def percentile_float(values: list[float], fraction: float) -> float:
+def percentile(values: list[float | int], fraction: float, *, round_digits: int | None = None) -> float:
     position = (len(values) - 1) * fraction
     lower = math.floor(position)
     upper = math.ceil(position)
     if lower == upper:
-        return round(values[lower], 6)
-    return round(values[lower] + (values[upper] - values[lower]) * (position - lower), 6)
+        result = float(values[lower])
+    else:
+        result = values[lower] + (values[upper] - values[lower]) * (position - lower)
+    return round(result, round_digits) if round_digits is not None else result
 
 
 def classification_items(counter: Counter[str]) -> list[dict[str, Any]]:
@@ -328,15 +326,6 @@ def boxplot_summary(values: list[int]) -> dict[str, float]:
     }
 
 
-def percentile(values: list[int], fraction: float) -> float:
-    position = (len(values) - 1) * fraction
-    lower = math.floor(position)
-    upper = math.ceil(position)
-    if lower == upper:
-        return values[lower]
-    return values[lower] + (values[upper] - values[lower]) * (position - lower)
-
-
 def topic_model(models: list[dict[str, Any]]) -> dict[str, Any]:
     texts = [model["text"] for model in models]
     if len(texts) < 2 or not any(texts):
@@ -463,7 +452,7 @@ class CorpusStatisticsAccumulator:
         for type_name in record.types:
             if type_name:
                 self.type_counter[str(type_name)] += 1
-        for name in node_names(record):
+        for name in record.names:
             stripped = name.strip()
             if stripped:
                 self.name_counter[stripped] += 1
@@ -471,7 +460,7 @@ class CorpusStatisticsAccumulator:
         row = _model_visualization_row(record)
         self.name_slot_counts.append(int(row["nameSlots"]))
         self.semantic_name_counts.append(int(row["semanticNameCount"]))
-        self.name_count_values.append(len(node_names(record)))
+        self.name_count_values.append(len(record.names))
         if row["nameSlots"]:
             self.missing_ratios.append(float(row["missingNameRatio"]))
         for classification, count in row["classificationCounts"].items():
@@ -513,7 +502,7 @@ class CorpusStatisticsAccumulator:
                     "language": str(record.language),
                     "nodes": record.node_count,
                     "edges": record.edge_count,
-                    "names": len(node_names(record)),
+                    "names": len(record.names),
                 }
             )
 

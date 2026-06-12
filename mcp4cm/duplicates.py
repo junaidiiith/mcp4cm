@@ -10,6 +10,7 @@ from typing import Any, Callable, Iterable, Literal
 from mcp4cm._deps import require_networkx, require_node2vec, require_sklearn, require_transformers_torch
 from mcp4cm.core import Dataset, ModelRecord
 from mcp4cm.parsers.fingerprints import canonical_graph_hash
+from mcp4cm.utils import pair_count, pair_key, progress_percent
 
 HashMode = Literal["names", "names_types", "canonical_graph"]
 IsomorphismMode = Literal["structure", "names", "names_types"]
@@ -900,10 +901,6 @@ def weighted_score(metrics: dict[str, float], weights: dict[str, float]) -> floa
     return sum(metrics.get(name, 0.0) * weight for name, weight in weights.items()) / total_weight
 
 
-def pair_count(item_count: int) -> int:
-    return item_count * (item_count - 1) // 2
-
-
 def _report_progress(
     progress: ProgressCallback | None,
     *,
@@ -914,13 +911,12 @@ def _report_progress(
 ) -> None:
     if progress is None:
         return
-    percent = round((current / total) * 100) if total else 100
     progress(
         {
             "phase": phase,
             "current": current,
             "total": total,
-            "percent": min(max(percent, 0), 100),
+            "percent": progress_percent(current, total, clamp=True),
             "message": message,
         }
     )
@@ -957,10 +953,6 @@ def hash_tokens_in_order(tokens: Iterable[str], algorithm: str = "sha256") -> st
 
 def normalize(value: object) -> str:
     return " ".join(str(value or "").strip().lower().split())
-
-
-def pair_key(left_id: str, right_id: str) -> tuple[str, str]:
-    return tuple(sorted((left_id, right_id)))  # type: ignore[return-value]
 
 
 def _add_group_votes(

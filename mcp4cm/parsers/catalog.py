@@ -22,6 +22,7 @@ from mcp4cm.parsers.ir import IR
 from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
 from mcp4cm.parsers.uml_xmi.parser import ParseOptions as UMLParseOptions
 from mcp4cm.parsers.uml_xmi.parser import UMLXMIParser
+from mcp4cm.utils import parse_bool
 
 
 @dataclass(frozen=True)
@@ -304,11 +305,7 @@ def normalize_warning_message(message: Any) -> str:
 
 
 def bool_option(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value in (None, ""):
-        return False
-    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+    return parse_bool(value, default=False)
 
 
 _DESCRIPTORS: dict[tuple[str, str], ParserDescriptor] = {}

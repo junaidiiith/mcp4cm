@@ -2,20 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from typing import Any
 
 from mcp4cm.core import ModelRecord
-
-TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
-
-
-def record_names(record: ModelRecord) -> list[str]:
-    return record.names
-
-
-def record_tokens(record: ModelRecord) -> list[str]:
-    return [match.group(0).lower() for match in TOKEN_RE.finditer(record.text_for_similarity())]
 
 
 def canonical_graph_payload(record: ModelRecord) -> dict[str, Any]:
