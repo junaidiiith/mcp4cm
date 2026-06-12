@@ -399,13 +399,6 @@ export interface DuplicateCanonicalSelection {
   duplicateModelIds: string[];
 }
 
-export interface DummyRow {
-  filterName: string;
-  filteredCount: number;
-  remainingCount: number;
-  examples?: Array<{ evidence?: string[] }>;
-}
-
 export interface DummyFilterSummary {
   filterId: string;
   filteredCount: number;
@@ -446,7 +439,6 @@ export interface DummyResponse {
   findings: DummyFinding[];
   statistics?: StatisticsPayload;
   statisticsJobId?: string;
-  rows?: DummyRow[];
 }
 
 export interface DummyProgressState {

@@ -864,24 +864,6 @@ def dummy_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> int:
 
 
 def dummy_response_payload(evaluation, statistics_job_id: str = "") -> dict[str, Any]:
-    filter_rows = [
-        {
-            "filterName": summary.filter_id,
-            "filteredCount": summary.filtered_count,
-            "remainingCount": summary.remaining_count,
-            "examples": [
-                {
-                    "modelId": finding.model_id,
-                    "reason": finding.reason,
-                    "score": finding.score,
-                    "evidence": list(finding.evidence),
-                }
-                for finding in evaluation.findings
-                if finding.filter_id == summary.filter_id and finding.decision == "removed"
-            ][:10],
-        }
-        for summary in evaluation.filter_summaries
-    ]
     return {
         "runSummary": {
             "totalModels": evaluation.run_summary.total_models,
@@ -921,7 +903,6 @@ def dummy_response_payload(evaluation, statistics_job_id: str = "") -> dict[str,
             }
             for finding in evaluation.findings
         ],
-        "rows": filter_rows,
         "statisticsJobId": statistics_job_id,
     }
 
