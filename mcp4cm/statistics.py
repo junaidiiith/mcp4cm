@@ -50,10 +50,10 @@ def node_names(record: ModelRecord) -> list[str]:
 
 def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     entries = typed_name_entries(record)
-    names = [entry["name"] for entry in entries if not entry["missing"]]
+    names = [entry["name"] for entry in entries if entry["classification"] != "missing"]
     semantic_names = [entry["name"] for entry in entries if entry["classification"] == "semantic"]
     tokens = [token for name in names for token in name.split()]
-    missing_names = sum(1 for entry in entries if entry["missing"])
+    missing_names = sum(1 for entry in entries if entry["classification"] == "missing")
     classification_counts = Counter(str(entry["classification"]) for entry in entries)
     name_counts = Counter(names)
     dominant_name, dominant_count = name_counts.most_common(1)[0] if name_counts else ("", 0)
@@ -87,8 +87,6 @@ def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
             {
                 "type": result.normalized_type or "unknown",
                 "name": result.normalized_name,
-                "missing": result.missing,
-                "typePlaceholder": result.type_like,
                 "classification": result.classification,
             }
         )
@@ -533,7 +531,7 @@ class CorpusStatisticsAccumulator:
             self.entry_type_counter[element_type] += 1
             type_quality = self.type_quality_counter.setdefault(element_type, Counter())
             type_quality[classification] += 1
-            if entry["missing"]:
+            if classification == "missing":
                 continue
             concept = str(entry["name"])
             self.concept_counter[concept] += 1
@@ -546,7 +544,7 @@ class CorpusStatisticsAccumulator:
             for token in concept.split():
                 token_counter[token] += 1
             model_concepts.add(concept)
-            if not entry["typePlaceholder"]:
+            if classification != "type_like":
                 self.filtered_concept_counter[concept] += 1
                 filtered_concepts.add(concept)
         for concept in model_concepts:

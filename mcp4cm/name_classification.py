@@ -52,9 +52,6 @@ class NameSlotClassification:
     normalized_name: str
     normalized_type: str
     classification: NameClassification
-    missing: bool
-    type_like: bool
-    placeholder: bool
     tokens: tuple[str, ...]
 
 
@@ -75,9 +72,6 @@ def classify_name_slot(raw_name: object, raw_type: object = "") -> NameSlotClass
         normalized_name=normalized_name,
         normalized_type=normalized_type,
         classification=classification,
-        missing=classification == "missing",
-        type_like=classification == "type_like",
-        placeholder=classification == "placeholder",
         tokens=tuple(sorted(tokenize_name(normalized_name))),
     )
 
