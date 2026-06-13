@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+from collections import Counter
 from typing import Any
 
-from mcp4cm.api.state import AFTER_DUMMY_STATISTICS_JOBS, AFTER_DUMMY_STATISTICS_LOCK, DATASETS
+from mcp4cm.api.state import (
+    AFTER_DUMMY_STATISTICS_JOBS,
+    AFTER_DUMMY_STATISTICS_LOCK,
+    DATASETS,
+    LABEL_PIPELINE_CACHE,
+    LABEL_PIPELINE_CACHE_LOCK,
+)
 from mcp4cm.core import Dataset
 from mcp4cm.dummy import default_filter_configs
 from mcp4cm.runtime_store import (
@@ -15,7 +23,17 @@ from mcp4cm.runtime_store import (
     load_model_from_runtime,
     resolve_dataset,
 )
-from mcp4cm.statistics import model_summary_fields
+from mcp4cm.statistics import label_pipeline_items, model_summary_fields, typed_name_entries
+
+LABEL_PIPELINE_SORT_KEYS = {
+    "rawName",
+    "normalizedName",
+    "rawType",
+    "normalizedType",
+    "classification",
+    "occurrences",
+    "documentFrequency",
+}
 
 
 def default_dummy_filter_configs(language: str) -> list[dict[str, Any]]:
@@ -126,6 +144,159 @@ def get_dataset_after_dummy_statistics_response(dataset_id: str) -> dict[str, An
         "jobId": job.get("jobId") or "",
         "error": job.get("error") or "",
     }
+
+
+def get_label_pipeline_page(
+    dataset_id: str,
+    *,
+    snapshot: str = "before",
+    page: int = 1,
+    page_size: int = 50,
+    query: str = "",
+    classification: str = "all",
+    sort: str = "documentFrequency",
+    order: str = "desc",
+) -> dict[str, Any]:
+    dataset_id = str(dataset_id or "")
+    if get_dataset_meta(dataset_id) is None:
+        raise ValueError("Unknown datasetId. Pipeline state was reset by a new run; please re-upload.")
+
+    snapshot = "after" if str(snapshot or "").strip().lower() == "after" else "before"
+    page = max(1, int(page))
+    page_size = max(1, min(int(page_size), 250))
+    sort = sort if sort in LABEL_PIPELINE_SORT_KEYS else "documentFrequency"
+    reverse = str(order or "desc").lower() != "asc"
+
+    rows = _label_pipeline_rows_for_snapshot(dataset_id, snapshot)
+    rows = _filter_label_pipeline_rows(rows, query=query, classification=classification)
+    _sort_label_pipeline_rows(rows, sort=sort, reverse=reverse)
+
+    total = len(rows)
+    total_pages = max(1, (total + page_size - 1) // page_size) if total else 0
+    page = min(page, total_pages) if total_pages else 1
+    start = (page - 1) * page_size
+    return {
+        "datasetId": dataset_id,
+        "snapshot": snapshot,
+        "page": page,
+        "pageSize": page_size,
+        "total": total,
+        "totalPages": total_pages,
+        "rows": rows[start : start + page_size],
+    }
+
+
+def _label_pipeline_rows_for_snapshot(dataset_id: str, snapshot: str) -> list[dict[str, Any]]:
+    retained_model_ids = None
+    cache_snapshot = snapshot
+    if snapshot == "after":
+        if load_dataset_after_dummy_statistics(dataset_id) is None:
+            raise ValueError("After-cleansing statistics are unavailable for this dataset.")
+        retained_model_ids = load_dataset_after_dummy_retained_model_ids(dataset_id)
+        if retained_model_ids is None:
+            raise ValueError("After-cleansing retained model IDs are unavailable for this dataset.")
+        cache_snapshot = f"after:{_retained_model_ids_signature(retained_model_ids)}"
+
+    cache_key = f"{dataset_id}:{cache_snapshot}"
+    with LABEL_PIPELINE_CACHE_LOCK:
+        cached = LABEL_PIPELINE_CACHE.get(cache_key)
+    if cached is not None:
+        return [dict(row) for row in cached]
+
+    dataset = get_dataset_by_id(dataset_id)
+    rows = _build_label_pipeline_rows(dataset, retained_model_ids=retained_model_ids)
+    with LABEL_PIPELINE_CACHE_LOCK:
+        LABEL_PIPELINE_CACHE[cache_key] = [dict(row) for row in rows]
+    return rows
+
+
+def _build_label_pipeline_rows(
+    dataset: Dataset | RuntimeDataset,
+    *,
+    retained_model_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    occurrence_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
+    document_frequency_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
+
+    for record in dataset:
+        if retained_model_ids is not None and str(record.model_id) not in retained_model_ids:
+            continue
+        model_label_rows = set()
+        for entry in typed_name_entries(record):
+            key = (
+                str(entry.get("rawName", "")),
+                str(entry.get("normalizedName", entry.get("name", ""))),
+                str(entry.get("rawType", "")),
+                str(entry.get("normalizedType", "")),
+                tuple(str(token) for token in entry.get("nameTokens", ())),
+                tuple(str(token) for token in entry.get("typeTokens", ())),
+                str(entry.get("classification", "")),
+            )
+            occurrence_counter[key] += 1
+            model_label_rows.add(key)
+        document_frequency_counter.update(model_label_rows)
+
+    return label_pipeline_items(occurrence_counter, document_frequency_counter, limit=len(occurrence_counter))
+
+
+def _filter_label_pipeline_rows(
+    rows: list[dict[str, Any]],
+    *,
+    query: str,
+    classification: str,
+) -> list[dict[str, Any]]:
+    classification = str(classification or "all").strip().lower()
+    if classification in {"semantic", "placeholder", "missing"}:
+        rows = [row for row in rows if str(row.get("classification") or "") == classification]
+
+    lowered_query = str(query or "").strip().lower()
+    if not lowered_query:
+        return rows
+    return [row for row in rows if lowered_query in _label_pipeline_search_text(row)]
+
+
+def _label_pipeline_search_text(row: dict[str, Any]) -> str:
+    tokens = [*row.get("nameTokens", []), *row.get("typeTokens", [])]
+    return " ".join(
+        [
+            str(row.get("rawName") or ""),
+            str(row.get("normalizedName") or ""),
+            str(row.get("rawType") or ""),
+            str(row.get("normalizedType") or ""),
+            str(row.get("classification") or ""),
+            " ".join(str(token) for token in tokens),
+        ]
+    ).lower()
+
+
+def _sort_label_pipeline_rows(rows: list[dict[str, Any]], *, sort: str, reverse: bool) -> None:
+    def tie_breakers(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+        return (
+            str(row.get("normalizedName") or "").lower(),
+            str(row.get("rawName") or "").lower(),
+            str(row.get("normalizedType") or "").lower(),
+            str(row.get("rawType") or "").lower(),
+            str(row.get("classification") or "").lower(),
+        )
+
+    if sort in {"occurrences", "documentFrequency"}:
+        rows.sort(
+            key=lambda row: (
+                -int(row.get(sort) or 0) if reverse else int(row.get(sort) or 0),
+                *tie_breakers(row),
+            )
+        )
+        return
+
+    rows.sort(key=lambda row: (str(row.get(sort) or "").lower(), *tie_breakers(row)), reverse=reverse)
+
+
+def _retained_model_ids_signature(model_ids: set[str]) -> str:
+    digest = hashlib.sha1()
+    for model_id in sorted(model_ids):
+        digest.update(model_id.encode("utf-8", errors="ignore"))
+        digest.update(b"\0")
+    return f"{len(model_ids)}:{digest.hexdigest()}"
 
 
 def top_items(counter, limit: int | None = None) -> list[dict[str, Any]]:

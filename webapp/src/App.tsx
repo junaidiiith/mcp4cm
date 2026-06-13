@@ -537,6 +537,7 @@ export default function App() {
             />
 
             <VisualizationPanel
+              datasetId={datasetId}
               beforeData={stats?.visualizations || null}
               afterData={afterDummyStats?.visualizations || null}
               beforeModelCount={stats?.summary.models || null}

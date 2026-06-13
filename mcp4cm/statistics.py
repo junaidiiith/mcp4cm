@@ -48,6 +48,7 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     entries = typed_name_entries(record)
     names = [entry["name"] for entry in entries if entry["classification"] != "missing"]
     semantic_names = [entry["name"] for entry in entries if entry["classification"] == "semantic"]
+    placeholder_names = [entry["name"] for entry in entries if entry["classification"] == "placeholder"]
     tokens = [
         token for entry in entries if entry["classification"] != "missing" for token in entry.get("nameTokens", ())
     ]
@@ -64,10 +65,12 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
         "namedElements": len(entries) - missing_names,
         "missingNameRatio": missing_names / len(entries) if entries else 0,
         "semanticNameCount": len(semantic_names),
+        "placeholderNameCount": len(placeholder_names),
         "classificationCounts": classification_counts,
         "dominantName": dominant_name,
         "dominantNameCount": dominant_count,
         "dominantNameRatio": dominant_count / named_count if named_count else 0,
+        "placeholderNameRatio": len(placeholder_names) / named_count if named_count else 0,
         "uniqueNames": len(set(names)),
         "tokens": len(tokens),
         "uniqueTokens": len(set(tokens)),
@@ -247,6 +250,49 @@ def vocabulary_summary(
     }
 
 
+def type_vocabulary_table_items(
+    type_concept_counters: dict[str, Counter[str]],
+    type_totals: Counter[str],
+    type_concept_classification_counters: dict[str, dict[str, Counter[str]]],
+    *,
+    type_limit: int | None = None,
+    name_limit: int = 6,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    type_items = type_totals.most_common() if type_limit is None else type_totals.most_common(type_limit)
+    for element_type, total in type_items:
+        concepts = type_concept_counters.get(element_type, Counter())
+        named_total = sum(concepts.values())
+        rows.append(
+            {
+                "type": element_type,
+                "totalOccurrences": int(total),
+                "namedOccurrences": int(named_total),
+                "names": [
+                    {
+                        "name": concept,
+                        "occurrences": int(count),
+                        "share": round(count / named_total, 6),
+                        "classification": vocabulary_classification_label(
+                            int(
+                                type_concept_classification_counters.get(element_type, {})
+                                .get(concept, Counter())
+                                .get("semantic", 0)
+                            ),
+                            int(
+                                type_concept_classification_counters.get(element_type, {})
+                                .get(concept, Counter())
+                                .get("placeholder", 0)
+                            ),
+                        ),
+                    }
+                    for concept, count in concepts.most_common(name_limit)
+                ],
+            }
+        )
+    return rows
+
+
 def label_pipeline_items(
     occurrence_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]],
     document_frequency_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]],
@@ -336,6 +382,11 @@ def model_quality_watchlists(rows: list[dict[str, Any]], *, limit: int = 12) -> 
         "highMissingRatio": sorted(
             rows,
             key=lambda item: (item["missingRatio"], item["nameSlots"], item["id"]),
+            reverse=True,
+        )[:limit],
+        "highPlaceholderRatio": sorted(
+            rows,
+            key=lambda item: (item["placeholderRatio"], item["nameSlots"], item["id"]),
             reverse=True,
         )[:limit],
         "highNameDominance": sorted(
@@ -470,7 +521,7 @@ class CorpusStatisticsAccumulator:
         self.filtered_concept_doc_freq: Counter[str] = Counter()
         self.concept_classification_counter: dict[str, Counter[str]] = {}
         self.type_concept_counter: dict[str, Counter[str]] = {}
-        self.type_token_counter: dict[str, Counter[str]] = {}
+        self.type_concept_classification_counter: dict[str, dict[str, Counter[str]]] = {}
         self.scatter_rows: list[dict[str, Any]] = []
         self.topic_model_rows: list[dict[str, Any]] = []
         self.sample_models: list[dict[str, Any]] = []
@@ -511,7 +562,9 @@ class CorpusStatisticsAccumulator:
                     "id": str(record.model_id),
                     "nameSlots": int(row["nameSlots"]),
                     "semanticNames": int(row["semanticNameCount"]),
+                    "placeholderNames": int(row["placeholderNameCount"]),
                     "missingRatio": round(float(row["missingNameRatio"]), 4),
+                    "placeholderRatio": round(float(row["placeholderNameRatio"]), 4),
                     "dominantName": str(row["dominantName"]),
                     "dominantNameRatio": round(float(row["dominantNameRatio"]), 4),
                 }
@@ -575,9 +628,8 @@ class CorpusStatisticsAccumulator:
             model_names.add(concept)
             type_concepts = self.type_concept_counter.setdefault(element_type, Counter())
             type_concepts[concept] += 1
-            token_counter = self.type_token_counter.setdefault(element_type, Counter())
-            for token in entry.get("nameTokens", tuple(str(concept).split())):
-                token_counter[token] += 1
+            type_concept_classifications = self.type_concept_classification_counter.setdefault(element_type, {})
+            type_concept_classifications.setdefault(concept, Counter())[classification] += 1
             model_concepts.add(concept)
             if classification != "placeholder":
                 self.filtered_concept_counter[concept] += 1
@@ -623,23 +675,6 @@ class CorpusStatisticsAccumulator:
             concepts = self.type_concept_counter.get(element_type, Counter())
             type_links.extend(
                 {"type": element_type, "concept": concept, "count": count} for concept, count in concepts.most_common(8)
-            )
-
-        type_counter = self.entry_type_counter
-        heatmap_types = [label for label, _ in type_counter.most_common(10)]
-        token_counter: Counter[str] = Counter()
-        for element_type in heatmap_types:
-            token_counter.update(self.type_token_counter.get(element_type, Counter()))
-        heatmap_tokens = [label for label, _ in token_counter.most_common(25)]
-        heatmap_rows = []
-        for element_type in heatmap_types:
-            counts = self.type_token_counter.get(element_type, Counter())
-            total = sum(counts.values()) or 1
-            heatmap_rows.append(
-                {
-                    "label": element_type,
-                    "values": [round(counts[token] / total, 5) for token in heatmap_tokens],
-                }
             )
 
         topic_result: dict[str, Any]
@@ -689,13 +724,17 @@ class CorpusStatisticsAccumulator:
                 self.concept_classification_counter,
                 model_count=model_count,
             ),
+            "typeVocabularyTable": type_vocabulary_table_items(
+                self.type_concept_counter,
+                self.entry_type_counter,
+                self.type_concept_classification_counter,
+            ),
             "labelPipelineRows": label_pipeline_items(
                 self.label_pipeline_counter,
                 self.label_pipeline_doc_freq,
             ),
             "nameReuseDistribution": name_reuse_distribution(self.concept_doc_freq, model_count),
             "elementTypeTreemap": counter_items(self.entry_type_counter, 40),
-            "vocabularyHeatmap": {"tokens": heatmap_tokens, "rows": heatmap_rows},
             "typeConceptLinks": type_links,
             "modelVocabularyScatter": scatter_points,
             "scatterNote": scatter_note,

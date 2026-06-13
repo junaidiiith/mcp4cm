@@ -6,6 +6,7 @@ import type {
   DuplicatePairsPage,
   DummyProgressState,
   DuplicateProgressState,
+  LabelPipelinePage,
   ModelInspectPayload,
   ParsedModelSummary,
   StatisticsPayload,
@@ -170,6 +171,32 @@ export async function getDatasetStatus(datasetId: string): Promise<DatasetRuntim
 
 export async function getDatasetAfterDummyStatistics(datasetId: string): Promise<AfterDummyStatisticsResponse> {
   return getJson<AfterDummyStatisticsResponse>(`/api/datasets/${encodeURIComponent(datasetId)}/statistics/after-dummy`);
+}
+
+export async function getLabelPipelineRows(
+  datasetId: string,
+  options?: {
+    snapshot?: "before" | "after";
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    classification?: "all" | "semantic" | "placeholder" | "missing";
+    sort?: string;
+    order?: "asc" | "desc";
+  },
+): Promise<LabelPipelinePage> {
+  const query = new URLSearchParams();
+  if (options?.snapshot) query.set("snapshot", options.snapshot);
+  if (options?.page) query.set("page", String(options.page));
+  if (options?.pageSize) query.set("pageSize", String(options.pageSize));
+  if (options?.query) query.set("query", options.query);
+  if (options?.classification) query.set("classification", options.classification);
+  if (options?.sort) query.set("sort", options.sort);
+  if (options?.order) query.set("order", options.order);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<LabelPipelinePage>(
+    `/api/datasets/${encodeURIComponent(datasetId)}/visualizations/label-pipeline${suffix}`,
+  );
 }
 
 export function delay(ms: number) {

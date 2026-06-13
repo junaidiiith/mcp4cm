@@ -11,6 +11,8 @@ from mcp4cm.api.state import (
     DUMMY_JOBS_LOCK,
     DUPLICATE_JOBS,
     DUPLICATE_JOBS_LOCK,
+    LABEL_PIPELINE_CACHE,
+    LABEL_PIPELINE_CACHE_LOCK,
     LOG,
     UPLOAD_LOCK,
     UPLOAD_PARSE_JOBS,
@@ -62,6 +64,8 @@ def reset_pipeline_state() -> None:
         DUMMY_JOBS.clear()
     with AFTER_DUMMY_STATISTICS_LOCK:
         AFTER_DUMMY_STATISTICS_JOBS.clear()
+    with LABEL_PIPELINE_CACHE_LOCK:
+        LABEL_PIPELINE_CACHE.clear()
     DATASETS.clear()
     for stage_dir in stage_dirs:
         remove_directory_quietly(stage_dir)

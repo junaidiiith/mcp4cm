@@ -1,5 +1,6 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Expand, Grid2X2, Info, ListTree, Network, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Expand, Grid2X2, Info, ListTree, Network, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { errorMessage, getLabelPipelineRows } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,12 +11,14 @@ import { round } from "../../utils";
 type VisualizationSnapshot = "before" | "after";
 
 export function VisualizationPanel({
+  datasetId,
   beforeData,
   afterData,
   beforeModelCount,
   afterModelCount,
   onInspectModel,
 }: {
+  datasetId: string;
   beforeData: VisualizationPayload | null;
   afterData: VisualizationPayload | null;
   beforeModelCount: number | null;
@@ -29,7 +32,10 @@ export function VisualizationPanel({
   const [snapshot, setSnapshot] = useState<VisualizationSnapshot>("before");
   const data = snapshot === "after" && afterData ? afterData : beforeData;
   const afterDataAvailable = Boolean(afterData);
-  const categories = useMemo(() => data ? visualizationCategories(data, onInspectModel) : [], [data, onInspectModel]);
+  const categories = useMemo(
+    () => data ? visualizationCategories(data, onInspectModel, datasetId, snapshot) : [],
+    [data, datasetId, onInspectModel, snapshot],
+  );
   const activeCharts = categories.find((category) => category.id === activeCategory)?.charts || categories[0]?.charts || [];
   const selectedChart = activeCharts.find((chart) => chart.id === selectedChartId) || activeCharts[0] || null;
   const expandedChart = categories.flatMap((category) => category.charts).find((chart) => chart.id === expandedChartId) || null;
@@ -181,6 +187,8 @@ interface VisualizationCategory {
 function visualizationCategories(
   data: VisualizationPayload,
   onInspectModel: (modelId: string) => void,
+  datasetId: string,
+  snapshot: VisualizationSnapshot,
 ): VisualizationCategory[] {
   return [
     {
@@ -214,7 +222,7 @@ function visualizationCategories(
         {
           id: "at-risk-models",
           title: "Models at Risk",
-          description: "Models at risk for low semantic naming, high missingness, and repeated names.",
+          description: "Models at risk for low semantic naming, high missingness, high placeholder naming, and repeated names.",
           render: () => <ModelQualityWatchlists watchlists={data.modelQualityWatchlists} onInspectModel={onInspectModel} />,
         },
       ],
@@ -227,7 +235,7 @@ function visualizationCategories(
           id: "label-pipeline",
           title: "Raw to Normalized Labels and Tokens",
           description: "Parser-observed names and types beside the derived normalized labels, tokens, and classification.",
-          render: () => <LabelPipelineTable rows={data.labelPipelineRows || []} />,
+          render: () => <LabelPipelineTable datasetId={datasetId} snapshot={snapshot} />,
         },
         {
           id: "vocabulary-summary",
@@ -242,16 +250,16 @@ function visualizationCategories(
           render: () => <VocabularyRanking rows={data.vocabularyRanking || []} />,
         },
         {
-          id: "type-vocabulary-heatmap",
-          title: "Name Tokens by Normalized Type",
-          description: "Relative derived name-token frequency within each major normalized node type.",
-          render: () => <Heatmap data={data.vocabularyHeatmap} />,
+          id: "type-vocabulary-table",
+          title: "Type-Specific Vocabulary",
+          description: "Top normalized names within each normalized node type in the corpus.",
+          render: () => <TypeVocabularyTable rows={data.typeVocabularyTable || []} />,
         },
         {
           id: "name-reuse-distribution",
           title: "Normalized Name Reuse Distribution",
           description: "How many distinct normalized names appear in one model versus many models.",
-          render: () => <LabeledHistogram items={data.nameReuseDistribution || []} />,
+          render: () => <NameReuseDistributionChart items={data.nameReuseDistribution || []} />,
         },
       ],
     },
@@ -386,6 +394,7 @@ function VocabularySummary({ summary }: { summary?: VisualizationPayload["vocabu
 }
 
 type LabelPipelineSortKey = "occurrences" | "documentFrequency" | "rawName" | "normalizedName" | "rawType" | "normalizedType";
+type LabelPipelineClassificationFilter = "all" | "semantic" | "placeholder" | "missing";
 
 const labelPipelineColumns: Array<{ key: LabelPipelineSortKey; label: string }> = [
   { key: "rawName", label: "Raw Name" },
@@ -396,26 +405,67 @@ const labelPipelineColumns: Array<{ key: LabelPipelineSortKey; label: string }> 
   { key: "documentFrequency", label: "Models" },
 ];
 
-function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelineRows"] }) {
-  const [sortKey, setSortKey] = useState<LabelPipelineSortKey>("occurrences");
+const labelPipelineClassificationFilters: Array<{ key: LabelPipelineClassificationFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "semantic", label: "Semantic" },
+  { key: "placeholder", label: "Placeholder" },
+  { key: "missing", label: "Missing" },
+];
+
+const labelPipelinePageSizes = [25, 50, 100, 250];
+
+function LabelPipelineTable({ datasetId, snapshot }: { datasetId: string; snapshot: VisualizationSnapshot }) {
+  const [sortKey, setSortKey] = useState<LabelPipelineSortKey>("documentFrequency");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [limit, setLimit] = useState(50);
-  const sortedRows = useMemo(() => {
-    const direction = sortDirection === "asc" ? 1 : -1;
-    return [...rows].sort((left, right) => {
-      const leftValue = left[sortKey];
-      const rightValue = right[sortKey];
-      if (typeof leftValue === "number" && typeof rightValue === "number") {
-        const diff = leftValue - rightValue;
-        if (diff !== 0) return diff * direction;
-      } else {
-        const diff = String(leftValue).localeCompare(String(rightValue));
-        if (diff !== 0) return diff * direction;
-      }
-      return left.normalizedName.localeCompare(right.normalizedName);
-    });
-  }, [rows, sortDirection, sortKey]);
-  const visibleRows = sortedRows.slice(0, limit);
+  const [query, setQuery] = useState("");
+  const [classification, setClassification] = useState<LabelPipelineClassificationFilter>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [payload, setPayload] = useState<Awaited<ReturnType<typeof getLabelPipelineRows>> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+  }, [classification, datasetId, pageSize, query, snapshot]);
+
+  useEffect(() => {
+    if (!datasetId) return;
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      getLabelPipelineRows(datasetId, {
+        snapshot,
+        page,
+        pageSize,
+        query,
+        classification,
+        sort: sortKey,
+        order: sortDirection,
+      })
+        .then((nextPayload) => {
+          if (!cancelled) setPayload(nextPayload);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(errorMessage(err, "Label rows could not be loaded."));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [classification, datasetId, page, pageSize, query, snapshot, sortDirection, sortKey]);
+
+  const visibleRows = payload?.rows || [];
+  const total = payload?.total || 0;
+  const totalPages = payload?.totalPages || 0;
+  const firstRow = total ? ((payload?.page || page) - 1) * (payload?.pageSize || pageSize) + 1 : 0;
+  const lastRow = total ? firstRow + visibleRows.length - 1 : 0;
+
   const onSort = (key: LabelPipelineSortKey) => {
     if (key === sortKey) {
       setSortDirection((current) => current === "asc" ? "desc" : "asc");
@@ -423,23 +473,41 @@ function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelin
       setSortKey(key);
       setSortDirection(key === "occurrences" || key === "documentFrequency" ? "desc" : "asc");
     }
+    setPage(1);
   };
-  if (!rows.length) return <EmptyChart />;
+  if (!datasetId) return <EmptyChart />;
   return (
     <div className="labelPipeline">
-      <label className="chartLimit">
-        Rows
-        <input
-          aria-label="Label pipeline row count"
-          type="number"
-          min={1}
-          value={limit}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (Number.isInteger(value)) setLimit(Math.max(value, 1));
-          }}
-        />
-      </label>
+      <div className="labelPipelineToolbar">
+        <label className="labelPipelineSearch">
+          <Search size={15} />
+          <input
+            aria-label="Search label rows"
+            placeholder="Search labels, types, tokens"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <select
+          aria-label="Filter by classification"
+          value={classification}
+          onChange={(event) => setClassification(event.target.value as LabelPipelineClassificationFilter)}
+        >
+          {labelPipelineClassificationFilters.map((filter) => (
+            <option key={filter.key} value={filter.key}>{filter.label}</option>
+          ))}
+        </select>
+        <label className="chartLimit">
+          Page size
+          <select
+            aria-label="Label pipeline page size"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {labelPipelinePageSizes.map((size) => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="labelPipelineFrame">
         <table className="typeQualityTable labelPipelineTable">
           <thead>
@@ -464,8 +532,8 @@ function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelin
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row, index) => (
-              <tr key={`${row.rawName}:${row.rawType}:${row.normalizedName}:${row.normalizedType}:${row.classification}:${index}`}>
+            {visibleRows.map((row) => (
+              <tr key={`${row.rawName}:${row.rawType}:${row.normalizedName}:${row.normalizedType}:${row.classification}`}>
                 <td title={row.rawName}>{row.rawName || <span className="mutedCell">empty</span>}</td>
                 <td title={row.normalizedName}><strong>{row.normalizedName || "empty"}</strong></td>
                 <td title={row.rawType}>{row.rawType || <span className="mutedCell">empty</span>}</td>
@@ -481,8 +549,41 @@ function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelin
                 </td>
               </tr>
             ))}
+            {!visibleRows.length && !loading && (
+              <tr>
+                <td colSpan={9}><span className="mutedCell">{error || "No label rows found."}</span></td>
+              </tr>
+            )}
           </tbody>
         </table>
+      </div>
+      <div className="labelPipelineFooter">
+        <span>{loading ? "Loading..." : `${firstRow.toLocaleString()}-${lastRow.toLocaleString()} of ${total.toLocaleString()}`}</span>
+        <div className="labelPipelinePager">
+          <Button
+            aria-label="Previous label rows page"
+            title="Previous page"
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={loading || page <= 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            <ChevronLeft size={16} />
+          </Button>
+          <span>{totalPages ? `${payload?.page || page} / ${totalPages}` : "0 / 0"}</span>
+          <Button
+            aria-label="Next label rows page"
+            title="Next page"
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={loading || !totalPages || page >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            <ChevronRight size={16} />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -497,7 +598,7 @@ function classificationDisplayLabel(classification: VisualizationPayload["labelP
   return classification.charAt(0).toUpperCase() + classification.slice(1);
 }
 
-type VocabularyFilter = "all" | "semantic" | "placeholder" | "excludePlaceholder";
+type VocabularyFilter = "all" | "semantic" | "placeholder" | "mixed";
 type VocabularySortKey =
   | "name"
   | "occurrences"
@@ -510,7 +611,7 @@ const vocabularyFilters: Array<{ key: VocabularyFilter; label: string }> = [
   { key: "all", label: "All" },
   { key: "semantic", label: "Semantic" },
   { key: "placeholder", label: "Placeholder" },
-  { key: "excludePlaceholder", label: "Exclude Placeholder" },
+  { key: "mixed", label: "Mixed" },
 ];
 
 const vocabularyColumns: Array<{ key: VocabularySortKey; label: string }> = [
@@ -620,10 +721,88 @@ function VocabularyRanking({ rows }: { rows: VisualizationPayload["vocabularyRan
   );
 }
 
+function TypeVocabularyTable({ rows }: { rows: VisualizationPayload["typeVocabularyTable"] }) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleRows = useMemo(
+    () => (normalizedQuery
+      ? rows.filter((row) => row.type.toLowerCase().includes(normalizedQuery))
+      : rows),
+    [normalizedQuery, rows],
+  );
+  if (!rows.length) return <EmptyChart />;
+  return (
+    <div className="typeVocabularyPanel">
+      <div className="typeVocabularyToolbar">
+        <label className="typeVocabularySearch">
+          <Search size={14} aria-hidden="true" />
+          <input
+            aria-label="Filter normalized types"
+            placeholder="Filter types"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <span className="typeVocabularyStatus">
+          {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} types
+        </span>
+      </div>
+      {!visibleRows.length ? <EmptyChart /> : (
+        <div className="typeVocabularyFrame">
+          <table className="typeQualityTable typeVocabularyTable">
+            <thead>
+              <tr>
+                <th>Normalized Type</th>
+                <th>Named Occurrences</th>
+                <th>Top Normalized Names</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => (
+                <tr key={row.type}>
+                  <td title={row.type}><strong>{row.type}</strong></td>
+                  <td>
+                    {row.namedOccurrences.toLocaleString()}
+                    {row.totalOccurrences !== row.namedOccurrences && (
+                      <small className="typeVocabularySubtle">
+                        {row.totalOccurrences.toLocaleString()} slots
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    {row.names.length ? (
+                      <div className="typeVocabularyNames">
+                        {row.names.map((name) => (
+                          <span
+                            className={`typeVocabularyName ${name.classification}`}
+                            key={`${row.type}:${name.name}`}
+                            title={`${name.name}: ${name.occurrences.toLocaleString()} occurrences, ${percentage(name.share)} within ${row.type}`}
+                          >
+                            <strong>{name.name}</strong>
+                            <small>{name.occurrences.toLocaleString()} · {percentage(name.share)}</small>
+                            <i>{vocabularyClassificationLabel(name.classification)}</i>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="typeVocabularyEmpty">No named vocabulary</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function vocabularyFilterMatches(row: VisualizationPayload["vocabularyRanking"][number], filter: VocabularyFilter) {
   if (filter === "semantic") return row.classification === "semantic";
-  if (filter === "placeholder") return row.placeholder > 0;
-  if (filter === "excludePlaceholder") return row.placeholder === 0;
+  if (filter === "placeholder") return row.classification === "placeholder";
+  if (filter === "mixed") return row.classification === "mixed";
   return true;
 }
 
@@ -844,6 +1023,52 @@ function SummaryStat({ label, value, suffix }: { label: string; value: string | 
   return <div className="qualityStat"><span>{label}</span><strong>{typeof value === "number" ? value.toLocaleString() : value}</strong>{suffix && <small>{suffix}</small>}</div>;
 }
 
+function NameReuseDistributionChart({ items }: { items: StatisticItem[] }) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  const singletonCount = items.find((item) => item.label === "1")?.count ?? 0;
+  if (!items.length) return <EmptyChart />;
+  return (
+    <div
+      className="nameReuseChart"
+      role="img"
+      aria-label="Normalized name reuse distribution grouped by model coverage per distinct name"
+    >
+      <p className="nameReuseChartExplainer">
+        Distinct normalized names grouped by how many models each name appears in.
+        Bar length compares bucket sizes, not share of the vocabulary.
+        {singletonCount > 0 && (
+          <>
+            {" "}
+            <strong>{percentage(singletonCount / Math.max(total, 1))}</strong> appear in only one model.
+          </>
+        )}
+      </p>
+      <div className="labeledHistogramHeader nameReuseChartHeader" aria-hidden="true">
+        <span>Models per name</span>
+        <span />
+        <span>Names</span>
+        <span>Share</span>
+      </div>
+      <div className="labeledHistogram nameReuseChartHistogram">
+        {items.map((item) => {
+          const share = percentage(item.count / Math.max(total, 1));
+          return (
+            <div className="labeledHistogramBar nameReuseChartBar" key={item.label}>
+              <span>{item.label}</span>
+              <i title={`${item.label} models per name: ${item.count.toLocaleString()} names (${share} of vocabulary)`}>
+                <b style={{ width: `${item.count / max * 100}%` }} />
+              </i>
+              <strong>{item.count.toLocaleString()}</strong>
+              <small>{share}</small>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LabeledHistogram({ items }: { items: StatisticItem[] }) {
   const max = Math.max(...items.map((item) => item.count), 1);
   const total = items.reduce((sum, item) => sum + item.count, 0);
@@ -882,6 +1107,12 @@ function ModelQualityWatchlists({
         title="Highest Missing Ratio"
         rows={watchlists.highMissingRatio}
         metric={(row) => `${percentage(row.missingRatio)} missing`}
+        onInspectModel={onInspectModel}
+      />
+      <ModelWatchlist
+        title="Highest Placeholder Among Named"
+        rows={watchlists.highPlaceholderRatio || []}
+        metric={(row) => `${percentage(row.placeholderRatio)} placeholder`}
         onInspectModel={onInspectModel}
       />
       <ModelWatchlist
@@ -981,81 +1212,6 @@ function ConceptTreemap({ links }: { links: VisualizationPayload["typeConceptLin
   }, {}));
   if (!groups.length) return <EmptyChart />;
   return <div className="conceptTreemap">{groups.map(([type, entries]) => <section key={type}><b>{type}</b><div>{(entries || []).map((entry) => <span style={{ flexGrow: entry.count }} title={`${entry.type} → ${entry.concept}: ${entry.count}`} key={`${entry.type}:${entry.concept}`}>{entry.concept}</span>)}</div></section>)}</div>;
-}
-
-function Heatmap({ data }: { data: VisualizationPayload["vocabularyHeatmap"] }) {
-  const [tokenLimit, setTokenLimit] = useState(Math.min(18, data.tokens.length));
-  const [typeLimit, setTypeLimit] = useState(Math.min(10, data.rows.length));
-  if (!data.tokens.length || !data.rows.length) return <EmptyChart />;
-  const tokens = data.tokens.slice(0, tokenLimit);
-  const rows = data.rows.slice(0, typeLimit);
-  const max = Math.max(...rows.flatMap((row) => row.values.slice(0, tokenLimit)), 0.01);
-  return (
-    <div className="heatmapPanel">
-      <div className="heatmapToolbar">
-        <label className="chartLimit">
-          Tokens
-          <input
-            aria-label="Vocabulary heatmap token count"
-            type="number"
-            min={1}
-            max={data.tokens.length}
-            value={tokenLimit}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isInteger(value)) setTokenLimit(Math.min(Math.max(value, 1), data.tokens.length));
-            }}
-          />
-        </label>
-        <label className="chartLimit">
-          Types
-          <input
-            aria-label="Vocabulary heatmap type count"
-            type="number"
-            min={1}
-            max={data.rows.length}
-            value={typeLimit}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isInteger(value)) setTypeLimit(Math.min(Math.max(value, 1), data.rows.length));
-            }}
-          />
-        </label>
-        <div className="heatmapLegend" aria-label="Heatmap color legend">
-          <span>Low</span>
-          <i />
-          <span>High</span>
-        </div>
-      </div>
-      <div className="heatmap" style={{ gridTemplateColumns: `150px repeat(${tokens.length}, minmax(42px, 1fr))` }}>
-        <b />
-        {tokens.map((token) => <span className="heatmapToken" key={token} title={token}>{token}</span>)}
-        {rows.map((row) => (
-          <div className="heatmapRow" style={{ display: "contents" }} key={row.label}>
-            <b title={row.label}>{row.label}</b>
-            {tokens.map((token, index) => {
-              const value = row.values[index] || 0;
-              return (
-                <span
-                  className="heatmapCell"
-                  key={`${row.label}:${token}`}
-                  style={{ backgroundColor: heatmapColor(value / max) }}
-                  title={`${row.label} / ${token}: ${round(value * 100)}% relative frequency`}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function heatmapColor(intensity: number) {
-  const value = Math.max(0, Math.min(1, intensity));
-  const lightness = 96 - value * 42;
-  const saturation = 26 + value * 24;
-  return `hsl(176  ${saturation}% ${lightness}%)`;
 }
 
 function TypeConceptLinks({ links }: { links: VisualizationPayload["typeConceptLinks"] }) {

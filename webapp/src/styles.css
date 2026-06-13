@@ -1841,7 +1841,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .visualizationDialogBody .treemap { min-height: 440px; }
 .visualizationDialogBody .boxplot { min-height: 260px; }
 .chartLimit { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 8px; color: #53677a; font-size: 12px; font-weight: 700; }
-.chartLimit input { width: 62px; min-height: 30px; padding: 4px 6px; }
+.chartLimit input, .chartLimit select { width: 82px; min-height: 30px; padding: 4px 6px; }
 .chartRowsScrollable { max-height: 300px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
 .horizontalBars { display: grid; gap: 6px; }
 .horizontalBarRow { display: grid; grid-template-columns: minmax(90px, 1.1fr) minmax(90px, 2fr) auto; gap: 8px; align-items: center; font-size: 11px; }
@@ -1850,9 +1850,58 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .horizontalBarRow i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0f766e, #6bc5bd); }
 .vocabularySummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .labelPipeline { display: grid; gap: 8px; }
+.labelPipelineToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.labelPipelineToolbar .chartLimit { margin-bottom: 0; }
+.labelPipelineToolbar select,
+.labelPipelineSearch input {
+  min-height: 32px;
+  border: 1px solid #cbd6df;
+  border-radius: 6px;
+  background: #fff;
+  color: #203040;
+  font-weight: 700;
+}
+.labelPipelineToolbar select { padding: 4px 8px; }
+.labelPipelineSearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 260px;
+  max-width: 520px;
+  color: #60717f;
+}
+.labelPipelineSearch input {
+  width: 100%;
+  padding: 5px 9px;
+}
 .labelPipelineFrame { max-height: 430px; overflow: auto; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; }
 .labelPipelineTable { min-width: 1180px; }
 .labelPipelineTable td { vertical-align: top; }
+.labelPipelineFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #53677a;
+  font-size: 12px;
+  font-weight: 800;
+}
+.labelPipelinePager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.labelPipelinePager button {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
 .mutedCell { color: #8b9aaa; font-style: italic; }
 .tokenList {
   display: flex;
@@ -1870,14 +1919,14 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   line-height: 1.2;
 }
 .vocabularyRanking { display: grid; gap: 10px; }
-.vocabularyRankingToolbar, .heatmapToolbar {
+.vocabularyRankingToolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.vocabularyRankingToolbar .chartLimit, .heatmapToolbar .chartLimit { margin-bottom: 0; }
+.vocabularyRankingToolbar .chartLimit { margin-bottom: 0; }
 .vocabularyFilterControl {
   display: flex;
   flex-wrap: wrap;
@@ -1939,6 +1988,96 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .vocabularyBadge.missing { background: #f1e8e8; color: #8b3a3a; }
 .vocabularyBadge.mixed { background: #eef2f7; color: #526675; }
 .vocabularyBadge.unknown { background: #f4f4f5; color: #71717a; }
+.typeVocabularyPanel { display: grid; gap: 10px; }
+.typeVocabularyToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.typeVocabularySearch {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-width: min(320px, 100%);
+  padding: 6px 10px;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #60717f;
+}
+.typeVocabularySearch input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #243d49;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+.typeVocabularyStatus {
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 700;
+}
+.typeVocabularyFrame {
+  max-height: 430px;
+  overflow: auto;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  background: #fff;
+}
+.typeVocabularyTable { min-width: 860px; }
+.typeVocabularyTable td { vertical-align: top; }
+.typeVocabularySubtle {
+  display: block;
+  margin-top: 4px;
+  color: #7d8d9a;
+  font-size: 11px;
+  font-weight: 700;
+}
+.typeVocabularyEmpty {
+  color: #7d8d9a;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+}
+.typeVocabularyNames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.typeVocabularyName {
+  display: grid;
+  gap: 3px;
+  max-width: 210px;
+  min-width: 132px;
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  background: #fbfdff;
+  padding: 6px 8px;
+}
+.typeVocabularyName strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #203040;
+  font-size: 12px;
+}
+.typeVocabularyName small,
+.typeVocabularyName i {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #60717f;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+.typeVocabularyName.semantic { border-color: #b7ddc8; background: #f1f8f5; }
+.typeVocabularyName.placeholder { border-color: #f1c987; background: #fffaf2; }
+.typeVocabularyName.mixed { border-color: #cbd6df; background: #f7fafc; }
 .qualityOverview { display: grid; gap: 14px; }
 .qualityStatGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .qualityStatGrid.compact { margin-bottom: 12px; }
@@ -1998,6 +2137,29 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .qualityRateCell span { color: #60717f; font-weight: 800; }
 .qualityRateCell i { height: 6px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
 .qualityRateCell i b { height: 100%; min-width: 0; }
+.nameReuseChart { display: grid; gap: 10px; max-width: 780px; }
+.nameReuseChartExplainer {
+  margin: 0;
+  color: #526675;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.nameReuseChartExplainer strong { color: #243d49; font-weight: 800; }
+.labeledHistogramHeader {
+  display: grid;
+  grid-template-columns: 56px minmax(160px, 1fr) 72px 52px;
+  gap: 10px;
+  align-items: end;
+  color: #60717f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.labeledHistogramHeader span:nth-child(3),
+.labeledHistogramHeader span:nth-child(4) { text-align: right; }
+.nameReuseChartHistogram { margin-top: -2px; }
+.nameReuseChartBar { grid-template-columns: 56px minmax(160px, 1fr) 72px 52px; }
 .labeledHistogram { display: grid; gap: 9px; max-width: 780px; }
 .labeledHistogramBar {
   display: grid;
@@ -2014,7 +2176,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .labeledHistogramBar small { color: #60717f; text-align: right; }
 .labeledHistogramBar i { height: 13px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
 .labeledHistogramBar i b { display: block; height: 100%; border-radius: inherit; background: #2d7d7d; }
-.modelWatchlists { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 12px; min-width: 860px; }
+.modelWatchlists { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; min-width: 1120px; }
 .modelWatchlist { min-width: 0; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; padding: 10px; }
 .modelWatchlist h5 { margin: 0 0 8px; color: #243d49; font-size: 12px; line-height: 1.2; }
 .modelWatchlistRow {
@@ -2060,47 +2222,6 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .conceptTreemap section { border: 1px solid #cbdfe0; border-radius: 6px; padding: 7px; background: #edf8f7; font-size: 11px; }
 .conceptTreemap section div { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
 .conceptTreemap span { min-width: 52px; padding: 4px; border-radius: 4px; background: #c6e6e3; overflow: hidden; text-overflow: ellipsis; }
-.heatmapPanel { display: grid; gap: 10px; }
-.heatmapLegend { display: grid; grid-template-columns: auto 90px auto; gap: 7px; align-items: center; color: #60717f; font-size: 11px; font-weight: 800; }
-.heatmapLegend i { height: 10px; border-radius: 999px; background: linear-gradient(90deg, hsl(176 26% 96%), hsl(176 50% 54%)); box-shadow: inset 0 0 0 1px #d6e3e8; }
-.heatmap {
-  display: grid;
-  gap: 3px;
-  min-width: 900px;
-  align-items: stretch;
-}
-.heatmap > b, .heatmapToken {
-  min-height: 42px;
-  padding: 6px;
-  border-bottom: 1px solid #dbe4ec;
-  color: #526675;
-  font-size: 10px;
-  font-weight: 800;
-}
-.heatmapToken {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  line-height: 1.15;
-}
-.heatmapRow b {
-  min-height: 28px;
-  padding: 6px 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #243d49;
-  font-size: 11px;
-}
-.heatmapCell {
-  min-height: 28px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(31, 61, 72, .04);
-}
-.heatmapCell:hover { box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .45); }
 .typeConceptLinks { display: grid; gap: 4px; }
 .typeConceptLinks div { display: grid; grid-template-columns: 130px minmax(80px, 1fr) minmax(110px, 1fr) 40px; gap: 8px; align-items: center; font-size: 11px; }
 .typeConceptLinks i { height: 8px; border-radius: 999px; overflow: hidden; background: #e6edf3; }
