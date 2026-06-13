@@ -39,3 +39,22 @@ include = ["mcp4cm*"]
     "metamodel/plugins/org.eclipse.uml2.uml.resources/profiles/*",
     "metamodel/plugins/org.eclipse.uml2.uml.resources/metamodels/*",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # import sorting
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+  "SIM", # simplification rules
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
