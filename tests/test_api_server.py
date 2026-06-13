@@ -254,7 +254,7 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
 
     assert statistics.status_code == 200
     assert statistics_data["summary"]["models"] == 1
-    assert statistics_data["visualizations"]["languageDistribution"][0]["count"] == 1
+    assert statistics_data["summary"]["languages"]["archimate"] == 1
 
 
 def test_dataset_status_reports_runtime_availability_without_raising():

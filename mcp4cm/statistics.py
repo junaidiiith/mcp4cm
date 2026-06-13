@@ -102,7 +102,6 @@ def histogram(
     bins: int,
     minimum: float | None = None,
     maximum: float | None = None,
-    log_counts: bool = False,
 ) -> list[dict[str, Any]]:
     if not values:
         return []
@@ -120,7 +119,7 @@ def histogram(
             "start": round(low + index * width, 4),
             "end": round(low + (index + 1) * width, 4),
             "count": count,
-            "displayCount": round(math.log10(count + 1), 4) if log_counts else count,
+            "displayCount": count,
         }
         for index, count in enumerate(counts)
     ]
@@ -702,8 +701,5 @@ class CorpusStatisticsAccumulator:
             "scatterNote": scatter_note,
             "topicModel": topic_result,
             "nameCountBoxplot": boxplot_summary(self.name_slot_counts),
-            "nameCountHistogramLog": histogram(self.name_slot_counts, bins=30, log_counts=True),
-            "fewNamesHistogram": histogram([count for count in self.name_slot_counts if count < 5], bins=20),
             "topNamesPerModel": counter_items(self.unique_name_doc_freq, 20),
-            "languageDistribution": counter_items(self.languages, 25),
         }

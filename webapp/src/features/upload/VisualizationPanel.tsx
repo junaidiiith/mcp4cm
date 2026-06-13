@@ -289,24 +289,6 @@ function visualizationCategories(
           description: "Five-number summary of parser-observed model name counts.",
           render: () => <Boxplot summary={data.nameCountBoxplot} />,
         },
-        {
-          id: "name-count-histogram-log",
-          title: "Histogram of Name Counts (Log Scale)",
-          description: "Log-scaled model frequency for parser-observed model name counts.",
-          render: () => <Histogram bins={data.nameCountHistogramLog} useDisplayCount />,
-        },
-        {
-          id: "few-names-histogram",
-          title: "Models with Fewer Than Five Names",
-          description: "Parser-observed name-count distribution for small models.",
-          render: () => <Histogram bins={data.fewNamesHistogram} />,
-        },
-        {
-          id: "language-distribution",
-          title: "Modeling Language Distribution",
-          description: "Parsed model count by modeling language.",
-          render: () => <HorizontalBars items={data.languageDistribution} />,
-        },
       ],
     },
     {
@@ -943,18 +925,6 @@ function ModelWatchlist({
       ))}
     </section>
   );
-}
-
-function Histogram({ bins, useDisplayCount = false, ratioAxis = false }: { bins: HistogramBin[]; useDisplayCount?: boolean; ratioAxis?: boolean }) {
-  const max = Math.max(...bins.map((bin) => useDisplayCount ? bin.displayCount : bin.count), 1);
-  if (!bins.length) return <EmptyChart />;
-  if (ratioAxis) return <RatioHistogram bins={bins} />;
-  return <div className="histogramFrame">
-    <div className="histogram">{bins.map((bin) => {
-      const value = useDisplayCount ? bin.displayCount : bin.count;
-      return <span key={`${bin.start}:${bin.end}`} style={{ height: `${value / max * 100}%` }} title={`${bin.start} to ${bin.end}: ${bin.count} model(s)`} />;
-    })}</div>
-  </div>;
 }
 
 function RatioHistogram({ bins, label = "Missing-name ratio" }: { bins: HistogramBin[]; label?: string }) {

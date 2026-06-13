@@ -203,10 +203,7 @@ export interface VisualizationPayload {
     prevalence?: StatisticItem[];
   };
   nameCountBoxplot: { min: number; q1: number; median: number; q3: number; max: number };
-  nameCountHistogramLog: HistogramBin[];
-  fewNamesHistogram: HistogramBin[];
   topNamesPerModel: StatisticItem[];
-  languageDistribution: StatisticItem[];
 }
 
 export interface VocabularyRankingRow {
