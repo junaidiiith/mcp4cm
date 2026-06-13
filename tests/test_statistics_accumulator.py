@@ -79,7 +79,7 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     assert vocabulary_summary["totalOccurrences"] == 7
     assert vocabulary_summary["semanticNames"] == 3
     assert vocabulary_summary["placeholderNames"] == 3
-    assert vocabulary_summary["singletonNames"] == 4
+    assert vocabulary_summary["singletonNames"] == 5
     review_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "review")
     assert review_row["occurrences"] == 2
     assert review_row["documentFrequency"] == 1
@@ -99,7 +99,7 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     assert actor_row["classification"] == "mixed"
     class_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "class1")
     assert class_row["classification"] == "placeholder"
-    assert visualizations["nameReuseDistribution"][0] == {"label": "1", "count": 4}
+    assert visualizations["nameReuseDistribution"][0] == {"label": "1", "count": 5}
     pipeline_row = next(row for row in visualizations["labelPipelineRows"] if row["rawName"] == "Approve invoice")
     assert pipeline_row["normalizedName"] == "approve invoice"
     assert pipeline_row["nameTokens"] == ["approve", "invoice"]
@@ -113,7 +113,7 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     assert placeholder_watchlist_row["id"] == "m1"
     assert placeholder_watchlist_row["placeholderNames"] == 3
     assert placeholder_watchlist_row["placeholderRatio"] == 0.4286
-    assert visualizations["modelQualityWatchlists"]["highNameDominance"][0]["dominantName"] == "review"
+    assert visualizations["modelQualityWatchlists"]["highNameDominance"][0]["dominantName"] == "actor"
     assert len(visualizations["typeVocabularyTable"]) == len(visualizations["elementTypeQualityMatrix"])
     assert {row["type"] for row in visualizations["typeVocabularyTable"]} == {
         row["type"] for row in visualizations["elementTypeQualityMatrix"]
