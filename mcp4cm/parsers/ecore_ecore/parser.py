@@ -29,6 +29,7 @@ try:
         EReference,
         EStructuralFeature,
         ETypedElement,
+        ETypeParameter,
     )
 except ImportError:
     raise ImportError(
@@ -578,8 +579,10 @@ class EcoreParser(BaseParser):
             EEnum,
             EEnumLiteral,
             EAttribute,
+            EReference,
             EOperation,
             EParameter,
+            ETypeParameter,
         )
         return [obj for obj in eobjects if isinstance(obj, node_types)]
 
@@ -756,6 +759,14 @@ class EcoreParser(BaseParser):
             self._fill_typed_element_data(obj, data)
             self._fill_structural_feature_data(obj, data)
             data["iD"] = bool(obj.iD)
+        elif isinstance(obj, EReference):
+            self._fill_typed_element_data(obj, data)
+            self._fill_structural_feature_data(obj, data)
+            data["containment"] = bool(obj.containment)
+            data["container"] = bool(obj.container)
+            if obj.eOpposite is not None:
+                data["oppositeName"] = obj.eOpposite.name or ""
+                data["hasOpposite"] = True
         elif isinstance(obj, EOperation):
             self._fill_typed_element_data(obj, data)
             data["throws"] = [
@@ -764,6 +775,8 @@ class EcoreParser(BaseParser):
             ]
         elif isinstance(obj, EParameter):
             self._fill_typed_element_data(obj, data)
+        elif isinstance(obj, ETypeParameter):
+            pass
 
         self._fill_annotation_data(obj, data, recursive=True)
 
@@ -1133,6 +1146,22 @@ class EcoreParser(BaseParser):
                         {"feature": "eStructuralFeatures", "kind": "EAttribute"},
                         ("eStructuralFeatures", "EAttribute"),
                     )
+                for ref in obj.eReferences:
+                    add_edge(
+                        "Contains",
+                        obj,
+                        ref,
+                        {"feature": "eStructuralFeatures", "kind": "EReference"},
+                        ("eStructuralFeatures", "EReference", ref.name or ""),
+                    )
+                for type_param in getattr(obj, "eTypeParameters", []):
+                    add_edge(
+                        "Contains",
+                        obj,
+                        type_param,
+                        {"feature": "eTypeParameters"},
+                        ("eTypeParameters", type_param.name or ""),
+                    )
                 for op in obj.eOperations:
                     add_edge(
                         "Contains",
@@ -1162,6 +1191,14 @@ class EcoreParser(BaseParser):
                         ("eLiterals",),
                     )
             elif isinstance(obj, EOperation):
+                for type_param in getattr(obj, "eTypeParameters", []):
+                    add_edge(
+                        "Contains",
+                        obj,
+                        type_param,
+                        {"feature": "eTypeParameters"},
+                        ("eTypeParameters", type_param.name or ""),
+                    )
                 for param in obj.eParameters:
                     add_edge(
                         "Contains",
@@ -1278,3 +1315,10 @@ class EcoreParser(BaseParser):
 
         edge_type = "Containment" if ref.containment else "Reference"
         add_edge(edge_type, source, target, data, ("eReferences", ref.name or ""))
+        add_edge(
+            "ReferenceType",
+            ref,
+            target,
+            {"feature": "eType", "kind": "referenceType"},
+            ("eType", "referenceType"),
+        )

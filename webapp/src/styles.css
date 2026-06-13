@@ -1849,6 +1849,26 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .horizontalBarRow i { height: 12px; overflow: hidden; border-radius: 999px; background: #e6edf3; }
 .horizontalBarRow i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0f766e, #6bc5bd); }
 .vocabularySummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.labelPipeline { display: grid; gap: 8px; }
+.labelPipelineFrame { max-height: 430px; overflow: auto; border: 1px solid #dbe4ec; border-radius: 6px; background: #fff; }
+.labelPipelineTable { min-width: 1180px; }
+.labelPipelineTable td { vertical-align: top; }
+.mutedCell { color: #8b9aaa; font-style: italic; }
+.tokenList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 220px;
+}
+.tokenList b {
+  min-height: 20px;
+  border-radius: 4px;
+  background: #edf4f7;
+  padding: 3px 5px;
+  color: #405869;
+  font-size: 10px;
+  line-height: 1.2;
+}
 .vocabularyRanking { display: grid; gap: 10px; }
 .vocabularyRankingToolbar, .heatmapToolbar {
   display: flex;
@@ -1917,6 +1937,7 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 .vocabularyBadge.semantic { background: #dcf3ed; color: #176b58; }
 .vocabularyBadge.placeholder { background: #faead3; color: #8a5615; }
 .vocabularyBadge.typeLike { background: #e7e9f7; color: #4c568d; }
+.vocabularyBadge.missing { background: #f1e8e8; color: #8b3a3a; }
 .vocabularyBadge.mixed { background: #eef2f7; color: #526675; }
 .vocabularyBadge.unknown { background: #f4f4f5; color: #71717a; }
 .qualityOverview { display: grid; gap: 14px; }

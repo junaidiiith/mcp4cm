@@ -180,6 +180,7 @@ export interface VisualizationPayload {
     mostReusedDocumentFrequency: number;
   };
   vocabularyRanking: VocabularyRankingRow[];
+  labelPipelineRows: LabelPipelineRow[];
   nameReuseDistribution: StatisticItem[];
   elementTypeTreemap: StatisticItem[];
   vocabularyHeatmap: { tokens: string[]; rows: Array<{ label: string; values: number[] }> };
@@ -219,6 +220,18 @@ export interface VocabularyRankingRow {
   placeholder: number;
   typeLike: number;
   classification: "semantic" | "placeholder" | "typeLike" | "mixed" | "unknown";
+}
+
+export interface LabelPipelineRow {
+  rawName: string;
+  normalizedName: string;
+  nameTokens: string[];
+  rawType: string;
+  normalizedType: string;
+  typeTokens: string[];
+  classification: "semantic" | "placeholder" | "type_like" | "missing";
+  occurrences: number;
+  documentFrequency: number;
 }
 
 export interface RatioSummary {

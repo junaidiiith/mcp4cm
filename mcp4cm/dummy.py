@@ -596,7 +596,7 @@ def derive_nodes(record: ModelRecord) -> list[DerivedNode]:
             normalized_name=result.normalized_name,
             normalized_type=result.normalized_type,
             classification=result.classification,
-            tokens=result.tokens,
+            tokens=result.name_tokens,
         )
         for node_id, result in iter_name_slots(record)
     ]

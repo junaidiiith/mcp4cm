@@ -85,6 +85,13 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     class_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "class1")
     assert class_row["classification"] == "typeLike"
     assert visualizations["nameReuseDistribution"][0] == {"label": "1", "count": 4}
+    pipeline_row = next(row for row in visualizations["labelPipelineRows"] if row["rawName"] == "Approve invoice")
+    assert pipeline_row["normalizedName"] == "approve invoice"
+    assert pipeline_row["nameTokens"] == ["approve", "invoice"]
+    assert pipeline_row["rawType"] == "Task"
+    assert pipeline_row["normalizedType"] == "task"
+    assert pipeline_row["typeTokens"] == ["task"]
+    assert pipeline_row["classification"] == "semantic"
     assert visualizations["modelQualityWatchlists"]["fewSemanticNames"][0]["id"] == "m1"
     assert visualizations["modelQualityWatchlists"]["highMissingRatio"][0]["id"] == "m1"
     assert visualizations["modelQualityWatchlists"]["highNameDominance"][0]["dominantName"] == "review"

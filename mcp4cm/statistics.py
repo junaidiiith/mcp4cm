@@ -48,7 +48,12 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     entries = typed_name_entries(record)
     names = [entry["name"] for entry in entries if entry["classification"] != "missing"]
     semantic_names = [entry["name"] for entry in entries if entry["classification"] == "semantic"]
-    tokens = [token for name in names for token in name.split()]
+    tokens = [
+        token
+        for entry in entries
+        if entry["classification"] != "missing"
+        for token in entry.get("nameTokens", ())
+    ]
     missing_names = sum(1 for entry in entries if entry["classification"] == "missing")
     classification_counts = Counter(str(entry["classification"]) for entry in entries)
     name_counts = Counter(names)
@@ -76,8 +81,14 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
 def typed_name_entries(record: ModelRecord) -> list[dict[str, Any]]:
     return [
         {
+            "rawType": result.raw_type,
+            "rawName": result.raw_name,
             "type": result.normalized_type or "unknown",
+            "normalizedType": result.normalized_type,
             "name": result.normalized_name,
+            "normalizedName": result.normalized_name,
+            "nameTokens": result.name_tokens,
+            "typeTokens": result.type_tokens,
             "classification": result.classification,
         }
         for _, result in iter_name_slots(record)
@@ -233,6 +244,29 @@ def vocabulary_summary(
         "mostReusedName": most_reused_name,
         "mostReusedDocumentFrequency": int(most_reused_count),
     }
+
+
+def label_pipeline_items(
+    occurrence_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]],
+    document_frequency_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]],
+    *,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "rawName": raw_name,
+            "normalizedName": normalized_name,
+            "nameTokens": list(name_tokens),
+            "rawType": raw_type,
+            "normalizedType": normalized_type,
+            "typeTokens": list(type_tokens),
+            "classification": classification,
+            "occurrences": int(occurrences),
+            "documentFrequency": int(document_frequency_counter.get(key, 0)),
+        }
+        for key, occurrences in occurrence_counter.most_common(limit)
+        for raw_name, normalized_name, raw_type, normalized_type, name_tokens, type_tokens, classification in [key]
+    ]
 
 
 def name_reuse_distribution(document_frequency_counter: Counter[str], model_count: int) -> list[dict[str, Any]]:
@@ -442,6 +476,8 @@ class CorpusStatisticsAccumulator:
         self.topic_model_rows: list[dict[str, Any]] = []
         self.sample_models: list[dict[str, Any]] = []
         self.unique_name_doc_freq: Counter[str] = Counter()
+        self.label_pipeline_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
+        self.label_pipeline_doc_freq: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
 
     def add(self, record: ModelRecord) -> None:
         self.node_counts.append(record.node_count)
@@ -509,9 +545,21 @@ class CorpusStatisticsAccumulator:
         model_concepts: set[str] = set()
         filtered_concepts: set[str] = set()
         model_names: set[str] = set()
+        model_label_rows: set[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = set()
         for entry in row["entries"]:
             element_type = str(entry["type"])
             classification = str(entry["classification"])
+            label_key = (
+                str(entry.get("rawName", "")),
+                str(entry.get("normalizedName", entry.get("name", ""))),
+                str(entry.get("rawType", "")),
+                str(entry.get("normalizedType", "")),
+                tuple(str(token) for token in entry.get("nameTokens", ())),
+                tuple(str(token) for token in entry.get("typeTokens", ())),
+                classification,
+            )
+            self.label_pipeline_counter[label_key] += 1
+            model_label_rows.add(label_key)
             self.entry_type_counter[element_type] += 1
             type_quality = self.type_quality_counter.setdefault(element_type, Counter())
             type_quality[classification] += 1
@@ -525,7 +573,7 @@ class CorpusStatisticsAccumulator:
             type_concepts = self.type_concept_counter.setdefault(element_type, Counter())
             type_concepts[concept] += 1
             token_counter = self.type_token_counter.setdefault(element_type, Counter())
-            for token in concept.split():
+            for token in entry.get("nameTokens", tuple(str(concept).split())):
                 token_counter[token] += 1
             model_concepts.add(concept)
             if classification != "type_like":
@@ -536,6 +584,7 @@ class CorpusStatisticsAccumulator:
         for concept in filtered_concepts:
             self.filtered_concept_doc_freq[concept] += 1
         self.unique_name_doc_freq.update(model_names)
+        self.label_pipeline_doc_freq.update(model_label_rows)
 
     def build_payload(self, *, skip_topic_model: bool = False, topic_model_skip_reason: str = "") -> dict[str, Any]:
         model_count = len(self.node_counts)
@@ -637,6 +686,10 @@ class CorpusStatisticsAccumulator:
                 self.concept_doc_freq,
                 self.concept_classification_counter,
                 model_count=model_count,
+            ),
+            "labelPipelineRows": label_pipeline_items(
+                self.label_pipeline_counter,
+                self.label_pipeline_doc_freq,
             ),
             "nameReuseDistribution": name_reuse_distribution(self.concept_doc_freq, model_count),
             "elementTypeTreemap": counter_items(self.entry_type_counter, 40),

@@ -9,6 +9,7 @@ from typing import Any, Callable, Iterable, Literal
 
 from mcp4cm._deps import require_networkx, require_node2vec, require_sklearn, require_transformers_torch
 from mcp4cm.core import Dataset, ModelRecord
+from mcp4cm.name_classification import extract_node_labels, normalize_label, normalize_name, normalize_type, raw_node_name, raw_node_type
 from mcp4cm.parsers.fingerprints import canonical_graph_hash
 from mcp4cm.utils import pair_count, pair_key, progress_percent
 
@@ -569,15 +570,13 @@ def hashable_name_tokens(
     deduplicate_name_tokens: bool = False,
 ) -> list[str]:
     tokens: list[str] = []
-    for _, attrs in record.graph.nodes(data=True):
-        name = normalize(attrs.get("name"))
-        if not name:
+    for label in extract_node_labels(record):
+        if not label.normalized_name:
             continue
         if include_types:
-            node_type = normalize(attrs.get("type") or attrs.get("eClass"))
-            tokens.append(f"{name}\t{node_type}")
+            tokens.append(f"{label.normalized_name}\t{label.normalized_type}")
         else:
-            tokens.append(name)
+            tokens.append(label.normalized_name)
     if deduplicate_name_tokens:
         tokens = sorted(set(tokens))
     else:
@@ -608,12 +607,10 @@ def record_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[st
 
 def node_name_type_pairs(record: ModelRecord) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
-    for _, attrs in record.graph.nodes(data=True):
-        name = normalize(attrs.get("name"))
-        if not name:
+    for label in extract_node_labels(record):
+        if not label.normalized_name:
             continue
-        node_type = normalize(attrs.get("type") or attrs.get("eClass"))
-        pairs.append((name, node_type))
+        pairs.append((label.normalized_name, label.normalized_type))
     return pairs
 
 
@@ -713,19 +710,11 @@ def record_text(record: ModelRecord, *, include_types: bool) -> str:
 
 
 def node_names(record: ModelRecord) -> list[str]:
-    return sorted(
-        normalize(attrs.get("name"))
-        for _, attrs in record.graph.nodes(data=True)
-        if normalize(attrs.get("name"))
-    )
+    return sorted(label.normalized_name for label in extract_node_labels(record) if label.normalized_name)
 
 
 def node_types(record: ModelRecord) -> list[str]:
-    return sorted(
-        normalize(attrs.get("type") or attrs.get("eClass"))
-        for _, attrs in record.graph.nodes(data=True)
-        if normalize(attrs.get("type") or attrs.get("eClass"))
-    )
+    return sorted(label.normalized_type for label in extract_node_labels(record) if label.normalized_type)
 
 
 def edge_types(record: ModelRecord) -> list[str]:
@@ -737,11 +726,11 @@ def edge_types(record: ModelRecord) -> list[str]:
 
 
 def node_type_attr(attrs: dict[str, object]) -> str:
-    return normalize(attrs.get("type") or attrs.get("eClass"))
+    return normalize_type(raw_node_type(attrs))
 
 
 def node_name_attr(attrs: dict[str, object]) -> str:
-    return normalize(attrs.get("name"))
+    return normalize_name(raw_node_name(attrs))
 
 
 def edge_type_attr(attrs: dict[str, object]) -> str:
@@ -952,7 +941,7 @@ def hash_tokens_in_order(tokens: Iterable[str], algorithm: str = "sha256") -> st
 
 
 def normalize(value: object) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    return normalize_label(value)
 
 
 def _add_group_votes(

@@ -164,8 +164,7 @@ export function VisualizationPanel({
   );
 }
 
-type VisualizationCategoryId = "quality" | "vocabulary" | "structure" | "topics";
-
+type VisualizationCategoryId = "quality" | "labels" | "structure" | "topics";
 interface VisualizationChartDefinition {
   id: string;
   title: string;
@@ -191,25 +190,25 @@ function visualizationCategories(
         {
           id: "missing-name-ratio",
           title: "Distribution of Missing-Name Ratio per Model",
-          description: "Share of parsed name slots recorded as empty.",
+          description: "Share of derived node name slots classified as missing.",
           render: () => <RatioQualityChart bins={data.missingNameRatioBands || data.missingNameRatioHistogram} summary={data.missingNameRatioSummary} />,
         },
         {
           id: "name-classification-overview",
           title: "Name Classification Overview",
-          description: "All parsed name slots grouped by their classifications.",
+          description: "All derived node name slots grouped by classification.",
           render: () => <NameClassificationOverview items={data.nameClassificationOverview || []} />,
         },
         {
           id: "name-classification-by-type",
-          title: "Name Classification by Type",
-          description: "Semantic, missing, placeholder, and type-like names by element type.",
+          title: "Name Classification by Normalized Type",
+          description: "Semantic, missing, placeholder, and type-like names grouped by normalized node type.",
           render: () => <TypeQualityTable rows={data.elementTypeQualityMatrix || []} />,
         },
         {
           id: "semantic-name-count-distribution",
           title: "Semantic Name Count Distribution",
-          description: "Model counts grouped by semantic name counts.",
+          description: "Model counts grouped by derived semantic-name counts.",
           render: () => <LabeledHistogram items={data.semanticNameCountHistogram || []} />,
         },
         {
@@ -221,31 +220,37 @@ function visualizationCategories(
       ],
     },
     {
-      id: "vocabulary",
-      label: "Vocabulary",
+      id: "labels",
+      label: "Labels",
       charts: [
         {
+          id: "label-pipeline",
+          title: "Raw to Normalized Labels and Tokens",
+          description: "Parser-observed names and types beside the derived normalized labels, tokens, and classification.",
+          render: () => <LabelPipelineTable rows={data.labelPipelineRows || []} />,
+        },
+        {
           id: "vocabulary-summary",
-          title: "Vocabulary Summary",
-          description: "Corpus-level counts for parsed names and reuse.",
+          title: "Normalized Name Vocabulary Summary",
+          description: "Corpus-level counts for derived normalized names and reuse.",
           render: () => <VocabularySummary summary={data.vocabularySummary} />,
         },
         {
           id: "vocabulary-ranking",
-          title: "Vocabulary Ranking",
-          description: "Names ranked by occurrence, model coverage, and classification.",
+          title: "Normalized Name Vocabulary Ranking",
+          description: "Derived normalized names ranked by occurrence, model coverage, and classification.",
           render: () => <VocabularyRanking rows={data.vocabularyRanking || []} />,
         },
         {
           id: "type-vocabulary-heatmap",
-          title: "Type-Specific Vocabulary Heatmap",
-          description: "Relative token frequency within each major element type.",
+          title: "Name Tokens by Normalized Type",
+          description: "Relative derived name-token frequency within each major normalized node type.",
           render: () => <Heatmap data={data.vocabularyHeatmap} />,
         },
         {
           id: "name-reuse-distribution",
-          title: "Name Reuse Distribution",
-          description: "How many distinct names appear in one model versus many models.",
+          title: "Normalized Name Reuse Distribution",
+          description: "How many distinct normalized names appear in one model versus many models.",
           render: () => <LabeledHistogram items={data.nameReuseDistribution || []} />,
         },
       ],
@@ -256,44 +261,44 @@ function visualizationCategories(
       charts: [
         {
           id: "element-type-treemap",
-          title: "Element Types in the Corpus",
-          description: "Treemap area is proportional to element count.",
+          title: "Normalized Node Types in the Corpus",
+          description: "Treemap area is proportional to normalized node type count.",
           render: () => <Treemap items={data.elementTypeTreemap} />,
         },
         {
           id: "type-name-links",
-          title: "Element Type to Frequent Names",
-          description: "Strongest type-to-name links.",
+          title: "Normalized Type to Frequent Names",
+          description: "Strongest links between normalized node types and normalized names.",
           render: () => <TypeConceptLinks links={data.typeConceptLinks} />,
         },
         {
           id: "names-within-types",
-          title: "Frequent Names within Element Types",
-          description: "Hierarchical treemap grouped by major type.",
+          title: "Frequent Normalized Names within Types",
+          description: "Hierarchical treemap grouped by major normalized node type.",
           render: () => <ConceptTreemap links={data.typeConceptLinks} />,
         },
         {
           id: "model-vocabulary-scatter",
           title: "Model Size vs Vocabulary Richness",
-          description: "Point size follows token count; color follows missing-name ratio.",
+          description: "Point size follows derived name-token count; color follows missing-name ratio.",
           render: () => <Scatter points={data.modelVocabularyScatter} />,
         },
         {
           id: "name-count-boxplot",
           title: "Boxplot of Name Counts in Models",
-          description: "Five-number summary of extracted name slots.",
+          description: "Five-number summary of parser-observed model name counts.",
           render: () => <Boxplot summary={data.nameCountBoxplot} />,
         },
         {
           id: "name-count-histogram-log",
           title: "Histogram of Name Counts (Log Scale)",
-          description: "Log-scaled model frequency.",
+          description: "Log-scaled model frequency for parser-observed model name counts.",
           render: () => <Histogram bins={data.nameCountHistogramLog} useDisplayCount />,
         },
         {
           id: "few-names-histogram",
           title: "Models with Fewer Than Five Names",
-          description: "Name-count distribution for small models.",
+          description: "Parser-observed name-count distribution for small models.",
           render: () => <Histogram bins={data.fewNamesHistogram} />,
         },
         {
@@ -311,7 +316,7 @@ function visualizationCategories(
         {
           id: "topic-map",
           title: `Document Topic Map (${data.topicModel.projectionMethod} projection)`,
-          description: "NMF topic assignment projected into two dimensions.",
+          description: "NMF topic assignment from derived name tokens projected into two dimensions.",
           render: () => <TopicScatter points={data.topicModel.points || []} />,
         },
         {
@@ -396,6 +401,123 @@ function VocabularySummary({ summary }: { summary?: VisualizationPayload["vocabu
       />
     </div>
   );
+}
+
+type LabelPipelineSortKey = "occurrences" | "documentFrequency" | "rawName" | "normalizedName" | "rawType" | "normalizedType";
+
+const labelPipelineColumns: Array<{ key: LabelPipelineSortKey; label: string }> = [
+  { key: "rawName", label: "Raw Name" },
+  { key: "normalizedName", label: "Normalized Name" },
+  { key: "rawType", label: "Raw Type" },
+  { key: "normalizedType", label: "Normalized Type" },
+  { key: "occurrences", label: "Occurrences" },
+  { key: "documentFrequency", label: "Models" },
+];
+
+function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelineRows"] }) {
+  const [sortKey, setSortKey] = useState<LabelPipelineSortKey>("occurrences");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [limit, setLimit] = useState(50);
+  const sortedRows = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    return [...rows].sort((left, right) => {
+      const leftValue = left[sortKey];
+      const rightValue = right[sortKey];
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        const diff = leftValue - rightValue;
+        if (diff !== 0) return diff * direction;
+      } else {
+        const diff = String(leftValue).localeCompare(String(rightValue));
+        if (diff !== 0) return diff * direction;
+      }
+      return left.normalizedName.localeCompare(right.normalizedName);
+    });
+  }, [rows, sortDirection, sortKey]);
+  const visibleRows = sortedRows.slice(0, limit);
+  const onSort = (key: LabelPipelineSortKey) => {
+    if (key === sortKey) {
+      setSortDirection((current) => current === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDirection(key === "occurrences" || key === "documentFrequency" ? "desc" : "asc");
+    }
+  };
+  if (!rows.length) return <EmptyChart />;
+  return (
+    <div className="labelPipeline">
+      <label className="chartLimit">
+        Rows
+        <input
+          aria-label="Label pipeline row count"
+          type="number"
+          min={1}
+          value={limit}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (Number.isInteger(value)) setLimit(Math.max(value, 1));
+          }}
+        />
+      </label>
+      <div className="labelPipelineFrame">
+        <table className="typeQualityTable labelPipelineTable">
+          <thead>
+            <tr>
+              {labelPipelineColumns.map((column) => (
+                <th key={column.key} aria-sort={sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}>
+                  <button
+                    className={sortKey === column.key ? "active" : ""}
+                    type="button"
+                    onClick={() => onSort(column.key)}
+                  >
+                    {column.label}
+                    {sortKey === column.key
+                      ? sortDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                      : <ArrowUpDown size={12} />}
+                  </button>
+                </th>
+              ))}
+              <th>Name Tokens</th>
+              <th>Type Tokens</th>
+              <th>Classification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((row, index) => (
+              <tr key={`${row.rawName}:${row.rawType}:${row.normalizedName}:${row.normalizedType}:${row.classification}:${index}`}>
+                <td title={row.rawName}>{row.rawName || <span className="mutedCell">empty</span>}</td>
+                <td title={row.normalizedName}><strong>{row.normalizedName || "empty"}</strong></td>
+                <td title={row.rawType}>{row.rawType || <span className="mutedCell">empty</span>}</td>
+                <td title={row.normalizedType}><strong>{row.normalizedType || "empty"}</strong></td>
+                <td>{row.occurrences.toLocaleString()}</td>
+                <td>{row.documentFrequency.toLocaleString()}</td>
+                <td><TokenList tokens={row.nameTokens} /></td>
+                <td><TokenList tokens={row.typeTokens} /></td>
+                <td>
+                  <span className={`vocabularyBadge ${classificationClassName(row.classification)}`}>
+                    {classificationDisplayLabel(row.classification)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TokenList({ tokens }: { tokens: string[] }) {
+  if (!tokens.length) return <span className="mutedCell">none</span>;
+  return <span className="tokenList">{tokens.map((token, index) => <b key={`${token}:${index}`}>{token}</b>)}</span>;
+}
+
+function classificationClassName(classification: VisualizationPayload["labelPipelineRows"][number]["classification"]) {
+  return classification === "type_like" ? "typeLike" : classification;
+}
+
+function classificationDisplayLabel(classification: VisualizationPayload["labelPipelineRows"][number]["classification"]) {
+  if (classification === "type_like") return "Type-like";
+  return classification.charAt(0).toUpperCase() + classification.slice(1);
 }
 
 type VocabularyFilter = "all" | "semantic" | "placeholder" | "typeLike" | "nonSemantic" | "excludeNonSemantic";
@@ -606,7 +728,7 @@ type TypeQualitySortKey =
 type SortDirection = "asc" | "desc";
 
 const typeQualityColumns: Array<{ key: TypeQualitySortKey; label: string }> = [
-  { key: "type", label: "Element Type" },
+  { key: "type", label: "Normalized Type" },
   { key: "total", label: "Total Slots" },
   { key: "semantic", label: "Semantic Count" },
   { key: "semanticRate", label: "Semantic %" },
