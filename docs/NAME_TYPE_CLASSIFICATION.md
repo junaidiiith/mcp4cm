@@ -39,8 +39,7 @@ Every parsed element with a name field is treated as one name slot. Each slot re
 | Classification | Meaning | Example |
 | --- | --- | --- |
 | Missing | The name is empty or unavailable. | empty name |
-| Type-like | The name repeats the element type. | type `class`, name `class`; type `activity`, name `activity1` |
-| Placeholder | The name is a generic dummy value. | `todo`, `test`, `dummy`, `my class` |
+| Placeholder | The name is generic, generated, dummy-like, or repeats the element type. | `todo`, `test`, `dummy`, `my class`; type `class`, name `class1` |
 | Semantic | The name appears to carry domain meaning. | `customer`, `approve invoice`, `shipping address` |
 
 The classification is ordered from weakest to strongest evidence:
@@ -49,33 +48,14 @@ The classification is ordered from weakest to strongest evidence:
 empty name
   -> Missing
 
-name repeats the element type
-  -> Type-like
-
-name is a known placeholder or dummy value
+name repeats the element type, or is a known placeholder/dummy value
   -> Placeholder
 
 otherwise
   -> Semantic
 ```
 
-This means one individual name slot is not both type-like and placeholder. If a name repeats the element type, it is classified as type-like first.
-
-## Type-Like Names
-
-A type-like name is a name that mostly tells us what kind of element it is, not what the element means.
-
-Examples:
-
-| Element Type | Name | Classification |
-| --- | --- | --- |
-| `class` | `class` | Type-like |
-| `class` | `class1` | Type-like |
-| `activity` | `activity` | Type-like |
-| `decision node` | `decision node2` | Type-like |
-| `attribute` | `customer id` | Semantic |
-
-Type-like names are important because they often come from generated, unfinished, or template-like models.
+Type-derived names such as `Class`, `Class1`, and `DecisionNode2` are classified as placeholders because they are low-information names for cleansing purposes.
 
 ## Placeholder Names
 
@@ -83,13 +63,19 @@ A placeholder name is a generic value that usually does not describe the domain.
 
 Examples:
 
-- `todo`
-- `test`
-- `dummy`
-- `example`
-- `my class`
+| Element Type | Name | Classification |
+| --- | --- | --- |
+| `class` | `class` | Placeholder |
+| `class` | `class1` | Placeholder |
+| `activity` | `activity` | Placeholder |
+| `decision node` | `decision node2` | Placeholder |
+| any | `todo` | Placeholder |
+| any | `test` | Placeholder |
+| any | `dummy` | Placeholder |
+| any | `my class` | Placeholder |
+| `attribute` | `customer id` | Semantic |
 
-Placeholder names are different from type-like names. A placeholder does not have to match the element type. It is weak because it is generic.
+Placeholder names are important because they often come from generated, unfinished, dummy-like, or template-like models.
 
 ## Semantic Names
 
@@ -103,7 +89,7 @@ Examples:
 - `delivery address`
 - `payment confirmation`
 
-Semantic does not mean the application fully understands the concept. It only means the name is not missing, not type-like, and not recognized as a placeholder.
+Semantic does not mean the application fully understands the concept. It only means the name is not missing and is not recognized as a placeholder.
 
 ## What "Mixed" Means in Vocabulary Views
 
@@ -115,7 +101,7 @@ Example:
 
 | Element Type | Name | Slot Classification |
 | --- | --- | --- |
-| `activity` | `activity` | Type-like |
+| `activity` | `activity` | Placeholder |
 | `role` | `activity` | Semantic |
 
 The vocabulary row for `activity` may therefore be shown as `Mixed`, meaning:
@@ -134,7 +120,7 @@ The Quality tab answers questions such as:
 
 - How many names are missing?
 - How many names are semantic?
-- Which element types contain many missing, placeholder, or type-like names?
+- Which element types contain many missing or placeholder names?
 - Which models are at risk because they have weak naming?
 
 ### Vocabulary Tab
@@ -145,7 +131,7 @@ It answers questions such as:
 
 - Which names occur most often?
 - Which names appear across many models?
-- Which names are semantic, placeholder, type-like, or mixed?
+- Which names are semantic, placeholder, or mixed?
 - Are names reused broadly across the corpus or mostly unique to individual models?
 - Which tokens are common for particular element types?
 
@@ -155,7 +141,6 @@ Useful interpretation examples:
 | --- | --- |
 | High occurrences, high model coverage | common corpus vocabulary |
 | High occurrences, low model coverage | repeated heavily in a few models |
-| High type-like count | generated or template-style naming |
 | Many singleton names | long-tail or model-specific vocabulary |
 | Many placeholders | unfinished or dummy-like models |
 
@@ -168,7 +153,6 @@ Typical cleansing signals include:
 - too few meaningful names
 - too many missing names
 - too many placeholder names
-- too many type-like names
 - very low vocabulary richness
 - one name repeated across much of the model
 
@@ -178,7 +162,7 @@ For example:
 
 | Model Pattern | Likely Cleansing Signal |
 | --- | --- |
-| Many elements named `class`, `class1`, `class2` | high type-like ratio |
+| Many elements named `class`, `class1`, `class2` | high placeholder ratio |
 | Many names such as `todo`, `test`, `dummy` | high placeholder ratio |
 | Most elements have no name | high missing-name ratio |
 | Only one or two semantic names in the whole graph | too few named elements |
@@ -197,7 +181,6 @@ Good signs:
 
 Warning signs:
 
-- many type-like names
 - many placeholder names
 - many models with almost no semantic names
 - vocabulary dominated by generic terms
