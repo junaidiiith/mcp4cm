@@ -21,13 +21,13 @@ pip install -e '.[ml]'
 Start the Flask backend:
 
 ```bash
-python -m mcp4cm.api_server
+python -m mcp4cm.api
 ```
 
 Backend logs are written to stdout by default. Set `MCP4CM_LOG_LEVEL` and `MCP4CM_LOG_FILE` to control verbosity and file logging:
 
 ```bash
-MCP4CM_LOG_LEVEL=DEBUG MCP4CM_LOG_FILE=backend.log python -m mcp4cm.api_server
+MCP4CM_LOG_LEVEL=DEBUG MCP4CM_LOG_FILE=backend.log python -m mcp4cm.api
 ```
 
 In another terminal, start the React development server:
@@ -48,7 +48,7 @@ To serve the built React app from Flask instead:
 cd webapp
 npm run build
 cd ..
-python -m mcp4cm.api_server
+python -m mcp4cm.api
 ```
 
 Then open `http://127.0.0.1:8765`.

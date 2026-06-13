@@ -5,15 +5,16 @@ import time
 
 import networkx as nx
 
-from mcp4cm import api_server
-from mcp4cm.api_server import DATASETS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS, create_app
+from mcp4cm.api import create_app
+from mcp4cm.api.state import DATASETS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS
+from mcp4cm.runtime_store import RUNTIME_DIR
 from mcp4cm.core import ModelRecord
 from mcp4cm.dummy import derive_nodes
 from mcp4cm.statistics import CorpusStatisticsAccumulator, typed_name_entries
 
 
 def clear_runtime():
-    shutil.rmtree(api_server.RUNTIME_DIR, ignore_errors=True)
+    shutil.rmtree(RUNTIME_DIR, ignore_errors=True)
 
 
 def test_corpus_statistics_accumulator_builds_without_graph_reload():
@@ -148,4 +149,4 @@ def test_upload_parse_uses_accumulator_for_statistics():
     assert finished["status"] == "complete"
     assert finished["statistics"]["summary"]["models"] == 20
     assert finished["statistics"]["visualizations"]["languageDistribution"][0]["count"] == 20
-    assert (api_server.RUNTIME_DIR / finished["datasetId"] / "statistics.json").exists()
+    assert (RUNTIME_DIR / finished["datasetId"] / "statistics.json").exists()

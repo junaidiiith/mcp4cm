@@ -662,10 +662,11 @@ function DuplicateGroupsReview({
 
   useEffect(() => {
     if (!jobId || !selectedGroupId) return;
+    const groupId = selectedGroupId;
     let cancelled = false;
     async function loadDetail() {
       try {
-        const detail = await getDuplicateGroupDetail(jobId, selectedGroupId);
+        const detail = await getDuplicateGroupDetail(jobId, groupId);
         if (!cancelled) setGroupDetail(detail);
       } catch (err) {
         if (!cancelled) setLoadError(errorText(err, "Could not load duplicate group detail."));

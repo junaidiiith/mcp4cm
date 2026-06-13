@@ -7,28 +7,33 @@ import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
-from mcp4cm import api_server
 from mcp4cm import runtime_store
-from mcp4cm.api_server import (
-    DATASETS,
-    DUPLICATE_JOBS,
-    UPLOAD_PARSE_JOBS,
-    UPLOAD_SESSIONS,
-    create_app,
+from mcp4cm._deps import require_networkx
+from mcp4cm.api import create_app
+from mcp4cm.api import process_utils
+from mcp4cm.api.process_utils import kill_processes_on_port, pids_on_port
+from mcp4cm.api.services.datasets import top_items
+from mcp4cm.api.services.duplicate_pipeline import selected_duplicate_techniques
+from mcp4cm.api.services.upload_summary import empty_upload_summary, merge_model_diagnostics
+from mcp4cm.api.state import DATASETS, DUPLICATE_JOBS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS
+from mcp4cm.core import Dataset, ModelDiagnostics
+from mcp4cm.runtime_store import (
+    RUNTIME_DIR,
+    deserialize_graph_from_runtime,
+    serialize_graph_for_runtime,
 )
-from mcp4cm.core import Dataset
 from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
 from mcp4cm.parsers.graph import normalize_graph_attributes
 
 
 def test_top_items_returns_all_values_when_limit_is_omitted():
-    items = api_server.top_items(Counter({f"type-{index}": index for index in range(20)}))
+    items = top_items(Counter({f"type-{index}": index for index in range(20)}))
 
     assert len(items) == 20
 
 
 def clear_runtime():
-    shutil.rmtree(api_server.RUNTIME_DIR, ignore_errors=True)
+    shutil.rmtree(RUNTIME_DIR, ignore_errors=True)
 
 
 def upload_and_parse_via_job(
@@ -173,7 +178,7 @@ def test_upload_start_resets_previous_pipeline_state_and_runtime(tmp_path):
     UPLOAD_PARSE_JOBS["old"] = {"status": "complete"}
     DUPLICATE_JOBS["old"] = {"status": "complete"}
 
-    runtime_dummy = api_server.RUNTIME_DIR / "old" / "index.json"
+    runtime_dummy = RUNTIME_DIR / "old" / "index.json"
     runtime_dummy.parent.mkdir(parents=True, exist_ok=True)
     runtime_dummy.write_text("{}", encoding="utf-8")
 
@@ -188,7 +193,7 @@ def test_upload_start_resets_previous_pipeline_state_and_runtime(tmp_path):
     assert "old" not in UPLOAD_PARSE_JOBS
     assert "old" not in DUPLICATE_JOBS
     assert not old_stage.exists()
-    assert not api_server.RUNTIME_DIR.exists()
+    assert not RUNTIME_DIR.exists()
 
 
 def test_upload_start_rejects_when_pipeline_run_is_active():
@@ -234,9 +239,9 @@ def test_runtime_dataset_persistence_supports_reload_when_memory_is_cleared():
     )
     assert job["status"] == "complete"
     dataset_id = job["datasetId"]
-    assert (api_server.RUNTIME_DIR / dataset_id / "index.json").exists()
-    assert (api_server.RUNTIME_DIR / dataset_id / "statistics.json").exists()
-    assert (api_server.RUNTIME_DIR / dataset_id / "ir").exists()
+    assert (RUNTIME_DIR / dataset_id / "index.json").exists()
+    assert (RUNTIME_DIR / dataset_id / "statistics.json").exists()
+    assert (RUNTIME_DIR / dataset_id / "ir").exists()
 
     DATASETS.clear()
     inspect = client.get(f"/api/datasets/{dataset_id}/models/m-runtime/inspect")
@@ -428,7 +433,7 @@ def test_dummy_filters_persist_after_cleansing_statistics():
             break
         time.sleep(0.05)
 
-    assert (api_server.RUNTIME_DIR / dataset_id / "statistics-after-dummy.json").exists()
+    assert (RUNTIME_DIR / dataset_id / "statistics-after-dummy.json").exists()
     assert after_statistics is not None
     assert after_statistics.status_code == 200
     assert after_statistics_data["summary"]["models"] == 1
@@ -496,7 +501,7 @@ def test_duplicate_detection_uses_retained_models_after_dummy_cleansing():
 
     assert dummy_payload["status"] == "complete"
     assert dummy_payload["result"]["runSummary"]["remainingModels"] == 2
-    assert (api_server.RUNTIME_DIR / dataset_id / "retained-models-after-dummy.json").exists()
+    assert (RUNTIME_DIR / dataset_id / "retained-models-after-dummy.json").exists()
 
     duplicate_payload = run_duplicate_job(
         client,
@@ -519,7 +524,7 @@ def test_duplicate_detection_uses_retained_models_after_dummy_cleansing():
 
 
 def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields():
-    nx = api_server.require_networkx()
+    nx = require_networkx()
     graph = nx.MultiDiGraph()
     graph.add_node(
         "n1",
@@ -541,7 +546,7 @@ def test_serialize_graph_for_runtime_flattens_attrs_and_deduplicates_data_fields
         specific="n1",
     )
 
-    payload = api_server.serialize_graph_for_runtime(graph)
+    payload = serialize_graph_for_runtime(graph)
 
     node = next(item for item in payload["nodes"] if item["id"] == "n1")
     assert "attrs" not in node
@@ -585,8 +590,8 @@ def test_deserialize_graph_from_runtime_supports_flat_and_legacy_attrs_shapes():
         "edges": [{"source": "n2", "target": "n2", "key": "e-flat", "id": "e-flat", "type": "Association", "data": {}}],
     }
 
-    legacy_graph = api_server.deserialize_graph_from_runtime(legacy_payload)
-    flat_graph = api_server.deserialize_graph_from_runtime(flat_payload)
+    legacy_graph = deserialize_graph_from_runtime(legacy_payload)
+    flat_graph = deserialize_graph_from_runtime(flat_payload)
 
     assert legacy_graph.nodes["n1"]["type"] == "Class"
     assert legacy_graph.nodes["n1"]["name"] == "Legacy"
@@ -600,7 +605,7 @@ def test_deserialize_graph_from_runtime_supports_flat_and_legacy_attrs_shapes():
 
 
 def test_normalize_graph_attributes_keeps_data_nested_without_top_level_duplicates():
-    nx = api_server.require_networkx()
+    nx = require_networkx()
     graph = nx.MultiDiGraph()
     graph.add_node("n1", type="Class", name="B", data={"attributes": [{"id": "att1"}]})
     graph.add_node("n2", type="Class", name="A", data={})
@@ -643,25 +648,25 @@ def test_pids_on_port_uses_lsof(monkeypatch):
         calls.append(command)
         return SimpleNamespace(returncode=0, stdout="123\n456\n", stderr="")
 
-    monkeypatch.setattr(api_server.subprocess, "run", fake_run)
+    monkeypatch.setattr(process_utils.subprocess, "run", fake_run)
 
-    assert api_server.pids_on_port(8765) == [123, 456]
+    assert pids_on_port(8765) == [123, 456]
     assert calls == [["lsof", "-ti", ":8765"]]
 
 
 def test_kill_processes_on_port_skips_current_pid(monkeypatch):
     killed = []
-    monkeypatch.setattr(api_server, "pids_on_port", lambda port: [111, os.getpid(), 222])
-    monkeypatch.setattr(api_server.os, "kill", lambda pid, sig: killed.append((pid, sig)))
+    monkeypatch.setattr(process_utils, "pids_on_port", lambda port: [111, os.getpid(), 222])
+    monkeypatch.setattr(process_utils.os, "kill", lambda pid, sig: killed.append((pid, sig)))
 
-    result = api_server.kill_processes_on_port(8765)
+    result = kill_processes_on_port(8765)
 
     assert result == [111, 222]
     assert [pid for pid, _ in killed] == [111, 222]
 
 
 def test_selected_duplicate_techniques_accepts_ml_aliases():
-    selected = api_server.selected_duplicate_techniques(
+    selected = selected_duplicate_techniques(
         {"techniques": ["Graph embeddings", "BERT semantic", "node2vec", "bert_similarity"]}
     )
 
@@ -669,14 +674,14 @@ def test_selected_duplicate_techniques_accepts_ml_aliases():
 
 
 def test_selected_duplicate_techniques_accepts_cached_payload_shapes():
-    assert api_server.selected_duplicate_techniques({"techniques": "graph_embeddings, BERT semantic"}) == [
+    assert selected_duplicate_techniques({"techniques": "graph_embeddings, BERT semantic"}) == [
         "graph_embedding",
         "bert_semantic",
     ]
-    assert api_server.selected_duplicate_techniques({"selectedTechniques": {"graph_embedding": True, "hash_names": False}}) == [
+    assert selected_duplicate_techniques({"selectedTechniques": {"graph_embedding": True, "hash_names": False}}) == [
         "graph_embedding"
     ]
-    assert api_server.selected_duplicate_techniques({"selected": [{"id": "bert_semantic"}]}) == ["bert_semantic"]
+    assert selected_duplicate_techniques({"selected": [{"id": "bert_semantic"}]}) == ["bert_semantic"]
 
 
 def test_flask_upload_dataset_route():
@@ -903,8 +908,8 @@ def test_flask_upload_dataset_route_rejects_jsonl_array_lines():
 
 
 def test_merge_model_diagnostics_does_not_add_parse_warning_when_typed_warnings_exist():
-    summary = api_server.empty_upload_summary()
-    diagnostics = api_server.ModelDiagnostics(
+    summary = empty_upload_summary()
+    diagnostics = ModelDiagnostics(
         parse_status="warning",
         warning_count=1,
         warnings_by_type={"INVALID_TYPE_REFERENCE": 1},
@@ -916,7 +921,7 @@ def test_merge_model_diagnostics_does_not_add_parse_warning_when_typed_warnings_
         source_path="modelset-uml/f51fd8af-292f-44c7-8a63-b9fc80cb4ab7.xmi",
     )
 
-    api_server.merge_model_diagnostics(summary, "f51fd8af-292f-44c7-8a63-b9fc80cb4ab7", diagnostics)
+    merge_model_diagnostics(summary, "f51fd8af-292f-44c7-8a63-b9fc80cb4ab7", diagnostics)
 
     assert summary["warnings"] == 1
     assert summary["warningsByType"] == {"INVALID_TYPE_REFERENCE": 1}
