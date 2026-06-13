@@ -4,9 +4,10 @@ import json
 import re
 import threading
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from mcp4cm._deps import require_networkx
 from mcp4cm.core import Dataset, ModelDiagnostics, ModelRecord
@@ -393,7 +394,9 @@ def delete_dataset_after_dummy_statistics(dataset_id: str) -> None:
         runtime_dataset_after_dummy_statistics_path(dataset_id).unlink(missing_ok=True)
 
 
-def save_dataset_after_dummy_retained_model_ids(dataset_id: str, model_ids: set[str] | list[str] | tuple[str, ...]) -> None:
+def save_dataset_after_dummy_retained_model_ids(
+    dataset_id: str, model_ids: set[str] | list[str] | tuple[str, ...]
+) -> None:
     dataset_id = str(dataset_id or "")
     if not dataset_id:
         return
@@ -510,7 +513,9 @@ def load_model_from_runtime(dataset_id: str, model_id: str) -> tuple[ModelRecord
     return record, diagnostics
 
 
-def load_model_entry_from_runtime(dataset_id: str, model_entry: dict[str, Any]) -> tuple[ModelRecord, ModelDiagnostics] | None:
+def load_model_entry_from_runtime(
+    dataset_id: str, model_entry: dict[str, Any]
+) -> tuple[ModelRecord, ModelDiagnostics] | None:
     dataset_id = str(dataset_id or "")
     if not dataset_id or not isinstance(model_entry, dict):
         return None

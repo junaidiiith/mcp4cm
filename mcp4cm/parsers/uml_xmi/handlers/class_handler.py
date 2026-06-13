@@ -1,14 +1,14 @@
 """Handler for uml:Class elements."""
 
-from typing import Any, Dict, List
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.diagnostics import WarningType
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import (
-    xsi_type,
     is_tool_extension,
     read_multiplicity,
+    xsi_type,
 )
 
 
@@ -30,7 +30,7 @@ class ClassHandler(ElementHandler):
             return
 
         name = self.read_name(elem)
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
 
         doc = self.extract_documentation(elem)
         if doc:
@@ -55,9 +55,9 @@ class ClassHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_owned_attributes(self, ctx, class_elem: ET.Element) -> List[Dict[str, Any]]:
+    def _parse_owned_attributes(self, ctx, class_elem: ET.Element) -> list[dict[str, Any]]:
         """Parse ownedAttribute elements (excluding association ends)."""
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for attr in class_elem.findall("./ownedAttribute"):
             if is_tool_extension(attr):
                 continue
@@ -70,7 +70,7 @@ class ClassHandler(ElementHandler):
             if not attr_id:
                 continue
 
-            item: Dict[str, Any] = {"id": attr_id}
+            item: dict[str, Any] = {"id": attr_id}
 
             attr_name = self.read_name(attr)
             if attr_name:

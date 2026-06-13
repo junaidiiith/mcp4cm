@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Optional, Sequence, Set
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping, Sequence
 
 from mcp4cm.parsers.diagnostics import WarningType
 from mcp4cm.parsers.ir import Edge
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import is_tool_extension, xmi_id, xsi_type
-
 
 EMBEDDED_VALUE_SPEC_TYPES: frozenset[str] = frozenset(
     {
@@ -34,13 +33,13 @@ class DirectedEdgeHandler(ElementHandler):
         edge_type: str,
         source_attr: str,
         target_attr: str,
-        source_child_tag: Optional[str] = None,
-        target_child_tag: Optional[str] = None,
+        source_child_tag: str | None = None,
+        target_child_tag: str | None = None,
         scalar_attrs: Sequence[str] = (),
         list_attrs: Sequence[str] = (),
-        rename_map: Optional[Mapping[str, str]] = None,
+        rename_map: Mapping[str, str] | None = None,
         child_ref_tags: Sequence[str] = (),
-        child_ref_rename_map: Optional[Mapping[str, str]] = None,
+        child_ref_rename_map: Mapping[str, str] | None = None,
         handled_children: Sequence[str] = (),
         include_name: bool = True,
     ):
@@ -62,7 +61,7 @@ class DirectedEdgeHandler(ElementHandler):
     def element_type(self) -> str:
         return self._element_type
 
-    def get_handled_attributes(self) -> Set[str]:
+    def get_handled_attributes(self) -> set[str]:
         return {
             "name" if self._include_name else "",
             self._source_attr,
@@ -71,7 +70,7 @@ class DirectedEdgeHandler(ElementHandler):
             *self._list_attrs,
         } - {""}
 
-    def get_handled_children(self) -> Set[str]:
+    def get_handled_children(self) -> set[str]:
         return {
             self._source_child_tag,
             self._target_child_tag,
@@ -87,12 +86,8 @@ class DirectedEdgeHandler(ElementHandler):
         if not rel_id:
             return
 
-        source_refs = self.split_ref_list(
-            self.resolve_reference(elem, self._source_attr, self._source_child_tag)
-        )
-        target_refs = self.split_ref_list(
-            self.resolve_reference(elem, self._target_attr, self._target_child_tag)
-        )
+        source_refs = self.split_ref_list(self.resolve_reference(elem, self._source_attr, self._source_child_tag))
+        target_refs = self.split_ref_list(self.resolve_reference(elem, self._target_attr, self._target_child_tag))
         if not source_refs or not target_refs:
             ctx.skip_with_warning(
                 WarningType.MISSING_EDGE_ENDPOINT,
@@ -101,7 +96,7 @@ class DirectedEdgeHandler(ElementHandler):
             )
             return
 
-        edge_data: Dict[str, object] = self.collect_attributes(
+        edge_data: dict[str, object] = self.collect_attributes(
             elem,
             scalar_attrs=self._scalar_attrs,
             list_attrs=self._list_attrs,
@@ -139,9 +134,9 @@ class DirectedEdgeHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _collect_embedded_value_specs(self, elem: ET.Element, *, existing_keys: Set[str]) -> Dict[str, object]:
+    def _collect_embedded_value_specs(self, elem: ET.Element, *, existing_keys: set[str]) -> dict[str, object]:
         """Embed guard/weight/argument/ownedRule ValueSpecifications into edge data."""
-        out: Dict[str, object] = {}
+        out: dict[str, object] = {}
 
         arguments = self._parse_value_spec_children(elem, "argument")
         if arguments:
@@ -170,14 +165,14 @@ class DirectedEdgeHandler(ElementHandler):
 
         return out
 
-    def _parse_value_spec_child(self, owner: ET.Element, child_tag: str) -> Optional[Dict[str, object]]:
+    def _parse_value_spec_child(self, owner: ET.Element, child_tag: str) -> dict[str, object] | None:
         child = owner.find(f"./{child_tag}")
         if child is None or is_tool_extension(child):
             return None
         return self._parse_value_spec_element(child)
 
-    def _parse_value_spec_children(self, owner: ET.Element, child_tag: str) -> list[Dict[str, object]]:
-        payloads: list[Dict[str, object]] = []
+    def _parse_value_spec_children(self, owner: ET.Element, child_tag: str) -> list[dict[str, object]]:
+        payloads: list[dict[str, object]] = []
         for child in owner.findall(f"./{child_tag}"):
             if is_tool_extension(child):
                 continue
@@ -186,12 +181,12 @@ class DirectedEdgeHandler(ElementHandler):
                 payloads.append(payload)
         return payloads
 
-    def _parse_value_spec_element(self, child: ET.Element) -> Optional[Dict[str, object]]:
+    def _parse_value_spec_element(self, child: ET.Element) -> dict[str, object] | None:
         child_type = xsi_type(child) or ""
         if child_type and child_type not in EMBEDDED_VALUE_SPEC_TYPES:
             return None
 
-        payload: Dict[str, object] = {}
+        payload: dict[str, object] = {}
 
         child_id = xmi_id(child)
         if child_id:
@@ -222,13 +217,13 @@ class DirectedEdgeHandler(ElementHandler):
 
         return payload or None
 
-    def _parse_owned_rules(self, owner: ET.Element) -> list[Dict[str, object]]:
-        rules: list[Dict[str, object]] = []
+    def _parse_owned_rules(self, owner: ET.Element) -> list[dict[str, object]]:
+        rules: list[dict[str, object]] = []
         for rule in owner.findall("./ownedRule"):
             if is_tool_extension(rule):
                 continue
 
-            rule_payload: Dict[str, object] = {}
+            rule_payload: dict[str, object] = {}
             rule_id = xmi_id(rule)
             if rule_id:
                 rule_payload["id"] = rule_id
@@ -250,7 +245,7 @@ class DirectedEdgeHandler(ElementHandler):
 
         return rules
 
-    def _resolve_existing_guard_ref(self, existing_keys: Set[str], elem: ET.Element) -> str:
+    def _resolve_existing_guard_ref(self, existing_keys: set[str], elem: ET.Element) -> str:
         if "guard" not in existing_keys:
             return ""
         guard_ref = elem.attrib.get("guard")

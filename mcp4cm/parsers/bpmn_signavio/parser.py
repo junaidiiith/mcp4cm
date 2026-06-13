@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from mcp4cm.parsers.ir import Edge, IR, Node
 from mcp4cm.parsers.base import BaseParser, register_parser
 from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
+from mcp4cm.parsers.ir import IR, Edge, Node
 
 # In Signavio/Oryx JSON, these stencils are modeled as connector shapes.
 EDGE_STENCIL_IDS = {
@@ -28,13 +28,13 @@ class ShapeRecord:
 
     id: str
     stencil_id: str
-    shape: Dict[str, Any]
-    parent_id: Optional[str]
-    outgoing_ids: List[str]
-    target_id: Optional[str]
+    shape: dict[str, Any]
+    parent_id: str | None
+    outgoing_ids: list[str]
+    target_id: str | None
 
 
-def _extract_stencil_id(shape: Dict[str, Any]) -> str:
+def _extract_stencil_id(shape: dict[str, Any]) -> str:
     stencil = shape.get("stencil")
     if not isinstance(stencil, dict):
         return ""
@@ -42,12 +42,12 @@ def _extract_stencil_id(shape: Dict[str, Any]) -> str:
     return stencil_id if isinstance(stencil_id, str) else ""
 
 
-def _extract_outgoing_ids(shape: Dict[str, Any]) -> List[str]:
+def _extract_outgoing_ids(shape: dict[str, Any]) -> list[str]:
     outgoing = shape.get("outgoing")
     if not isinstance(outgoing, list):
         return []
 
-    refs: List[str] = []
+    refs: list[str] = []
     for item in outgoing:
         if not isinstance(item, dict):
             continue
@@ -57,7 +57,7 @@ def _extract_outgoing_ids(shape: Dict[str, Any]) -> List[str]:
     return refs
 
 
-def _extract_target_id(shape: Dict[str, Any]) -> Optional[str]:
+def _extract_target_id(shape: dict[str, Any]) -> str | None:
     target = shape.get("target")
     if isinstance(target, dict):
         target_id = target.get("resourceId")
@@ -66,9 +66,9 @@ def _extract_target_id(shape: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _compact_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+def _compact_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Keep meaningful values while dropping empty placeholders."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for key, value in data.items():
         if value in ("", None, [], {}):
             continue
@@ -76,7 +76,7 @@ def _compact_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def _extract_name(shape: Dict[str, Any]) -> str:
+def _extract_name(shape: dict[str, Any]) -> str:
     props = shape.get("properties")
     if isinstance(props, dict):
         name = props.get("name")
@@ -91,7 +91,7 @@ class BPMNSignavioJSONParser(BaseParser):
 
     language = "BPMN-Signavio-JSON"
 
-    def parse(self, filepath: str) -> Tuple[IR, ParserRunStats]:
+    def parse(self, filepath: str) -> tuple[IR, ParserRunStats]:
         self._start_run()
 
         path = Path(filepath)
@@ -99,7 +99,7 @@ class BPMNSignavioJSONParser(BaseParser):
             raise CannotParseError(f"File does not exist: {filepath}")
 
         try:
-            with open(path, "r", encoding="utf-8") as handle:
+            with open(path, encoding="utf-8") as handle:
                 data = json.load(handle)
         except json.JSONDecodeError as exc:
             raise CannotParseError(f"Invalid JSON: {exc}") from exc
@@ -137,10 +137,10 @@ class BPMNSignavioJSONParser(BaseParser):
             },
         )
 
-        records: Dict[str, ShapeRecord] = {}
-        order: List[str] = []
-        parent_of: Dict[str, Optional[str]] = {}
-        incoming_refs: Dict[str, List[str]] = {}
+        records: dict[str, ShapeRecord] = {}
+        order: list[str] = []
+        parent_of: dict[str, str | None] = {}
+        incoming_refs: dict[str, list[str]] = {}
 
         self._collect_shapes(data, None, records, order, parent_of)
         self._build_incoming_index(records, incoming_refs)
@@ -225,11 +225,11 @@ class BPMNSignavioJSONParser(BaseParser):
 
     def _collect_shapes(
         self,
-        shape: Dict[str, Any],
-        parent_id: Optional[str],
-        records: Dict[str, ShapeRecord],
-        order: List[str],
-        parent_of: Dict[str, Optional[str]],
+        shape: dict[str, Any],
+        parent_id: str | None,
+        records: dict[str, ShapeRecord],
+        order: list[str],
+        parent_of: dict[str, str | None],
     ) -> None:
         shape_id = shape.get("resourceId")
         if not isinstance(shape_id, str) or not shape_id:
@@ -281,8 +281,8 @@ class BPMNSignavioJSONParser(BaseParser):
 
     def _build_incoming_index(
         self,
-        records: Dict[str, ShapeRecord],
-        incoming_refs: Dict[str, List[str]],
+        records: dict[str, ShapeRecord],
+        incoming_refs: dict[str, list[str]],
     ) -> None:
         for rec in records.values():
             for target_ref in rec.outgoing_ids:
@@ -294,7 +294,7 @@ class BPMNSignavioJSONParser(BaseParser):
                     continue
                 incoming_refs.setdefault(target_ref, []).append(rec.id)
 
-    def _identify_edge_shapes(self, records: Dict[str, ShapeRecord]) -> set[str]:
+    def _identify_edge_shapes(self, records: dict[str, ShapeRecord]) -> set[str]:
         edge_ids: set[str] = set()
         for rec in records.values():
             if rec.stencil_id in EDGE_STENCIL_IDS or rec.target_id:
@@ -304,9 +304,9 @@ class BPMNSignavioJSONParser(BaseParser):
     def _resolve_edge_source(
         self,
         rec: ShapeRecord,
-        incoming_refs: Dict[str, List[str]],
+        incoming_refs: dict[str, list[str]],
         node_ids: set[str],
-    ) -> Optional[str]:
+    ) -> str | None:
         source_candidates = [source for source in incoming_refs.get(rec.id, []) if source in node_ids]
         if source_candidates:
             if len(source_candidates) > 1:
@@ -326,7 +326,7 @@ class BPMNSignavioJSONParser(BaseParser):
 
         return None
 
-    def _resolve_edge_target(self, rec: ShapeRecord, node_ids: set[str]) -> Optional[str]:
+    def _resolve_edge_target(self, rec: ShapeRecord, node_ids: set[str]) -> str | None:
         if rec.target_id:
             return rec.target_id
 
@@ -340,8 +340,8 @@ class BPMNSignavioJSONParser(BaseParser):
 
         return None
 
-    def _build_node_data(self, rec: ShapeRecord) -> Dict[str, Any]:
-        data: Dict[str, Any] = {}
+    def _build_node_data(self, rec: ShapeRecord) -> dict[str, Any]:
+        data: dict[str, Any] = {}
 
         props = rec.shape.get("properties")
         if isinstance(props, dict):
@@ -357,8 +357,8 @@ class BPMNSignavioJSONParser(BaseParser):
 
         return data
 
-    def _build_edge_data(self, rec: ShapeRecord) -> Dict[str, Any]:
-        data: Dict[str, Any] = {}
+    def _build_edge_data(self, rec: ShapeRecord) -> dict[str, Any]:
+        data: dict[str, Any] = {}
 
         props = rec.shape.get("properties")
         if isinstance(props, dict):

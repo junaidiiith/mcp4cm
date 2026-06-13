@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
-from mcp4cm.core import ModelDiagnostics, ModelRecord, ModelingLanguage
+from mcp4cm.core import ModelDiagnostics, ModelingLanguage, ModelRecord
 from mcp4cm.parsers.archimate_archi.parser import ArchiMateArchiParser
 from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
 from mcp4cm.parsers.bpmn_signavio.parser import BPMNSignavioJSONParser
-from mcp4cm.parsers.diagnostics import ModelParseDiagnostics, ParserRunStats, WarningType
+from mcp4cm.parsers.diagnostics import ParserRunStats
 from mcp4cm.parsers.graph import (
     UMLFeatureProjection,
     convert_to_networkx,
@@ -54,7 +55,7 @@ class ParserDescriptor:
     format: str
     parser_id: str
     extensions: tuple[str, ...]
-    adapter_factory: Callable[[], "ParserAdapterBase"]
+    adapter_factory: Callable[[], ParserAdapterBase]
     option_specs: tuple[OptionSpec, ...] = ()
 
     def normalize_options(self, payload: Mapping[str, Any] | None = None) -> ParserOptions:
@@ -62,23 +63,25 @@ class ParserDescriptor:
         allowed = {spec.external_name: spec for spec in self.option_specs}
         unsupported = sorted(str(key) for key in payload if key not in allowed)
         if unsupported:
-            raise ValueError(
-                f"Unsupported option(s) for {self.language}/{self.format}: {', '.join(unsupported)}"
-            )
-        values = {spec.internal_name: spec.coerce(payload.get(spec.external_name, spec.default)) for spec in self.option_specs}
+            raise ValueError(f"Unsupported option(s) for {self.language}/{self.format}: {', '.join(unsupported)}")
+        values = {
+            spec.internal_name: spec.coerce(payload.get(spec.external_name, spec.default)) for spec in self.option_specs
+        }
         return ParserOptions(values)
 
     def matches_extension(self, relpath: str | Path) -> bool:
         return Path(str(relpath)).suffix.lower() in self.extensions
 
-    def create_adapter(self) -> "ParserAdapterBase":
+    def create_adapter(self) -> ParserAdapterBase:
         return self.adapter_factory()
 
 
 class ParserAdapterBase:
     descriptor: ParserDescriptor
 
-    def parse_file(self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None) -> ParsedModelResult:
+    def parse_file(
+        self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None
+    ) -> ParsedModelResult:
         raise NotImplementedError
 
     def _success_diagnostics(
@@ -97,7 +100,9 @@ class ParserAdapterBase:
             parse_status=status,
             warning_count=warning_count,
             warnings_by_type=dict(warnings_by_type or {}),
-            warning_messages_by_type={key: list(messages) for key, messages in (warning_messages_by_type or {}).items()},
+            warning_messages_by_type={
+                key: list(messages) for key, messages in (warning_messages_by_type or {}).items()
+            },
             elements_loaded=elements_loaded,
             elements_skipped=elements_skipped,
             parse_time_ms=parse_time_ms,
@@ -108,7 +113,9 @@ class ParserAdapterBase:
 class JsonGraphParserAdapter(ParserAdapterBase):
     parser_id = ""
 
-    def parse_file(self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None) -> ParsedModelResult:
+    def parse_file(
+        self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None
+    ) -> ParsedModelResult:
         _ = options
         relpath = relpath or str(path)
         started = time.perf_counter()
@@ -155,7 +162,9 @@ class IRParserAdapter(ParserAdapterBase):
     metadata_language: str
     format_name: str
 
-    def parse_file(self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None) -> ParsedModelResult:
+    def parse_file(
+        self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None
+    ) -> ParsedModelResult:
         relpath = relpath or str(path)
         started = time.perf_counter()
         parser = self.create_parser(options)
@@ -207,7 +216,9 @@ class UMLXMIAdapter(IRParserAdapter):
     format_name = "xmi"
 
     def create_parser(self, options: ParserOptions):
-        return UMLXMIParser(options=UMLParseOptions(include_model_root_node=bool(options.get("include_model_root_node", True))))
+        return UMLXMIParser(
+            options=UMLParseOptions(include_model_root_node=bool(options.get("include_model_root_node", True)))
+        )
 
     def apply_projection(self, graph, options: ParserOptions) -> None:
         expand_uml_feature_nodes(
@@ -274,7 +285,9 @@ def diagnostics_from_stats(
     parse_time_ms: int,
     stats: ParserRunStats,
 ) -> ModelDiagnostics:
-    warnings_by_type = {str(key.value if hasattr(key, "value") else key): int(value) for key, value in stats.warnings_by_type.items()}
+    warnings_by_type = {
+        str(key.value if hasattr(key, "value") else key): int(value) for key, value in stats.warnings_by_type.items()
+    }
     warning_messages_by_type: dict[str, list[str]] = {}
     for warning_type, messages in stats.warning_msgs.items():
         key = str(warning_type.value if hasattr(warning_type, "value") else warning_type)
@@ -322,7 +335,9 @@ def resolve_parser(language: str, data_format: str) -> ParserDescriptor:
         return _DESCRIPTORS[key]
     except KeyError as exc:
         supported = ", ".join(f"{language}/{data_format}" for language, data_format in sorted(_DESCRIPTORS))
-        raise ValueError(f"Unsupported language/format combination: {language}/{data_format}. Supported: {supported}") from exc
+        raise ValueError(
+            f"Unsupported language/format combination: {language}/{data_format}. Supported: {supported}"
+        ) from exc
 
 
 def parser_descriptors() -> tuple[ParserDescriptor, ...]:
@@ -396,9 +411,7 @@ register_descriptor(
         parser_id="ecore-ecore",
         extensions=(".ecore",),
         adapter_factory=EcoreFileAdapter,
-        option_specs=(
-            OptionSpec("resolveExternalRefs", "resolve_external_refs", True, bool_option),
-        ),
+        option_specs=(OptionSpec("resolveExternalRefs", "resolve_external_refs", True, bool_option),),
     )
 )
 register_descriptor(

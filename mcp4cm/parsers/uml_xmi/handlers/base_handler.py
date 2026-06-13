@@ -1,21 +1,22 @@
 """Base handler class for UML element handlers."""
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 import xml.etree.ElementTree as ET
+from abc import ABC, abstractmethod
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from mcp4cm.parsers.diagnostics import WarningType
 from mcp4cm.parsers.ir import Node
 from mcp4cm.parsers.uml_xmi.metamodel import SUPPORTED_UML_CONCEPTS, UMLConceptSpec, UMLParseContract
 from mcp4cm.parsers.uml_xmi.xmi_utils import (
-    xmi_id,
-    xsi_type,
-    localname,
-    is_tool_extension,
+    XSI_NS,
     href_to_type_ref,
+    is_tool_extension,
+    localname,
     parse_boolean,
     read_multiplicity,
-    XSI_NS,
+    xmi_id,
+    xsi_type,
 )
 
 
@@ -31,7 +32,7 @@ class ElementHandler(ABC):
     def handle(self, ctx, elem: ET.Element) -> None:
         """Handle a single element."""
 
-    def concept_spec(self) -> Optional[UMLConceptSpec]:
+    def concept_spec(self) -> UMLConceptSpec | None:
         """Return metamodel concept spec for the current handler."""
         return SUPPORTED_UML_CONCEPTS.get(self.element_type)
 
@@ -42,21 +43,21 @@ class ElementHandler(ABC):
             return UMLParseContract()
         return concept.parse_contract
 
-    def get_handled_attributes(self) -> Set[str]:
+    def get_handled_attributes(self) -> set[str]:
         """Return set of attribute names this handler processes."""
         concept = self.concept_spec()
         if concept is None:
             return set()
         return set(concept.allowed_attributes)
 
-    def get_handled_children(self) -> Set[str]:
+    def get_handled_children(self) -> set[str]:
         """Return set of child element tags this handler processes."""
         concept = self.concept_spec()
         if concept is None:
             return set()
         return set(concept.allowed_children)
 
-    def log_unhandled_attributes(self, ctx, elem: ET.Element, handled: Set[str]) -> None:
+    def log_unhandled_attributes(self, ctx, elem: ET.Element, handled: set[str]) -> None:
         """Log unhandled attributes for an element."""
         elem_id = xmi_id(elem)
         elem_type = xsi_type(elem) or localname(elem.tag)
@@ -76,7 +77,7 @@ class ElementHandler(ABC):
                     f"(ID: {elem_id}), Attribute: {attr_local}, Value: {attr_value}",
                 )
 
-    def log_unhandled_children(self, ctx, elem: ET.Element, handled: Set[str]) -> None:
+    def log_unhandled_children(self, ctx, elem: ET.Element, handled: set[str]) -> None:
         """Log unhandled child elements."""
         elem_id = xmi_id(elem)
         elem_type = xsi_type(elem) or localname(elem.tag)
@@ -106,11 +107,10 @@ class ElementHandler(ABC):
                 else:
                     ctx.warn(
                         WarningType.UNHANDLED_CHILD,
-                        f"[UNHANDLED CHILD] Element: {elem_type} (ID: {elem_id}), "
-                        f"Child: {child_tag} (ID: {child_id})",
+                        f"[UNHANDLED CHILD] Element: {elem_type} (ID: {elem_id}), Child: {child_tag} (ID: {child_id})",
                     )
 
-    def require_xmi_id(self, ctx, elem: ET.Element, *, role: str = "Element") -> Optional[str]:
+    def require_xmi_id(self, ctx, elem: ET.Element, *, role: str = "Element") -> str | None:
         """Return xmi:id or record a skip with warning when missing."""
         elem_id = xmi_id(elem)
         if elem_id:
@@ -165,10 +165,10 @@ class ElementHandler(ABC):
         scalar_attrs: Iterable[str] = (),
         boolean_attrs: Iterable[str] = (),
         list_attrs: Iterable[str] = (),
-        rename_map: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, Any]:
+        rename_map: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Collect attributes with centralized conversion semantics."""
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         rename_map = rename_map or {}
 
         for attr_name in scalar_attrs:
@@ -188,7 +188,7 @@ class ElementHandler(ABC):
 
         return out
 
-    def collect_concept_attributes(self, elem: ET.Element) -> Dict[str, Any]:
+    def collect_concept_attributes(self, elem: ET.Element) -> dict[str, Any]:
         """Collect attributes declared in the concept parse contract."""
         contract = self.get_parse_contract()
         return self.collect_attributes(
@@ -204,8 +204,8 @@ class ElementHandler(ABC):
         elem: ET.Element,
         *,
         child_tags: Iterable[str] = (),
-        rename_map: Optional[Mapping[str, str]] = None,
-    ) -> Dict[str, List[str]]:
+        rename_map: Mapping[str, str] | None = None,
+    ) -> dict[str, list[str]]:
         """Collect xmi:id references from selected direct child tags."""
         tags = tuple(dict.fromkeys(child_tags))
         if not tags:
@@ -213,7 +213,7 @@ class ElementHandler(ABC):
 
         tag_set = set(tags)
         rename_map = rename_map or {}
-        refs_by_tag: Dict[str, List[str]] = {tag: [] for tag in tags}
+        refs_by_tag: dict[str, list[str]] = {tag: [] for tag in tags}
 
         for child in elem:
             if is_tool_extension(child):
@@ -225,7 +225,7 @@ class ElementHandler(ABC):
             if child_id:
                 refs_by_tag[child_tag].append(child_id)
 
-        out: Dict[str, List[str]] = {}
+        out: dict[str, list[str]] = {}
         for tag in tags:
             refs = refs_by_tag.get(tag) or []
             if not refs:
@@ -241,7 +241,7 @@ class ElementHandler(ABC):
         node_id: str,
         node_type: str,
         name: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         """Insert a node once and merge data on repeated encounters."""
         if node_id not in ctx.nodes_by_id:
@@ -252,20 +252,19 @@ class ElementHandler(ABC):
         if existing.type != node_type or (name and existing.name and existing.name != name):
             ctx.skip_with_warning(
                 WarningType.DUPLICATE_ID,
-                f"Duplicate node id '{node_id}' encountered with conflicting payload; "
-                f"keeping first node definition.",
+                f"Duplicate node id '{node_id}' encountered with conflicting payload; keeping first node definition.",
             )
         if name and not existing.name:
             existing.name = name
         existing.data.update({k: v for k, v in data.items() if k not in existing.data})
 
-    def split_ref_list(self, refs: Optional[str]) -> List[str]:
+    def split_ref_list(self, refs: str | None) -> list[str]:
         """Split a whitespace-separated IDREF list into values."""
         if not refs:
             return []
         return [part for part in refs.split() if part]
 
-    def resolve_reference(self, elem: ET.Element, attr_name: str, child_tag: str) -> Optional[str]:
+    def resolve_reference(self, elem: ET.Element, attr_name: str, child_tag: str) -> str | None:
         """Resolve reference from attribute first, then from nested child element."""
         attr_value = elem.attrib.get(attr_name)
         if attr_value:
@@ -288,9 +287,9 @@ class ElementHandler(ABC):
 
         return None
 
-    def parse_owned_operations(self, ctx, owner_elem: ET.Element) -> List[Dict[str, Any]]:
+    def parse_owned_operations(self, ctx, owner_elem: ET.Element) -> list[dict[str, Any]]:
         """Parse ownedOperation elements."""
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for op in owner_elem.findall("./ownedOperation"):
             if is_tool_extension(op):
                 continue
@@ -305,7 +304,7 @@ class ElementHandler(ABC):
                 )
                 continue
 
-            item: Dict[str, Any] = {"id": op_id}
+            item: dict[str, Any] = {"id": op_id}
 
             op_name = self.read_name(op)
             if op_name:
@@ -327,7 +326,7 @@ class ElementHandler(ABC):
 
         return out
 
-    def parse_owned_parameters(self, ctx, owner_elem: ET.Element) -> List[Dict[str, Any]]:
+    def parse_owned_parameters(self, ctx, owner_elem: ET.Element) -> list[dict[str, Any]]:
         """Parse ownedParameter elements (typically from operations)."""
         params = []
         for param in owner_elem.findall("./ownedParameter"):
@@ -344,7 +343,7 @@ class ElementHandler(ABC):
                 )
                 continue
 
-            param_data: Dict[str, Any] = {"id": param_id}
+            param_data: dict[str, Any] = {"id": param_id}
 
             param_name = self.read_name(param)
             if param_name:
@@ -372,7 +371,7 @@ class ElementHandler(ABC):
 
         return params
 
-    def resolve_property_type(self, ctx, prop: ET.Element) -> Optional[str]:
+    def resolve_property_type(self, ctx, prop: ET.Element) -> str | None:
         """Resolve type reference for a property-like element."""
         type_id = prop.attrib.get("type")
         if type_id:
@@ -386,7 +385,7 @@ class ElementHandler(ABC):
 
     def set_resolved_type_fields(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         resolved_type: str,
         *,
         type_key: str = "type",

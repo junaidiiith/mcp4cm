@@ -7,21 +7,14 @@ import shutil
 import sys
 import urllib.request
 import zipfile
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable
 
 from tqdm import tqdm
 
-
-EA_MODELSET_URL = (
-    "https://github.com/me-big-tuwien-ac-at/EAModelSet/releases/download/"
-    "v0.0.3/eamodelset.zip"
-)
-MODELSET_URL = (
-    "https://github.com/modelset/modelset-dataset/releases/download/"
-    "v0.9.4/modelset.zip"
-)
+EA_MODELSET_URL = "https://github.com/me-big-tuwien-ac-at/EAModelSet/releases/download/v0.0.3/eamodelset.zip"
+MODELSET_URL = "https://github.com/modelset/modelset-dataset/releases/download/v0.9.4/modelset.zip"
 
 ALL_TARGETS = (
     "eamodelset-json",

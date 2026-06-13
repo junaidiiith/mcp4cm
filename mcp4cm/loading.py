@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from mcp4cm.core import Dataset, DatasetType, ModelRecord
-from mcp4cm.parsers.parse import parse_file, parse_files
+from mcp4cm.parsers.parse import parse_files
 
 
 def load_dataset(
@@ -30,9 +30,21 @@ def load_dataset(
             diagnostics.update(dataset.diagnostics)
         return Dataset(records=records, dataset_type=DatasetType.MODELSET, root=root, diagnostics=diagnostics)
     if dataset_type == DatasetType.MODELSET_UML:
-        return load_modelset(root, language="uml", format=format or "json", dataset_type=DatasetType.MODELSET_UML, filter_language=language)
+        return load_modelset(
+            root,
+            language="uml",
+            format=format or "json",
+            dataset_type=DatasetType.MODELSET_UML,
+            filter_language=language,
+        )
     if dataset_type == DatasetType.MODELSET_ECORE:
-        return load_modelset(root, language="ecore", format=format or "json", dataset_type=DatasetType.MODELSET_ECORE, filter_language=language)
+        return load_modelset(
+            root,
+            language="ecore",
+            format=format or "json",
+            dataset_type=DatasetType.MODELSET_ECORE,
+            filter_language=language,
+        )
     if dataset_type == DatasetType.EAMODELSET:
         processed = root / "processed-models" if (root / "processed-models").exists() else root
         return load_eamodelset(processed, natural_language=language, format=format or "json")
@@ -51,7 +63,11 @@ def load_modelset(
     filepaths = sorted(source.rglob("*.json")) if source.is_dir() else [source]
     parsed = parse_files(filepaths, language=language, format=format)
     records = [record for record in parsed.records if _matches_language(record, filter_language)]
-    diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
+    diagnostics = {
+        record.model_id: parsed.diagnostics[record.model_id]
+        for record in records
+        if record.model_id in parsed.diagnostics
+    }
     return Dataset(records=records, dataset_type=dataset_type or language, root=source, diagnostics=diagnostics)
 
 
@@ -67,7 +83,11 @@ def load_eamodelset(
     filepaths = sorted([*root.glob("*.json"), *root.glob("*/model.json")])
     parsed = parse_files(filepaths, language="archimate", format=format)
     records = [record for record in parsed.records if _matches_language(record, filter_language)]
-    diagnostics = {record.model_id: parsed.diagnostics[record.model_id] for record in records if record.model_id in parsed.diagnostics}
+    diagnostics = {
+        record.model_id: parsed.diagnostics[record.model_id]
+        for record in records
+        if record.model_id in parsed.diagnostics
+    }
     return Dataset(records=records, dataset_type=DatasetType.EAMODELSET, root=root, diagnostics=diagnostics)
 
 

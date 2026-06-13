@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.diagnostics import WarningType
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
-from mcp4cm.parsers.uml_xmi.xmi_utils import xsi_type, is_tool_extension, read_multiplicity
+from mcp4cm.parsers.uml_xmi.xmi_utils import is_tool_extension, read_multiplicity, xsi_type
 
 
 class AssociationClassHandler(ElementHandler):
@@ -26,7 +26,7 @@ class AssociationClassHandler(ElementHandler):
         if not assoc_class_id:
             return
 
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
 
         doc = self.extract_documentation(elem)
         if doc:
@@ -51,9 +51,9 @@ class AssociationClassHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_owned_attributes(self, ctx, owner_elem: ET.Element) -> List[Dict[str, Any]]:
+    def _parse_owned_attributes(self, ctx, owner_elem: ET.Element) -> list[dict[str, Any]]:
         """Parse class-owned attributes and skip association-end style attributes."""
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for attr in owner_elem.findall("./ownedAttribute"):
             if is_tool_extension(attr):
                 continue
@@ -65,7 +65,7 @@ class AssociationClassHandler(ElementHandler):
             if not attr_id:
                 continue
 
-            item: Dict[str, Any] = {"id": attr_id}
+            item: dict[str, Any] = {"id": attr_id}
             attr_name = self.read_name(attr)
             if attr_name:
                 item["name"] = attr_name

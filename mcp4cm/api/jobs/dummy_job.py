@@ -8,9 +8,9 @@ from typing import Any
 from mcp4cm.api.services.datasets import build_statistics_payload, get_dataset
 from mcp4cm.api.state import AFTER_DUMMY_STATISTICS_JOBS, AFTER_DUMMY_STATISTICS_LOCK, DUMMY_JOBS, DUMMY_JOBS_LOCK, LOG
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.runtime_store import RuntimeDataset
 from mcp4cm.dummy import evaluate_dummy_filters
 from mcp4cm.runtime_store import (
+    RuntimeDataset,
     delete_dataset_after_dummy_retained_model_ids,
     delete_dataset_after_dummy_statistics,
     save_dataset_after_dummy_retained_model_ids,
@@ -82,8 +82,12 @@ def run_dummy_job(job_id: str, body: dict[str, Any]) -> None:
             totalModels=len(records),
             message="Evaluating dummy filters.",
         )
-        evaluation_dataset = Dataset(records, getattr(dataset, "dataset_type", "runtime"), getattr(dataset, "root", None))
-        evaluation = evaluate_dummy_filters(evaluation_dataset, filter_configs=configs if isinstance(configs, list) else None)
+        evaluation_dataset = Dataset(
+            records, getattr(dataset, "dataset_type", "runtime"), getattr(dataset, "root", None)
+        )
+        evaluation = evaluate_dummy_filters(
+            evaluation_dataset, filter_configs=configs if isinstance(configs, list) else None
+        )
         report(
             stage="summarizing",
             progress=95,
@@ -118,7 +122,9 @@ def run_dummy_job(job_id: str, body: dict[str, Any]) -> None:
         report(status="error", stage="error", message=str(exc), error=str(exc), finishedAt=time.time())
 
 
-def load_dummy_job_records(job_id: str, dataset: Dataset | RuntimeDataset, total_models: int, report) -> list[ModelRecord]:
+def load_dummy_job_records(
+    job_id: str, dataset: Dataset | RuntimeDataset, total_models: int, report
+) -> list[ModelRecord]:
     records: list[ModelRecord] = []
     last_report = 0
     for index, record in enumerate(dataset, start=1):

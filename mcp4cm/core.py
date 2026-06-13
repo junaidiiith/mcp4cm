@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 class ModelingLanguage(str, Enum):
@@ -101,7 +102,7 @@ class ModelDiagnostics:
         }
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any] | None) -> "ModelDiagnostics":
+    def from_dict(cls, payload: dict[str, Any] | None) -> ModelDiagnostics:
         payload = payload or {}
         return cls(
             parse_status=str(payload.get("parseStatus") or payload.get("parse_status") or "success"),
@@ -109,7 +110,9 @@ class ModelDiagnostics:
             warnings_by_type=dict(payload.get("warningsByType") or payload.get("warnings_by_type") or {}),
             warning_messages_by_type={
                 str(key): [str(message) for message in (messages or [])]
-                for key, messages in dict(payload.get("warningMessagesByType") or payload.get("warning_messages_by_type") or {}).items()
+                for key, messages in dict(
+                    payload.get("warningMessagesByType") or payload.get("warning_messages_by_type") or {}
+                ).items()
             },
             error_message=str(payload.get("errorMessage") or payload.get("error_message") or ""),
             elements_loaded=int(payload.get("elementsLoaded") or payload.get("elements_loaded") or 0),

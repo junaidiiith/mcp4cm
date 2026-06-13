@@ -1,15 +1,15 @@
-from io import BytesIO
 import json
 import shutil
 import time
+from io import BytesIO
 
 import networkx as nx
 
 from mcp4cm.api import create_app
 from mcp4cm.api.state import DATASETS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS
-from mcp4cm.runtime_store import RUNTIME_DIR
 from mcp4cm.core import ModelRecord
 from mcp4cm.dummy import derive_nodes
+from mcp4cm.runtime_store import RUNTIME_DIR
 from mcp4cm.statistics import CorpusStatisticsAccumulator, typed_name_entries
 
 
@@ -132,8 +132,7 @@ def test_upload_parse_uses_accumulator_for_statistics():
         for index in range(20)
     ]
     files = [
-        (BytesIO(json.dumps(model).encode("utf-8")), f"models/model-{index}.json")
-        for index, model in enumerate(models)
+        (BytesIO(json.dumps(model).encode("utf-8")), f"models/model-{index}.json") for index, model in enumerate(models)
     ]
 
     started = client.post("/api/uploads/start", json={"language": "archimate", "format": "json"}).get_json()

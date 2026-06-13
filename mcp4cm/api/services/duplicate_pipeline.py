@@ -16,7 +16,6 @@ from mcp4cm.duplicates import (
 )
 from mcp4cm.utils import pair_count, pair_key, pair_lookup_key, parse_bool
 
-
 DUPLICATE_TECHNIQUE_ORDER = (
     "hash",
     "tfidf",
@@ -200,8 +199,7 @@ def raise_no_duplicate_technique_error(body: dict[str, Any]) -> None:
             f"{', '.join(unsupported)}. Supported techniques: {', '.join(DUPLICATE_TECHNIQUE_ORDER)}."
         )
     raise ValueError(
-        "Select at least one duplicate technique. "
-        f"Request contained techniques={raw_duplicate_techniques(body)!r}."
+        f"Select at least one duplicate technique. Request contained techniques={raw_duplicate_techniques(body)!r}."
     )
 
 
@@ -222,7 +220,9 @@ def add_votes(
     default_score: float | None = None,
 ) -> None:
     for left_id, right_id, score in pairs:
-        votes.setdefault(pair_key(left_id, right_id), {})[technique] = default_score if default_score is not None else score
+        votes.setdefault(pair_key(left_id, right_id), {})[technique] = (
+            default_score if default_score is not None else score
+        )
 
 
 def add_technique_model_counts(
@@ -611,10 +611,7 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
-                metrics_by_pair = {
-                    pair_key(pair.left_id, pair.right_id): dict(pair.metrics)
-                    for pair in pairs
-                }
+                metrics_by_pair = {pair_key(pair.left_id, pair.right_id): dict(pair.metrics) for pair in pairs}
                 add_pair_evidence(technique, technique_pairs, metrics_by_pair=metrics_by_pair)
             elif technique == "graph_embedding":
                 pairs = graph_embedding_pairs(
@@ -647,7 +644,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                     mode=parse_isomorphism_mode(thresholds.get("isomorphismMode", "names")),
                     match_edge_types=parse_bool(thresholds.get("matchEdgeTypes"), default=True),
                     ignore_direction=parse_bool(thresholds.get("ignoreDirection"), default=False),
-                    match_parallel_edge_multiplicity=parse_bool(thresholds.get("matchParallelEdgeMultiplicity"), default=True),
+                    match_parallel_edge_multiplicity=parse_bool(
+                        thresholds.get("matchParallelEdgeMultiplicity"), default=True
+                    ),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]

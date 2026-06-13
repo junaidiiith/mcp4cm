@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-from mcp4cm.core import ModelRecord
 from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
 from mcp4cm.parsers.ir import IR
 
@@ -18,7 +17,7 @@ class BaseParser(ABC):
     version: str = "1.0.0"
 
     def __init__(self):
-        self._run_stats: Optional[ParserRunStats] = None
+        self._run_stats: ParserRunStats | None = None
 
     @property
     def parser_id(self) -> str:
@@ -69,6 +68,4 @@ class ParserAdapter(Protocol):
     loading or low-level IR parsers.
     """
 
-    def parse_file(self, path: Path, *, model_id: str, options: Any) -> Any:
-        ...
-
+    def parse_file(self, path: Path, *, model_id: str, options: Any) -> Any: ...

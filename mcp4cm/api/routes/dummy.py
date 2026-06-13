@@ -23,7 +23,9 @@ def handle_dummy(body: dict[str, Any]) -> dict[str, Any]:
     dataset = get_dataset(body)
     records = list(dataset)
     evaluation_dataset = Dataset(records, getattr(dataset, "dataset_type", "runtime"), getattr(dataset, "root", None))
-    evaluation = evaluate_dummy_filters(evaluation_dataset, filter_configs=configs if isinstance(configs, list) else None)
+    evaluation = evaluate_dummy_filters(
+        evaluation_dataset, filter_configs=configs if isinstance(configs, list) else None
+    )
     retained_model_ids = {outcome.model_id for outcome in evaluation.model_outcomes if not outcome.removed}
     statistics_job_id = uuid.uuid4().hex
     if dataset_id:

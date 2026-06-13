@@ -1,6 +1,5 @@
 """Handlers for uml:Dependency-like elements."""
 
-from typing import List
 import xml.etree.ElementTree as ET
 
 from mcp4cm.parsers.diagnostics import WarningType

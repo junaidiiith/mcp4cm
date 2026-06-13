@@ -1,17 +1,17 @@
 """Ecore parser for converting Ecore models to graph-based IR."""
 
-from dataclasses import dataclass
-from itertools import chain
-from pathlib import Path
 import os
 import re
 import tempfile
-import xml.etree.ElementTree as ET
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 import uuid
+import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from dataclasses import dataclass
+from itertools import chain
+from pathlib import Path
+from typing import Any
 
 try:
-    from pyecore.resources import ResourceSet, URI
     from pyecore.ecore import (
         EAnnotation,
         EAttribute,
@@ -19,26 +19,25 @@ try:
         EDataType,
         EEnum,
         EEnumLiteral,
-        EProxy,
         EModelElement,
         ENamedElement,
         EObject,
         EOperation,
         EPackage,
         EParameter,
+        EProxy,
         EReference,
         EStructuralFeature,
         ETypedElement,
         ETypeParameter,
     )
+    from pyecore.resources import URI, ResourceSet
 except ImportError:
-    raise ImportError(
-        "pyecore is required for Ecore parsing. Install it with: pip install pyecore"
-    )
+    raise ImportError("pyecore is required for Ecore parsing. Install it with: pip install pyecore")
 
 from mcp4cm.parsers.base import BaseParser, register_parser
-from mcp4cm.parsers.diagnostics import WarningType, CannotParseError, ParserRunStats
-from mcp4cm.parsers.ir import Edge, IR, Node
+from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
+from mcp4cm.parsers.ir import IR, Edge, Node
 
 
 def _generate_id(prefix: str = "") -> str:
@@ -46,11 +45,11 @@ def _generate_id(prefix: str = "") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:8]}" if prefix else uuid.uuid4().hex[:8]
 
 
-def _safe_bool(value: Optional[bool], default: bool) -> bool:
+def _safe_bool(value: bool | None, default: bool) -> bool:
     return default if value is None else bool(value)
 
 
-def _safe_int(value: Optional[int], default: int) -> int:
+def _safe_int(value: int | None, default: int) -> int:
     return default if value is None else int(value)
 
 
@@ -101,7 +100,7 @@ class EcoreParser(BaseParser):
 
     def __init__(self):
         super().__init__()
-        self._dataset_root: Optional[Path] = None
+        self._dataset_root: Path | None = None
         # When enabled, we try to resolve relative external "*.ecore#..." references by
         # searching within a bounded collection scope and registering ResourceSet URI mappings.
         #
@@ -115,19 +114,19 @@ class EcoreParser(BaseParser):
             os.getenv("CMBENCHMARK_ECORE_SCOPED_URI_MAPPING", "1"),
         ).strip().lower() not in {"0", "false", "no", "off"}
         # Cache basename lookups within a scope root to avoid repeated recursive scans.
-        self._scope_basename_cache: Dict[str, Dict[str, List[Path]]] = {}
+        self._scope_basename_cache: dict[str, dict[str, list[Path]]] = {}
         # Per-parse caches for frequently repeated type normalization.
-        self._etype_cache: Dict[Any, Optional[Union[EObject, ExternalDataTypeRef]]] = {}
-        self._external_eclass_cache: Dict[Any, Optional[Union[ExternalClassRef, EObject]]] = {}
+        self._etype_cache: dict[Any, EObject | ExternalDataTypeRef | None] = {}
+        self._external_eclass_cache: dict[Any, ExternalClassRef | EObject | None] = {}
         # Reuse a ResourceSet across parses so external resources and URI mappings are cached.
         # This avoids repeatedly re-loading referenced .ecore files for every model.
         self._shared_rset = ResourceSet()
         # Per-parse fallback map for EReference eType strings (sourceClass, refName) -> eType expression.
         # Used only when pyecore partially loads due unresolved externals and drops ref.eType.
-        self._reference_target_fallback_map: Dict[Tuple[str, str], str] = {}
+        self._reference_target_fallback_map: dict[tuple[str, str], str] = {}
         self._had_unresolved_external_load = False
 
-    def set_dataset_root(self, dataset_root: Union[str, Path]) -> None:
+    def set_dataset_root(self, dataset_root: str | Path) -> None:
         self._dataset_root = Path(dataset_root).resolve()
 
     def set_enable_scoped_uri_mappings(self, enabled: bool) -> None:
@@ -152,7 +151,7 @@ class EcoreParser(BaseParser):
                 pass
             self._scope_basename_cache.clear()
 
-    def parse(self, filepath: str) -> Tuple[IR, ParserRunStats]:
+    def parse(self, filepath: str) -> tuple[IR, ParserRunStats]:
         """
         Parse an Ecore model file into IR.
 
@@ -218,8 +217,7 @@ class EcoreParser(BaseParser):
 
         primary_root = mm_roots[0]
         root_packages_meta = [
-            {"name": pkg.name or "", "nsURI": pkg.nsURI or "", "nsPrefix": pkg.nsPrefix or ""}
-            for pkg in mm_roots
+            {"name": pkg.name or "", "nsURI": pkg.nsURI or "", "nsPrefix": pkg.nsPrefix or ""} for pkg in mm_roots
         ]
         ir = IR(
             id=_generate_id("model"),
@@ -234,7 +232,7 @@ class EcoreParser(BaseParser):
         self._add_model_level_annotations(resource.contents, ir.data)
 
         # Collect all EObjects across all root packages (stable order, de-duplicated)
-        all_eobjects: List[EObject] = []
+        all_eobjects: list[EObject] = []
         seen: set = set()
         for root in mm_roots:
             for obj in chain((root,), root.eAllContents()):
@@ -246,9 +244,7 @@ class EcoreParser(BaseParser):
         if self._had_unresolved_external_load:
             self._reference_target_fallback_map = self._build_reference_target_fallback_map(path)
 
-        node_eobjects: List[Union[EObject, ExternalDataTypeRef]] = self._filter_node_eobjects(
-            all_eobjects
-        )
+        node_eobjects: list[EObject | ExternalDataTypeRef] = self._filter_node_eobjects(all_eobjects)
         node_eobjects = self._extend_with_referenced_datatypes(node_eobjects, all_eobjects)
         node_eobjects = self._extend_with_referenced_external_classes(node_eobjects, all_eobjects)
         node_eobjects = self._extend_with_fallback_reference_targets(node_eobjects, all_eobjects)
@@ -301,7 +297,7 @@ class EcoreParser(BaseParser):
                 ),
             )
 
-    def _find_collection_scope_root(self, path: Path) -> Optional[Path]:
+    def _find_collection_scope_root(self, path: Path) -> Path | None:
         # Preferred: explicit dataset root from scan/profile context.
         if self._dataset_root is not None:
             try:
@@ -322,14 +318,12 @@ class EcoreParser(BaseParser):
                 return Path(*parts[: idx + 3]).resolve()
         return None
 
-    def _extract_external_ecore_refs(self, path: Path) -> List[str]:
+    def _extract_external_ecore_refs(self, path: Path) -> list[str]:
         text = path.read_text(encoding="utf-8", errors="ignore")
         refs = set(self._EXTERNAL_ECORE_REF_PATTERN.findall(text))
         return sorted(refs)
 
-    def _resolve_ref_within_scope(
-        self, ref: str, model_dir: Path, scope_root: Path
-    ) -> Optional[Path]:
+    def _resolve_ref_within_scope(self, ref: str, model_dir: Path, scope_root: Path) -> Path | None:
         # Try direct relative path first (still bounded by scope_root)
         if "/" in ref or "\\" in ref:
             normalized = ref.replace("\\", "/")
@@ -346,7 +340,7 @@ class EcoreParser(BaseParser):
         if not candidates:
             return None
 
-        def score(candidate: Path) -> Tuple[int, int, str]:
+        def score(candidate: Path) -> tuple[int, int, str]:
             rel = os.path.relpath(candidate, model_dir)
             rel_parts = Path(rel).parts
             up_count = sum(1 for part in rel_parts if part == "..")
@@ -355,24 +349,19 @@ class EcoreParser(BaseParser):
 
         return min(candidates, key=score)
 
-    def _load_resource_with_compat_fallback(
-        self, rset: ResourceSet, path: Path, filepath: str
-    ):
+    def _load_resource_with_compat_fallback(self, rset: ResourceSet, path: Path, filepath: str):
         resource = rset.create_resource(URI(str(path.absolute())))
         try:
             self._load_resource_allowing_unresolved_external(resource, filepath)
             return resource
         except Exception as err:
-            if not (
-                self._is_unsupported_ekeys_error(err)
-                or self._is_comment_tag_error(err)
-            ):
+            if not (self._is_unsupported_ekeys_error(err) or self._is_comment_tag_error(err)):
                 raise
             original_err = err
 
         original_bytes = path.read_bytes()
         sanitized_bytes = original_bytes
-        compat_actions: List[Tuple[str, int]] = []
+        compat_actions: list[tuple[str, int]] = []
 
         if self._is_comment_tag_error(original_err):
             sanitized_bytes, removed_comments = self._XML_COMMENT_PATTERN.subn(b"", sanitized_bytes)
@@ -410,9 +399,7 @@ class EcoreParser(BaseParser):
             )
         return fallback_resource
 
-    def _force_resolve_if_already_loaded(
-        self, proxy: EProxy, proxy_path: str
-    ) -> Optional[EObject]:
+    def _force_resolve_if_already_loaded(self, proxy: EProxy, proxy_path: str) -> EObject | None:
         """
         Avoid triggering expensive autoload of external resources.
 
@@ -453,8 +440,8 @@ class EcoreParser(BaseParser):
             else:
                 raise
 
-    def _build_reference_target_fallback_map(self, path: Path) -> Dict[Tuple[str, str], str]:
-        fallback_map: Dict[Tuple[str, str], str] = {}
+    def _build_reference_target_fallback_map(self, path: Path) -> dict[tuple[str, str], str]:
+        fallback_map: dict[tuple[str, str], str] = {}
         xsi_type_key = "{http://www.w3.org/2001/XMLSchema-instance}type"
         try:
             root = ET.fromstring(path.read_text(encoding="utf-8", errors="ignore"))
@@ -480,10 +467,10 @@ class EcoreParser(BaseParser):
 
     def _recover_reference_target_from_fallback(
         self,
-        source: Optional[EClass],
+        source: EClass | None,
         ref: EReference,
-        class_index: Dict[str, List[EClass]],
-    ) -> Optional[Union[EClass, ExternalClassRef]]:
+        class_index: dict[str, list[EClass]],
+    ) -> EClass | ExternalClassRef | None:
         if source is None:
             return None
         source_name = (getattr(source, "name", None) or "").strip()
@@ -539,7 +526,7 @@ class EcoreParser(BaseParser):
         msg = str(err)
         return "Invalid tag name '<cyfunction Comment" in msg
 
-    def _detect_root_packages(self, contents: Iterable[Any]) -> List[EPackage]:
+    def _detect_root_packages(self, contents: Iterable[Any]) -> list[EPackage]:
         """
         Root detection:
         - Scan resource.contents for EPackage objects.
@@ -551,14 +538,14 @@ class EcoreParser(BaseParser):
             raise CannotParseError("No EPackage found in resource")
         return packages
 
-    def _add_model_level_annotations(self, contents: Iterable[Any], model_data: Dict[str, Any]) -> None:
+    def _add_model_level_annotations(self, contents: Iterable[Any], model_data: dict[str, Any]) -> None:
         """
         Collect top-level EAnnotations (directly under resource.contents) into IR.data.
         """
         annotations = [obj for obj in contents if isinstance(obj, EAnnotation)]
         if not annotations:
             return
-        model_ann: Dict[str, Dict[str, str]] = model_data.setdefault("modelAnnotations", {})
+        model_ann: dict[str, dict[str, str]] = model_data.setdefault("modelAnnotations", {})
         for ann in annotations:
             source = ann.source or ""
             block = model_ann.setdefault(source, {})
@@ -571,7 +558,7 @@ class EcoreParser(BaseParser):
                 if isinstance(current, EModelElement) and current.eAnnotations:
                     stack.extend(list(current.eAnnotations))
 
-    def _filter_node_eobjects(self, eobjects: Iterable[EObject]) -> List[EObject]:
+    def _filter_node_eobjects(self, eobjects: Iterable[EObject]) -> list[EObject]:
         node_types = (
             EPackage,
             EClass,
@@ -588,16 +575,16 @@ class EcoreParser(BaseParser):
 
     def _extend_with_referenced_datatypes(
         self,
-        node_eobjects: List[Union[EObject, ExternalDataTypeRef]],
+        node_eobjects: list[EObject | ExternalDataTypeRef],
         all_eobjects: Iterable[EObject],
-    ) -> List[Union[EObject, ExternalDataTypeRef]]:
+    ) -> list[EObject | ExternalDataTypeRef]:
         """
         Ensure that all non-enum EDataTypes referenced via eType are materialized as nodes.
 
         This includes external Ecore primitives like EString/EBoolean/EFloat.
         """
         existing = set(node_eobjects)
-        extra: List[Union[EObject, ExternalDataTypeRef]] = []
+        extra: list[EObject | ExternalDataTypeRef] = []
 
         for obj in all_eobjects:
             if isinstance(obj, (EAttribute, EOperation, EParameter)):
@@ -618,16 +605,16 @@ class EcoreParser(BaseParser):
 
     def _extend_with_referenced_external_classes(
         self,
-        node_eobjects: List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]],
+        node_eobjects: list[EObject | ExternalDataTypeRef | ExternalClassRef],
         all_eobjects: Iterable[EObject],
-    ) -> List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]]:
+    ) -> list[EObject | ExternalDataTypeRef | ExternalClassRef]:
         """
         Ensure that external EClasses referenced via EReference.eType are materialized as nodes.
 
         Common case: EObject from Ecore package.
         """
         existing = set(node_eobjects)
-        extra: List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]] = []
+        extra: list[EObject | ExternalDataTypeRef | ExternalClassRef] = []
 
         for obj in all_eobjects:
             # External EClass reference targets
@@ -649,9 +636,9 @@ class EcoreParser(BaseParser):
 
     def _extend_with_fallback_reference_targets(
         self,
-        node_eobjects: List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]],
+        node_eobjects: list[EObject | ExternalDataTypeRef | ExternalClassRef],
         all_eobjects: Iterable[EObject],
-    ) -> List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]]:
+    ) -> list[EObject | ExternalDataTypeRef | ExternalClassRef]:
         """
         Add reference targets recovered from raw XML when pyecore left EReference.eType unset.
         """
@@ -659,9 +646,9 @@ class EcoreParser(BaseParser):
             return list(node_eobjects)
 
         existing = set(node_eobjects)
-        extra: List[Union[EObject, ExternalDataTypeRef, ExternalClassRef]] = []
+        extra: list[EObject | ExternalDataTypeRef | ExternalClassRef] = []
 
-        class_index: Dict[str, List[EClass]] = {}
+        class_index: dict[str, list[EClass]] = {}
         for obj in all_eobjects:
             if isinstance(obj, EClass):
                 cname = (obj.name or "").strip()
@@ -682,9 +669,9 @@ class EcoreParser(BaseParser):
         return list(node_eobjects) + extra
 
     def _build_eobject_index(
-        self, eobjects: Iterable[Union[EObject, ExternalDataTypeRef, ExternalClassRef]]
-    ) -> Dict[Any, str]:
-        eobject_to_id: Dict[Any, str] = {}
+        self, eobjects: Iterable[EObject | ExternalDataTypeRef | ExternalClassRef]
+    ) -> dict[Any, str]:
+        eobject_to_id: dict[Any, str] = {}
         for index, obj in enumerate(eobjects, start=1):
             if obj in eobject_to_id:
                 self.skip_with_warning(
@@ -703,10 +690,10 @@ class EcoreParser(BaseParser):
 
     def _build_node(
         self,
-        obj: Union[EObject, ExternalDataTypeRef, ExternalClassRef],
-        eobject_to_id: Dict[Any, str],
-        root_pkg_set: Set[EPackage],
-    ) -> Optional[Node]:
+        obj: EObject | ExternalDataTypeRef | ExternalClassRef,
+        eobject_to_id: dict[Any, str],
+        root_pkg_set: set[EPackage],
+    ) -> Node | None:
         node_id = eobject_to_id.get(obj)
         if not node_id:
             self.skip_with_warning(
@@ -741,7 +728,7 @@ class EcoreParser(BaseParser):
 
         node_type = obj.eClass.name if hasattr(obj, "eClass") else type(obj).__name__
         name = obj.name if isinstance(obj, ENamedElement) and obj.name else ""
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
 
         if isinstance(obj, EPackage):
             data["nsURI"] = obj.nsURI or ""
@@ -769,10 +756,7 @@ class EcoreParser(BaseParser):
                 data["hasOpposite"] = True
         elif isinstance(obj, EOperation):
             self._fill_typed_element_data(obj, data)
-            data["throws"] = [
-                ex.name if isinstance(ex, ENamedElement) and ex.name else ""
-                for ex in obj.eExceptions
-            ]
+            data["throws"] = [ex.name if isinstance(ex, ENamedElement) and ex.name else "" for ex in obj.eExceptions]
         elif isinstance(obj, EParameter):
             self._fill_typed_element_data(obj, data)
         elif isinstance(obj, ETypeParameter):
@@ -782,7 +766,7 @@ class EcoreParser(BaseParser):
 
         return Node(id=node_id, type=node_type, name=name, data=data)
 
-    def _normalize_etype(self, raw_etype: Any) -> Optional[Union[EObject, ExternalDataTypeRef]]:
+    def _normalize_etype(self, raw_etype: Any) -> EObject | ExternalDataTypeRef | None:
         """
         Normalize ETypedElement.eType into either a real EObject (preferred) or a synthetic
         ExternalDataTypeRef when pyecore leaves builtins as strings.
@@ -814,9 +798,7 @@ class EcoreParser(BaseParser):
         self._etype_cache[cache_key] = None
         return None
 
-    def _report_invalid_type_reference(
-        self, raw_etype: Any, context: str, as_skip: bool
-    ) -> None:
+    def _report_invalid_type_reference(self, raw_etype: Any, context: str, as_skip: bool) -> None:
         if isinstance(raw_etype, EProxy):
             proxy_path = getattr(raw_etype, "_proxy_path", "") or ""
             message = f"Invalid proxy type reference for {context}: {proxy_path!r}"
@@ -827,7 +809,7 @@ class EcoreParser(BaseParser):
         else:
             self.warn(WarningType.INVALID_TYPE_REFERENCE, message)
 
-    def _parse_external_datatype_ref(self, etype_str: str) -> Optional[ExternalDataTypeRef]:
+    def _parse_external_datatype_ref(self, etype_str: str) -> ExternalDataTypeRef | None:
         """
         Parse strings like:
           'ecore:EDataType http://www.eclipse.org/emf/2002/Ecore#//EString'
@@ -858,7 +840,7 @@ class EcoreParser(BaseParser):
 
         return ExternalDataTypeRef(nsURI=ns_uri, packageName=package_name, name=name)
 
-    def _parse_proxy_datatype_ref(self, proxy_path: str) -> Optional[ExternalDataTypeRef]:
+    def _parse_proxy_datatype_ref(self, proxy_path: str) -> ExternalDataTypeRef | None:
         """
         Parse EProxy paths like:
           'http://www.eclipse.org/emf/2002/Ecore#//EString'
@@ -877,7 +859,7 @@ class EcoreParser(BaseParser):
         package_name = "ecore" if "emf/2002/Ecore" in ns_uri else fragment_pkg_hint
         return ExternalDataTypeRef(nsURI=ns_uri, packageName=package_name or "ecore", name=name)
 
-    def _extract_name_and_pkg_from_fragment(self, fragment: str) -> Tuple[str, str]:
+    def _extract_name_and_pkg_from_fragment(self, fragment: str) -> tuple[str, str]:
         """
         Extract (name, package_hint) from common Ecore URI fragments.
         Supports:
@@ -908,7 +890,7 @@ class EcoreParser(BaseParser):
             return parts[-1], ""
         return token, ""
 
-    def _normalize_external_eclass(self, raw_etype: Any) -> Optional[Union[ExternalClassRef, EObject]]:
+    def _normalize_external_eclass(self, raw_etype: Any) -> ExternalClassRef | EObject | None:
         """
         For EReference.eType we want an EClass target node.
         If the type is unresolved and represented as proxy or string, create an external EClass ref.
@@ -935,7 +917,7 @@ class EcoreParser(BaseParser):
         self._external_eclass_cache[cache_key] = None
         return None
 
-    def _parse_proxy_eclass_ref(self, proxy_path: str) -> Optional[ExternalClassRef]:
+    def _parse_proxy_eclass_ref(self, proxy_path: str) -> ExternalClassRef | None:
         proxy_path = (proxy_path or "").strip()
         if not proxy_path:
             return None
@@ -961,7 +943,7 @@ class EcoreParser(BaseParser):
             originResource=origin,
         )
 
-    def _parse_external_eclass_ref(self, etype_str: str) -> Optional[ExternalClassRef]:
+    def _parse_external_eclass_ref(self, etype_str: str) -> ExternalClassRef | None:
         """
         Parse strings like:
           'ecore:EClass http://www.eclipse.org/emf/2002/Ecore#//EObject'
@@ -985,30 +967,26 @@ class EcoreParser(BaseParser):
             name=name,
         )
 
-    def _fill_typed_element_data(self, obj: ETypedElement, data: Dict[str, Any]) -> None:
+    def _fill_typed_element_data(self, obj: ETypedElement, data: dict[str, Any]) -> None:
         data["ordered"] = _safe_bool(getattr(obj, "ordered", None), True)
         data["unique"] = _safe_bool(getattr(obj, "unique", None), True)
         data["lowerBound"] = _safe_int(getattr(obj, "lowerBound", None), 0)
         data["upperBound"] = _safe_int(getattr(obj, "upperBound", None), 1)
         data["required"] = data["lowerBound"] >= 1
 
-    def _fill_structural_feature_data(
-        self, obj: EStructuralFeature, data: Dict[str, Any]
-    ) -> None:
+    def _fill_structural_feature_data(self, obj: EStructuralFeature, data: dict[str, Any]) -> None:
         data["changeable"] = _safe_bool(getattr(obj, "changeable", None), True)
         data["volatile"] = _safe_bool(getattr(obj, "volatile", None), False)
         data["transient"] = _safe_bool(getattr(obj, "transient", None), False)
         data["unsettable"] = _safe_bool(getattr(obj, "unsettable", None), False)
         data["derived"] = _safe_bool(getattr(obj, "derived", None), False)
 
-    def _fill_annotation_data(
-        self, obj: EObject, data: Dict[str, Any], recursive: bool = False
-    ) -> None:
+    def _fill_annotation_data(self, obj: EObject, data: dict[str, Any], recursive: bool = False) -> None:
         if not isinstance(obj, EModelElement):
             return
         if not obj.eAnnotations:
             return
-        annotations: Dict[str, Dict[str, str]] = data.setdefault("annotations", {})
+        annotations: dict[str, dict[str, str]] = data.setdefault("annotations", {})
         if not recursive:
             for ann in obj.eAnnotations:
                 source = ann.source or ""
@@ -1027,9 +1005,7 @@ class EcoreParser(BaseParser):
             if isinstance(ann, EModelElement) and ann.eAnnotations:
                 stack.extend(list(ann.eAnnotations))
 
-    def _fill_datatype_data(
-        self, dtype: EDataType, data: Dict[str, Any], root_pkg_set: Set[EPackage]
-    ) -> None:
+    def _fill_datatype_data(self, dtype: EDataType, data: dict[str, Any], root_pkg_set: set[EPackage]) -> None:
         """
         Minimal but informative EDataType payload, with internal/external classification.
         """
@@ -1037,23 +1013,21 @@ class EcoreParser(BaseParser):
         internal = bool(pkg) and self._is_package_within_any_root(pkg, root_pkg_set)
         data["external"] = not internal
         if not internal:
-            data["nsURI"] = (pkg.nsURI if pkg is not None and pkg.nsURI else "http://www.eclipse.org/emf/2002/Ecore")
-            data["packageName"] = (pkg.name if pkg is not None and pkg.name else "ecore")
+            data["nsURI"] = pkg.nsURI if pkg is not None and pkg.nsURI else "http://www.eclipse.org/emf/2002/Ecore"
+            data["packageName"] = pkg.name if pkg is not None and pkg.name else "ecore"
 
-    def _is_package_within_any_root(self, pkg: EPackage, root_pkg_set: Set[EPackage]) -> bool:
+    def _is_package_within_any_root(self, pkg: EPackage, root_pkg_set: set[EPackage]) -> bool:
         """
         Returns True iff pkg is within any of the root packages (including the roots themselves).
         """
-        current: Optional[EPackage] = pkg
+        current: EPackage | None = pkg
         while current is not None:
             if current in root_pkg_set:
                 return True
             current = getattr(current, "eSuperPackage", None)
         return False
 
-    def _iter_annotation_details(
-        self, ann: EAnnotation
-    ) -> Iterable[Tuple[str, str]]:
+    def _iter_annotation_details(self, ann: EAnnotation) -> Iterable[tuple[str, str]]:
         details = getattr(ann, "details", None)
         if details is None:
             return []
@@ -1067,13 +1041,11 @@ class EcoreParser(BaseParser):
                 entries.append((key, value))
         return entries
 
-    def _build_edges(
-        self, all_eobjects: Iterable[EObject], eobject_to_id: Dict[Any, str]
-    ) -> List[Edge]:
-        edges: List[Edge] = []
+    def _build_edges(self, all_eobjects: Iterable[EObject], eobject_to_id: dict[Any, str]) -> list[Edge]:
+        edges: list[Edge] = []
         created_keys: set = set()
         edge_counter = 0
-        class_index: Dict[str, List[EClass]] = {}
+        class_index: dict[str, list[EClass]] = {}
         for candidate in all_eobjects:
             if isinstance(candidate, EClass):
                 cname = (candidate.name or "").strip()
@@ -1084,8 +1056,8 @@ class EcoreParser(BaseParser):
             edge_type: str,
             source: EObject,
             target: Any,
-            data: Dict[str, Any],
-            key_hint: Tuple[Any, ...],
+            data: dict[str, Any],
+            key_hint: tuple[Any, ...],
         ) -> None:
             nonlocal edge_counter
             source_id = eobject_to_id.get(source)
@@ -1093,10 +1065,7 @@ class EcoreParser(BaseParser):
             if not source_id or not target_id:
                 self.skip_with_warning(
                     WarningType.MISSING_EDGE_ENDPOINT,
-                    (
-                        "Unresolved edge "
-                        f"{edge_type} from {_safe_obj_label(source)} to {_safe_obj_label(target)}"
-                    ),
+                    (f"Unresolved edge {edge_type} from {_safe_obj_label(source)} to {_safe_obj_label(target)}"),
                 )
                 return
             edge_key = (edge_type, source_id, target_id) + key_hint
@@ -1265,10 +1234,10 @@ class EcoreParser(BaseParser):
     def _add_reference_edge(
         self,
         ref: EReference,
-        source_owner: Optional[EClass],
-        eobject_to_id: Dict[Any, str],
+        source_owner: EClass | None,
+        eobject_to_id: dict[Any, str],
         add_edge,
-        class_index: Dict[str, List[EClass]],
+        class_index: dict[str, list[EClass]],
     ) -> None:
         source = source_owner or ref.eContainingClass
         target = ref.eType
@@ -1291,7 +1260,7 @@ class EcoreParser(BaseParser):
         if normalized_target is not None:
             target = normalized_target
 
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "name": ref.name or "",
             "ordered": _safe_bool(getattr(ref, "ordered", None), True),
             "unique": _safe_bool(getattr(ref, "unique", None), True),

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-import xml.etree.ElementTree as ET
 
 from mcp4cm.parsers.uml_xmi.parser import UMLXMIParser
 from mcp4cm.parsers.uml_xmi.xmi_utils import localname, xmi_id, xsi_type

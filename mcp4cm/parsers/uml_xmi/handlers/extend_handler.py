@@ -1,7 +1,7 @@
 """Handler for extend relationships in Use Cases."""
 
-from typing import Any, Dict
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.diagnostics import WarningType
 from mcp4cm.parsers.ir import Edge
@@ -41,7 +41,7 @@ class ExtendHandler(ElementHandler):
             )
             return
 
-        edge_data: Dict[str, Any] = {}
+        edge_data: dict[str, Any] = {}
         if extension_location:
             edge_data["extensionLocation"] = extension_location
             ext_point_elem = ctx.elem(extension_location)

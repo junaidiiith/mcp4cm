@@ -1,7 +1,6 @@
 """XMI utility functions for UML parsing."""
 
 import os
-from typing import Dict, Optional
 import xml.etree.ElementTree as ET
 
 # === Namespaces ===
@@ -19,12 +18,12 @@ def localname(tag: str) -> str:
     return tag.split("}", 1)[1] if "}" in tag else tag
 
 
-def xmi_id(elem: ET.Element) -> Optional[str]:
+def xmi_id(elem: ET.Element) -> str | None:
     """Extract xmi:id attribute from element."""
     return elem.attrib.get(XMI_ID)
 
 
-def xsi_type(elem: ET.Element) -> Optional[str]:
+def xsi_type(elem: ET.Element) -> str | None:
     """Extract type attribute from element (prefer xsi:type, fallback to xmi:type)."""
     return elem.attrib.get(XSI_TYPE) or elem.attrib.get(XMI_TYPE)
 
@@ -35,12 +34,12 @@ def is_tool_extension(elem: ET.Element) -> bool:
     return ln in {"Extension", "eAnnotations", "details"}
 
 
-def read_multiplicity(owner: ET.Element) -> Dict[str, str]:
+def read_multiplicity(owner: ET.Element) -> dict[str, str]:
     """
     Reads lowerValue/upperValue from a Property/ownedEnd element.
     Returns only present keys (no nulls).
     """
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     lower = owner.find("./lowerValue")
     upper = owner.find("./upperValue")
     if lower is not None and "value" in lower.attrib:
@@ -86,10 +85,10 @@ def find_model(root: ET.Element) -> ET.Element:
 
 
 # TODO: Verify if this is needed
-def parse_boolean(value: Optional[str]) -> Optional[bool]:
+def parse_boolean(value: str | None) -> bool | None:
     """
     Convert XML boolean string to Python boolean.
-    
+
     XML booleans are typically "true" or "false" (case-insensitive).
     Returns None if value is None or empty, True/False otherwise.
     """

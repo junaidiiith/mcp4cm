@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from mcp4cm.core import ModelDiagnostics
 from mcp4cm.parsers.ir import IR
@@ -42,8 +42,8 @@ class ParserRunStats:
 
     elements_skipped: int = 0
     warning_count: int = 0
-    warnings_by_type: Dict[WarningType, int] = field(default_factory=dict)
-    warning_msgs: Dict[WarningType, List[str]] = field(default_factory=dict)
+    warnings_by_type: dict[WarningType, int] = field(default_factory=dict)
+    warning_msgs: dict[WarningType, list[str]] = field(default_factory=dict)
 
     def add_skip(self, warning_type: WarningType, message: str = "") -> None:
         """Record a skipped element with a warning."""
@@ -68,15 +68,15 @@ class ModelParseDiagnostics:
     file_id: str
     relpath: str
     parse_status: ParseStatus
-    parse_error_msg: Optional[str] = None
+    parse_error_msg: str | None = None
     elements_loaded: int = 0
     elements_skipped: int = 0
     parse_time_ms: int = 0
     file_size_bytes_source: int = 0
     file_size_bytes_ir: int = 0
     warning_count: int = 0
-    warnings_by_type: Dict[str, int] = field(default_factory=dict)
-    warning_msgs: Dict[str, List[str]] = field(default_factory=dict)
+    warnings_by_type: dict[str, int] = field(default_factory=dict)
+    warning_msgs: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def skip_ratio(self) -> float:
@@ -90,7 +90,7 @@ class ModelParseDiagnostics:
         denom = max(1, self.elements_loaded)
         return self.warning_count / denom
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = asdict(self)
         result["skip_ratio"] = self.skip_ratio
@@ -103,7 +103,9 @@ class ModelParseDiagnostics:
             parse_status=self.parse_status,
             warning_count=int(self.warning_count),
             warnings_by_type={str(key): int(value) for key, value in self.warnings_by_type.items()},
-            warning_messages_by_type={str(key): [str(message) for message in messages] for key, messages in self.warning_msgs.items()},
+            warning_messages_by_type={
+                str(key): [str(message) for message in messages] for key, messages in self.warning_msgs.items()
+            },
             error_message=str(self.parse_error_msg or ""),
             elements_loaded=int(self.elements_loaded),
             elements_skipped=int(self.elements_skipped),
@@ -117,12 +119,12 @@ class ParseFailure:
     """Information about a failed parse attempt."""
 
     relpath: str
-    ir_id: Optional[str]
+    ir_id: str | None
     error_class: str
     message: str
     parser: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
@@ -132,12 +134,12 @@ class ParseBatchResult:
     """Result container for batch parsing operations."""
 
     parser_language: str
-    totals: Dict[str, int]
-    irs: List[IR] = field(default_factory=list)
-    diagnostics: Dict[str, ModelParseDiagnostics] = field(default_factory=dict)
-    failures: List[ParseFailure] = field(default_factory=list)
+    totals: dict[str, int]
+    irs: list[IR] = field(default_factory=list)
+    diagnostics: dict[str, ModelParseDiagnostics] = field(default_factory=dict)
+    failures: list[ParseFailure] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "parser_language": self.parser_language,

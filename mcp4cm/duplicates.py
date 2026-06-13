@@ -3,13 +3,21 @@ from __future__ import annotations
 import hashlib
 import math
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, Literal
 
 from mcp4cm._deps import require_networkx, require_node2vec, require_sklearn, require_transformers_torch
 from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.name_classification import extract_node_labels, normalize_label, normalize_name, normalize_type, raw_node_name, raw_node_type
+from mcp4cm.name_classification import (
+    extract_node_labels,
+    normalize_label,
+    normalize_name,
+    normalize_type,
+    raw_node_name,
+    raw_node_type,
+)
 from mcp4cm.parsers.fingerprints import canonical_graph_hash
 from mcp4cm.utils import pair_count, pair_key, progress_percent
 
@@ -70,7 +78,9 @@ def detect_duplicates_by_hash(
         groups: dict[str, list[str]] = defaultdict(list)
         records = list(dataset)
         total = len(records)
-        _report_progress(progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints.")
+        _report_progress(
+            progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints."
+        )
         for index, record in enumerate(records, start=1):
             fingerprint = canonical_graph_hash(record)
             groups[fingerprint].append(record.model_id)
@@ -105,7 +115,9 @@ def detect_duplicates_by_name_hash(
     groups: dict[str, list[str]] = defaultdict(list)
     records = list(dataset)
     total = len(records)
-    _report_progress(progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints.")
+    _report_progress(
+        progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints."
+    )
 
     for index, record in enumerate(records, start=1):
         tokens = hashable_name_tokens(
@@ -130,11 +142,15 @@ def detect_duplicates_by_name_hash(
     ]
 
 
-def detect_duplicates_by_node_name_hash(dataset: Dataset, progress: ProgressCallback | None = None) -> list[DuplicateGroup]:
+def detect_duplicates_by_node_name_hash(
+    dataset: Dataset, progress: ProgressCallback | None = None
+) -> list[DuplicateGroup]:
     return detect_duplicates_by_name_hash(dataset, include_types=False, progress=progress)
 
 
-def detect_duplicates_by_node_name_type_hash(dataset: Dataset, progress: ProgressCallback | None = None) -> list[DuplicateGroup]:
+def detect_duplicates_by_node_name_type_hash(
+    dataset: Dataset, progress: ProgressCallback | None = None
+) -> list[DuplicateGroup]:
     return detect_duplicates_by_name_hash(dataset, include_types=True, progress=progress)
 
 
@@ -200,7 +216,9 @@ def tfidf_duplicate_pairs(
 
     pairs: list[SimilarPair] = []
     total_pairs = pair_count(len(records))
-    _report_progress(progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning TF-IDF pair similarities.")
+    _report_progress(
+        progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning TF-IDF pair similarities."
+    )
     for index, (left, right) in enumerate(combinations(range(len(records)), 2), start=1):
         score = float(similarity[left, right])
         if score >= threshold:
@@ -208,7 +226,9 @@ def tfidf_duplicate_pairs(
         _report_pair_progress(progress, index, total_pairs, "TF-IDF pair(s) scanned")
 
     pairs.sort(key=lambda pair: pair.score, reverse=True)
-    _report_progress(progress, phase="done", current=total_pairs, total=total_pairs, message=f"TF-IDF found {len(pairs)} pairs.")
+    _report_progress(
+        progress, phase="done", current=total_pairs, total=total_pairs, message=f"TF-IDF found {len(pairs)} pairs."
+    )
     return pairs
 
 
@@ -266,7 +286,9 @@ def graph_similarity_pairs(
 
     pairs: list[GraphSimilarPair] = []
     total_pairs = pair_count(len(records))
-    _report_progress(progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph similarity pairs.")
+    _report_progress(
+        progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph similarity pairs."
+    )
     for index, (left, right) in enumerate(combinations(records, 2), start=1):
         metrics = graph_similarity_metrics(left, right, use_directed_metrics=use_directed_metrics)
         score = weighted_score(metrics, weights)
@@ -275,7 +297,13 @@ def graph_similarity_pairs(
         _report_pair_progress(progress, index, total_pairs, "graph similarity pair(s) scanned")
 
     pairs.sort(key=lambda pair: pair.score, reverse=True)
-    _report_progress(progress, phase="done", current=total_pairs, total=total_pairs, message=f"Graph similarity found {len(pairs)} pairs.")
+    _report_progress(
+        progress,
+        phase="done",
+        current=total_pairs,
+        total=total_pairs,
+        message=f"Graph similarity found {len(pairs)} pairs.",
+    )
     return pairs
 
 
@@ -294,7 +322,9 @@ def graph_isomorphism_pairs(
 
     pairs: list[SimilarPair] = []
     total_pairs = pair_count(len(records))
-    _report_progress(progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph isomorphism candidates.")
+    _report_progress(
+        progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph isomorphism candidates."
+    )
     for checked, (left, right) in enumerate(combinations(records, 2), start=1):
         if are_graphs_isomorphic(
             left,
@@ -307,7 +337,13 @@ def graph_isomorphism_pairs(
             pairs.append(SimilarPair(left.model_id, right.model_id, 1.0, f"graph_isomorphism_{mode}"))
         _report_pair_progress(progress, checked, total_pairs, "isomorphism candidate pair(s) checked")
 
-    _report_progress(progress, phase="done", current=total_pairs, total=total_pairs, message=f"Graph isomorphism found {len(pairs)} pairs.")
+    _report_progress(
+        progress,
+        phase="done",
+        current=total_pairs,
+        total=total_pairs,
+        message=f"Graph isomorphism found {len(pairs)} pairs.",
+    )
     return pairs
 
 
@@ -329,7 +365,9 @@ def graph_embedding_pairs(
     Node2Vec = require_node2vec()
     np = _require_numpy()
     embeddings: list[Any] = []
-    _report_progress(progress, phase="embedding", current=0, total=len(records), message="Computing Node2Vec graph embeddings.")
+    _report_progress(
+        progress, phase="embedding", current=0, total=len(records), message="Computing Node2Vec graph embeddings."
+    )
     for index, record in enumerate(records, start=1):
         embeddings.append(
             _node2vec_graph_embedding(
@@ -359,7 +397,13 @@ def graph_embedding_pairs(
         progress=progress,
         message="graph embedding pair(s) scanned",
     )
-    _report_progress(progress, phase="done", current=pair_count(len(records)), total=pair_count(len(records)), message=f"Graph embeddings found {len(pairs)} pairs.")
+    _report_progress(
+        progress,
+        phase="done",
+        current=pair_count(len(records)),
+        total=pair_count(len(records)),
+        message=f"Graph embeddings found {len(pairs)} pairs.",
+    )
     return pairs
 
 
@@ -394,7 +438,9 @@ def bert_semantic_similarity_pairs(
     ]
     embeddings = []
     total_batches = math.ceil(len(records) / batch_size)
-    _report_progress(progress, phase="embedding", current=0, total=total_batches, message="Computing BERT semantic embeddings.")
+    _report_progress(
+        progress, phase="embedding", current=0, total=total_batches, message="Computing BERT semantic embeddings."
+    )
     with torch.no_grad():
         for batch_index, start in enumerate(range(0, len(texts), batch_size), start=1):
             batch = texts[start : start + batch_size]
@@ -418,7 +464,13 @@ def bert_semantic_similarity_pairs(
         progress=progress,
         message="BERT semantic pair(s) scanned",
     )
-    _report_progress(progress, phase="done", current=pair_count(len(records)), total=pair_count(len(records)), message=f"BERT semantic similarity found {len(pairs)} pairs.")
+    _report_progress(
+        progress,
+        phase="done",
+        current=pair_count(len(records)),
+        total=pair_count(len(records)),
+        message=f"BERT semantic similarity found {len(pairs)} pairs.",
+    )
     return pairs
 
 
@@ -443,7 +495,10 @@ def are_graphs_isomorphic(
         match_parallel_edge_multiplicity=match_parallel_edge_multiplicity,
     )
 
-    if left_graph.number_of_nodes() != right_graph.number_of_nodes() or left_graph.number_of_edges() != right_graph.number_of_edges():
+    if (
+        left_graph.number_of_nodes() != right_graph.number_of_nodes()
+        or left_graph.number_of_edges() != right_graph.number_of_edges()
+    ):
         return False
 
     node_match = _isomorphism_node_match(mode)
@@ -466,8 +521,12 @@ def graph_similarity_metrics(
         "density_similarity": density_similarity(left, right),
     }
     if use_directed_metrics:
-        metrics["in_degree_histogram_similarity"] = cosine_counter(in_degree_histogram(left), in_degree_histogram(right))
-        metrics["out_degree_histogram_similarity"] = cosine_counter(out_degree_histogram(left), out_degree_histogram(right))
+        metrics["in_degree_histogram_similarity"] = cosine_counter(
+            in_degree_histogram(left), in_degree_histogram(right)
+        )
+        metrics["out_degree_histogram_similarity"] = cosine_counter(
+            out_degree_histogram(left), out_degree_histogram(right)
+        )
     return metrics
 
 
@@ -744,8 +803,7 @@ def _isomorphism_node_match(mode: IsomorphismMode):
         return lambda left, right: node_name_attr(left) == node_name_attr(right)
     if mode == "names_types":
         return lambda left, right: (
-            node_name_attr(left) == node_name_attr(right)
-            and node_type_attr(left) == node_type_attr(right)
+            node_name_attr(left) == node_name_attr(right) and node_type_attr(left) == node_type_attr(right)
         )
     raise ValueError(f"Unsupported isomorphism mode: {mode}")
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from flask import request
-from werkzeug.datastructures import FileStorage
 
 
 def read_json_body() -> dict[str, Any]:

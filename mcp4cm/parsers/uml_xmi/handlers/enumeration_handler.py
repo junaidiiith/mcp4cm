@@ -1,7 +1,7 @@
 """Handler for uml:Enumeration elements."""
 
-from typing import Any, Dict, List
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.ir import Node
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
@@ -26,7 +26,7 @@ class EnumerationHandler(ElementHandler):
             return
 
         name = self.read_name(elem)
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
 
         doc = self.extract_documentation(elem)
         if doc:
@@ -41,7 +41,7 @@ class EnumerationHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_literals(self, ctx, elem: ET.Element) -> List[Dict[str, Any]]:
+    def _parse_literals(self, ctx, elem: ET.Element) -> list[dict[str, Any]]:
         """Parse ownedLiteral elements."""
         literals = []
         for lit in elem.findall("./ownedLiteral"):
@@ -52,7 +52,7 @@ class EnumerationHandler(ElementHandler):
             if not lit_id:
                 continue
 
-            lit_data: Dict[str, Any] = {"id": lit_id}
+            lit_data: dict[str, Any] = {"id": lit_id}
 
             lit_name = self.read_name(lit)
             if lit_name:

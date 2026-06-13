@@ -2,49 +2,48 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Tuple
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 from mcp4cm.parsers.base import BaseParser, register_parser
-from mcp4cm.parsers.ir import IR, Node, Edge
-from mcp4cm.parsers.diagnostics import WarningType
-from mcp4cm.parsers.diagnostics import ParserRunStats
-from mcp4cm.parsers.uml_xmi.xmi_utils import (
-    xmi_id,
-    xsi_type,
-    is_tool_extension,
-    find_model,
-    localname,
-)
-from mcp4cm.parsers.uml_xmi.metamodel import (
-    TAG_TO_CONCEPT,
-    CONTAINMENT_CHILD_TAGS,
-    SUPPORTED_UML_CONCEPTS,
-    UMLHandlerSpec,
-)
+from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
+from mcp4cm.parsers.ir import IR, Edge, Node
 from mcp4cm.parsers.uml_xmi.handlers import (
+    ActorHandler,
+    AssociationClassHandler,
+    AssociationHandler,
+    ClassHandler,
+    ComponentHandler,
+    DataTypeHandler,
+    DependencyHandler,
+    DirectedEdgeHandler,
     ElementHandler,
+    EnumerationHandler,
+    ExtendHandler,
+    GeneralizationHandler,
+    IncludeHandler,
+    InformationFlowHandler,
+    InstanceSpecificationHandler,
+    InterfaceHandler,
+    InterfaceRealizationHandler,
     ModelHandler,
     PackageHandler,
-    ClassHandler,
-    InterfaceHandler,
-    AssociationHandler,
-    GeneralizationHandler,
-    InterfaceRealizationHandler,
-    DependencyHandler,
-    EnumerationHandler,
-    DataTypeHandler,
-    ComponentHandler,
-    UseCaseHandler,
-    IncludeHandler,
-    ExtendHandler,
-    ActorHandler,
     SimpleNodeHandler,
-    AssociationClassHandler,
-    InformationFlowHandler,
-    DirectedEdgeHandler,
-    InstanceSpecificationHandler,
+    UseCaseHandler,
+)
+from mcp4cm.parsers.uml_xmi.metamodel import (
+    CONTAINMENT_CHILD_TAGS,
+    SUPPORTED_UML_CONCEPTS,
+    TAG_TO_CONCEPT,
+    UMLHandlerSpec,
+)
+from mcp4cm.parsers.uml_xmi.xmi_utils import (
+    find_model,
+    is_tool_extension,
+    localname,
+    xmi_id,
+    xsi_type,
 )
 
 IGNORED_UNHANDLED_ELEMENTS: set[str] = set()
@@ -63,7 +62,7 @@ EMBEDDED_VALUE_SPEC_TYPES: set[str] = {
 
 # Post-processing reference materialization for concepts that currently store
 # key relationships only in node.data payload.
-NODE_SCALAR_REF_KEYS: Dict[str, Tuple[str, ...]] = {
+NODE_SCALAR_REF_KEYS: dict[str, tuple[str, ...]] = {
     "ActivityParameterNode": ("parameter",),
     "BehaviorExecutionSpecification": ("enclosingInteraction", "start", "finish"),
     "ExecutionOccurrenceSpecification": ("enclosingInteraction",),
@@ -77,7 +76,7 @@ NODE_SCALAR_REF_KEYS: Dict[str, Tuple[str, ...]] = {
     "DataStoreNode": ("type",),
 }
 
-NODE_LIST_REF_KEYS: Dict[str, Tuple[str, ...]] = {
+NODE_LIST_REF_KEYS: dict[str, tuple[str, ...]] = {
     "BehaviorExecutionSpecification": ("coveredRefs", "generalOrderingRefs"),
     "ExecutionOccurrenceSpecification": ("coveredRefs",),
     "Lifeline": ("coveredByRefs",),
@@ -129,18 +128,18 @@ class ParseContext:
     root: ET.Element
     ir: IR
     options: ParseOptions
-    run_stats: Optional[ParserRunStats] = None
+    run_stats: ParserRunStats | None = None
 
-    id_index: Dict[str, ET.Element] = field(default_factory=dict)
-    parent_map: Dict[ET.Element, ET.Element] = field(default_factory=dict)
+    id_index: dict[str, ET.Element] = field(default_factory=dict)
+    parent_map: dict[ET.Element, ET.Element] = field(default_factory=dict)
 
-    nodes_by_id: Dict[str, Node] = field(default_factory=dict)
-    handler_map: Dict[str, ElementHandler] = field(default_factory=dict)
-    tag_handler_map: Dict[str, str] = field(default_factory=dict)
+    nodes_by_id: dict[str, Node] = field(default_factory=dict)
+    handler_map: dict[str, ElementHandler] = field(default_factory=dict)
+    tag_handler_map: dict[str, str] = field(default_factory=dict)
 
     edge_ids: set[str] = field(default_factory=set)
 
-    def elem(self, _id: str) -> Optional[ET.Element]:
+    def elem(self, _id: str) -> ET.Element | None:
         """Get element by xmi:id."""
         return self.id_index.get(_id)
 
@@ -185,16 +184,16 @@ class UMLXMIParser(BaseParser):
 
     def __init__(
         self,
-        options: Optional[ParseOptions] = None,
-        handlers: Optional[List[ElementHandler]] = None,
+        options: ParseOptions | None = None,
+        handlers: list[ElementHandler] | None = None,
     ):
         super().__init__()
         self.options = options or ParseOptions()
         self.handlers = handlers or self._get_default_handlers()
 
-    def _get_default_handlers(self) -> List[ElementHandler]:
+    def _get_default_handlers(self) -> list[ElementHandler]:
         """Build default handlers from executable metamodel specs."""
-        handlers: List[ElementHandler] = []
+        handlers: list[ElementHandler] = []
         for concept_id, concept in SUPPORTED_UML_CONCEPTS.items():
             handler_spec = concept.handler
             if handler_spec is None:
@@ -226,9 +225,7 @@ class UMLXMIParser(BaseParser):
 
         if handler_spec.kind == "directed_edge":
             if not handler_spec.edge_type or not handler_spec.source_attr or not handler_spec.target_attr:
-                raise ValueError(
-                    f"Directed-edge concept '{concept_id}' is missing edge_type/source_attr/target_attr."
-                )
+                raise ValueError(f"Directed-edge concept '{concept_id}' is missing edge_type/source_attr/target_attr.")
             return DirectedEdgeHandler(
                 element_type=concept_id,
                 edge_type=handler_spec.edge_type,
@@ -263,7 +260,7 @@ class UMLXMIParser(BaseParser):
 
         raise ValueError(f"Unsupported handler kind '{handler_spec.kind}' for concept '{concept_id}'.")
 
-    def parse(self, filepath: str) -> Tuple[IR, ParserRunStats]:
+    def parse(self, filepath: str) -> tuple[IR, ParserRunStats]:
         """Parse a UML XMI file into IR."""
         self._start_run()
 
@@ -312,7 +309,7 @@ class UMLXMIParser(BaseParser):
             for child in list(parent):
                 ctx.parent_map[child] = parent
 
-    def _resolve_handler_key(self, ctx: ParseContext, elem: ET.Element) -> Optional[str]:
+    def _resolve_handler_key(self, ctx: ParseContext, elem: ET.Element) -> str | None:
         """Resolve a handler key from XML tag and/or xsi:type."""
         tag_name = localname(elem.tag)
 
@@ -362,9 +359,8 @@ class UMLXMIParser(BaseParser):
             # their owning directed edge payload.
             elem_tag = localname(elem.tag)
             elem_type = xsi_type(elem) or ""
-            if (
-                elem_tag in EDGE_VALUE_SPEC_TAGS
-                and (elem_type in EMBEDDED_VALUE_SPEC_TYPES or (not elem_type and "value" in elem.attrib))
+            if elem_tag in EDGE_VALUE_SPEC_TAGS and (
+                elem_type in EMBEDDED_VALUE_SPEC_TYPES or (not elem_type and "value" in elem.attrib)
             ):
                 continue
 
@@ -372,7 +368,10 @@ class UMLXMIParser(BaseParser):
             parent_tag = localname(parent.tag) if parent is not None else ""
             if (
                 elem_tag in CONTEXTUAL_VALUE_SPEC_TAGS
-                and (elem_type in EMBEDDED_VALUE_SPEC_TYPES or (not elem_type and ("value" in elem.attrib or "symbol" in elem.attrib)))
+                and (
+                    elem_type in EMBEDDED_VALUE_SPEC_TYPES
+                    or (not elem_type and ("value" in elem.attrib or "symbol" in elem.attrib))
+                )
                 and (
                     (elem_tag == "specification" and parent_tag == "ownedRule")
                     or (elem_tag == "value" and parent_tag == "slot")
@@ -396,8 +395,7 @@ class UMLXMIParser(BaseParser):
             if elem_type and elem_type not in IGNORED_UNHANDLED_ELEMENTS:
                 ctx.skip_with_warning(
                     WarningType.UNKNOWN_NODE_TYPE,
-                    f"[UNHANDLED ELEMENT] Type: {elem_type}, ID: {elem_id}, "
-                    f"Tag: {localname(elem.tag)}",
+                    f"[UNHANDLED ELEMENT] Type: {elem_type}, ID: {elem_id}, Tag: {localname(elem.tag)}",
                 )
 
     def _create_containment_edges(self, ctx: ParseContext, model: ET.Element) -> None:
@@ -433,7 +431,7 @@ class UMLXMIParser(BaseParser):
                 )
             )
 
-    def _child_concept_and_id(self, child: ET.Element) -> Optional[Tuple[str, str]]:
+    def _child_concept_and_id(self, child: ET.Element) -> tuple[str, str] | None:
         """Resolve concept type and xmi:id for containment-relevant child elements."""
         if is_tool_extension(child):
             return None
@@ -459,7 +457,7 @@ class UMLXMIParser(BaseParser):
 
         return None
 
-    def _walk_containment(self, ctx: ParseContext, container: ET.Element, current_pkg_id: Optional[str]) -> None:
+    def _walk_containment(self, ctx: ParseContext, container: ET.Element, current_pkg_id: str | None) -> None:
         """Recursively walk containment-relevant children."""
         for child in list(container):
             if is_tool_extension(child):
@@ -519,7 +517,7 @@ class UMLXMIParser(BaseParser):
                 continue
 
             parent = ctx.parent_map.get(elem)
-            owner_id: Optional[str] = None
+            owner_id: str | None = None
             while parent is not None:
                 parent_id = xmi_id(parent)
                 if parent_id and parent_id in ctx.nodes_by_id:

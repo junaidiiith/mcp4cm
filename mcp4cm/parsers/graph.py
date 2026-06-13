@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
 from mcp4cm.parsers.ir import IR
@@ -27,7 +27,7 @@ class UMLFeatureProjection:
     include_parameters: bool = True
 
 
-def convert_to_networkx(graph: IR, missing_node_policy: MissingNodePolicy = "error") -> "nx.MultiDiGraph":
+def convert_to_networkx(graph: IR, missing_node_policy: MissingNodePolicy = "error") -> nx.MultiDiGraph:
     """
     Convert an IR graph into an equivalent NetworkX MultiDiGraph.
 
@@ -45,15 +45,11 @@ def convert_to_networkx(graph: IR, missing_node_policy: MissingNodePolicy = "err
         import networkx as nx
     except ImportError as exc:
         raise ImportError(
-            "convert_to_networkx requires the optional dependency 'networkx'. "
-            "Install it with: pip install networkx"
+            "convert_to_networkx requires the optional dependency 'networkx'. Install it with: pip install networkx"
         ) from exc
 
     if missing_node_policy not in {"create", "error", "skip"}:
-        raise ValueError(
-            "missing_node_policy must be one of: 'create', 'error', 'skip'. "
-            f"Got: {missing_node_policy!r}"
-        )
+        raise ValueError(f"missing_node_policy must be one of: 'create', 'error', 'skip'. Got: {missing_node_policy!r}")
 
     nx_graph = nx.MultiDiGraph(
         id=graph.id,
@@ -209,11 +205,13 @@ def extract_features(attrs: dict[str, Any], data: dict[str, Any], keys: tuple[st
 def feature_node_id(parent_id: Any, feature_kind: str, index: int, feature: dict[str, Any]) -> str:
     name = feature.get("name") or ""
     payload = json.dumps(feature.get("data") or {}, sort_keys=True, default=str)
-    digest = hashlib.sha1(f"{parent_id}|{feature_kind}|{index}|{name}|{payload}".encode("utf-8")).hexdigest()[:12]
+    digest = hashlib.sha1(f"{parent_id}|{feature_kind}|{index}|{name}|{payload}".encode()).hexdigest()[:12]
     return f"{parent_id}::{feature_kind}::{digest}"
 
 
-def build_feature_nodes(parent_id: Any, feature_kind: str, feature_items: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
+def build_feature_nodes(
+    parent_id: Any, feature_kind: str, feature_items: list[dict[str, Any]]
+) -> list[tuple[str, dict[str, Any]]]:
     nodes: list[tuple[str, dict[str, Any]]] = []
     for index, feature in enumerate(feature_items):
         name = feature.get("name") or ""
@@ -234,7 +232,9 @@ def build_feature_nodes(parent_id: Any, feature_kind: str, feature_items: list[d
     return nodes
 
 
-def build_feature_edges(parent_id: Any, edge_type: str, feature_items: list[dict[str, Any]]) -> list[tuple[str, str, dict[str, Any]]]:
+def build_feature_edges(
+    parent_id: Any, edge_type: str, feature_items: list[dict[str, Any]]
+) -> list[tuple[str, str, dict[str, Any]]]:
     edges: list[tuple[str, str, dict[str, Any]]] = []
     feature_kind = edge_type.replace("has_", "")
     for index, feature in enumerate(feature_items):

@@ -1,16 +1,16 @@
 """Handler for uml:Association elements."""
 
-from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
+from typing import Any
 
-from mcp4cm.parsers.ir import Edge
 from mcp4cm.parsers.diagnostics import WarningType
+from mcp4cm.parsers.ir import Edge
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import (
-    xmi_id,
-    xsi_type,
     is_tool_extension,
     read_multiplicity,
+    xmi_id,
+    xsi_type,
 )
 
 
@@ -35,7 +35,7 @@ class AssociationHandler(ElementHandler):
         if not assoc_id:
             return
 
-        owned_ends: Dict[str, Dict[str, Any]] = {}
+        owned_ends: dict[str, dict[str, Any]] = {}
         for end in elem.findall("./ownedEnd"):
             if is_tool_extension(end):
                 continue
@@ -43,7 +43,7 @@ class AssociationHandler(ElementHandler):
             if end_data:
                 owned_ends[end_data["id"]] = end_data
 
-        ends: List[Dict[str, Any]] = []
+        ends: list[dict[str, Any]] = []
         member_end_ids = self.split_ref_list(elem.attrib.get("memberEnd"))
         if member_end_ids:
             for end_id in member_end_ids:
@@ -72,7 +72,7 @@ class AssociationHandler(ElementHandler):
 
         end1, end2 = ends[0], ends[1]
 
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "end1": self._clean_end_data(end1),
             "end2": self._clean_end_data(end2),
         }
@@ -104,8 +104,7 @@ class AssociationHandler(ElementHandler):
             data["partEndId"] = part_end["id"]
             if len(composition_pairs) > 1:
                 data["compositionPairs"] = [
-                    {"wholeEndId": whole["id"], "partEndId": part["id"]}
-                    for whole, part in composition_pairs
+                    {"wholeEndId": whole["id"], "partEndId": part["id"]} for whole, part in composition_pairs
                 ]
 
         ctx.add_edge(
@@ -122,8 +121,8 @@ class AssociationHandler(ElementHandler):
         self.log_unhandled_children(ctx, elem, handled_children)
 
     def _parse_association_end(
-        self, ctx, end: ET.Element, fallback_id: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, ctx, end: ET.Element, fallback_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Parse an association end and return its data."""
         end_id = xmi_id(end) or fallback_id
         if not end_id:
@@ -145,7 +144,7 @@ class AssociationHandler(ElementHandler):
             )
             return None
 
-        end_data: Dict[str, Any] = {
+        end_data: dict[str, Any] = {
             "id": end_id,
             "typeId": type_id,
         }
@@ -172,10 +171,6 @@ class AssociationHandler(ElementHandler):
 
         return end_data
 
-    def _clean_end_data(self, end_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _clean_end_data(self, end_data: dict[str, Any]) -> dict[str, Any]:
         """Drop internal parsing fields from end data payload."""
-        return {
-            key: value
-            for key, value in end_data.items()
-            if key not in {"typeId"} and value is not None
-        }
+        return {key: value for key, value in end_data.items() if key not in {"typeId"} and value is not None}

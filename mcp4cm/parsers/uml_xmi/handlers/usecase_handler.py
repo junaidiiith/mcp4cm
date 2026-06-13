@@ -1,7 +1,7 @@
 """Handler for uml:UseCase elements."""
 
-from typing import Any, Dict, List
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import (
@@ -27,7 +27,7 @@ class UseCaseHandler(ElementHandler):
             return
 
         name = self.read_name(elem)
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
 
         doc = self.extract_documentation(elem)
         if doc:
@@ -48,9 +48,9 @@ class UseCaseHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_extension_points(self, ctx, usecase_elem: ET.Element) -> List[Dict[str, Any]]:
+    def _parse_extension_points(self, ctx, usecase_elem: ET.Element) -> list[dict[str, Any]]:
         """Parse extensionPoint elements."""
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for ext_point in usecase_elem.findall("./extensionPoint"):
             if is_tool_extension(ext_point):
                 continue
@@ -59,7 +59,7 @@ class UseCaseHandler(ElementHandler):
             if not ext_point_id:
                 continue
 
-            item: Dict[str, Any] = {"id": ext_point_id}
+            item: dict[str, Any] = {"id": ext_point_id}
 
             ext_point_name = self.read_name(ext_point)
             if ext_point_name:

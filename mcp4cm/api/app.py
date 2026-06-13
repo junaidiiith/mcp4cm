@@ -11,7 +11,7 @@ from flask import Flask, g, jsonify, request, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from mcp4cm.api.process_utils import kill_processes_on_port
-from mcp4cm.api.routes import datasets, duplicates, dummy, uploads
+from mcp4cm.api.routes import datasets, dummy, duplicates, uploads
 from mcp4cm.api.state import LOG, WEBAPP_DIST
 
 
@@ -42,7 +42,9 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
     @app.before_request
     def log_request_start():
         g.request_started_at = time.perf_counter()
-        LOG.info("request_start method=%s path=%s content_length=%s", request.method, request.path, request.content_length)
+        LOG.info(
+            "request_start method=%s path=%s content_length=%s", request.method, request.path, request.content_length
+        )
         if request.method == "OPTIONS" and request.path.startswith("/api/"):
             return "", 204
 
@@ -52,7 +54,13 @@ def create_app(webapp_dist: Path | str = WEBAPP_DIST) -> Flask:
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         elapsed_ms = (time.perf_counter() - getattr(g, "request_started_at", time.perf_counter())) * 1000
-        LOG.info("request_end method=%s path=%s status=%s elapsed_ms=%.1f", request.method, request.path, response.status_code, elapsed_ms)
+        LOG.info(
+            "request_end method=%s path=%s status=%s elapsed_ms=%.1f",
+            request.method,
+            request.path,
+            response.status_code,
+            elapsed_ms,
+        )
         return response
 
     @app.route("/api/health", methods=["GET"])

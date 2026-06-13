@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 
 from mcp4cm.api.pipeline import remove_directory_quietly
@@ -215,5 +214,7 @@ def parse_staged_dataset(
         add_upload_warning(summary, issue.type, issue.message, path=issue.path, model_id=issue.model_id)
     if model_entries:
         finalize_runtime_dataset(dataset_id=dataset_id, dataset_type=language, model_entries=model_entries)
-    runtime_dataset = RuntimeDataset.from_meta(dataset_id, get_dataset_meta(dataset_id) or {"recordCount": 0, "models": []})
+    runtime_dataset = RuntimeDataset.from_meta(
+        dataset_id, get_dataset_meta(dataset_id) or {"recordCount": 0, "models": []}
+    )
     return runtime_dataset, finalize_upload_summary(summary), corpus_stats

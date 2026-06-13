@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Protocol
 
 from mcp4cm.core import ModelDiagnostics, ModelRecord
 from mcp4cm.parsers.catalog import ParsedModelResult, resolve_parser
@@ -128,7 +129,9 @@ def parse_staged_files(
         if not source_path.exists():
             result.invalid_files.append(relpath)
             result.issues.append(
-                FileParseIssue(path=relpath, type="MISSING_FILE", message=f"{relpath} does not exist in upload staging.")
+                FileParseIssue(
+                    path=relpath, type="MISSING_FILE", message=f"{relpath} does not exist in upload staging."
+                )
             )
             if progress:
                 progress(file_index, total_files)
@@ -143,7 +146,9 @@ def parse_staged_files(
                 continue
         except OSError as exc:
             result.invalid_files.append(relpath)
-            result.issues.append(FileParseIssue(path=relpath, type="FILE_ERROR", message=f"{relpath} failed to stat: {exc}"))
+            result.issues.append(
+                FileParseIssue(path=relpath, type="FILE_ERROR", message=f"{relpath} failed to stat: {exc}")
+            )
             if progress:
                 progress(file_index, total_files)
             continue

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections import Counter
 import math
 import warnings
+from collections import Counter
 from statistics import mean, median
 from typing import Any
 
@@ -49,10 +49,7 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
     names = [entry["name"] for entry in entries if entry["classification"] != "missing"]
     semantic_names = [entry["name"] for entry in entries if entry["classification"] == "semantic"]
     tokens = [
-        token
-        for entry in entries
-        if entry["classification"] != "missing"
-        for token in entry.get("nameTokens", ())
+        token for entry in entries if entry["classification"] != "missing" for token in entry.get("nameTokens", ())
     ]
     missing_names = sum(1 for entry in entries if entry["classification"] == "missing")
     classification_counts = Counter(str(entry["classification"]) for entry in entries)
@@ -99,7 +96,14 @@ def counter_items(counter: Counter[str], limit: int | None = None) -> list[dict[
     return [{"label": label, "count": count} for label, count in counter.most_common(limit)]
 
 
-def histogram(values: list[float | int], *, bins: int, minimum: float | None = None, maximum: float | None = None, log_counts: bool = False) -> list[dict[str, Any]]:
+def histogram(
+    values: list[float | int],
+    *,
+    bins: int,
+    minimum: float | None = None,
+    maximum: float | None = None,
+    log_counts: bool = False,
+) -> list[dict[str, Any]]:
     if not values:
         return []
     low = min(values) if minimum is None else minimum
@@ -122,7 +126,9 @@ def histogram(values: list[float | int], *, bins: int, minimum: float | None = N
     ]
 
 
-def ratio_bands(values: list[float], *, bands: tuple[float, ...] = (0, 0.01, 0.1, 0.3, 0.7, 1.0)) -> list[dict[str, Any]]:
+def ratio_bands(
+    values: list[float], *, bands: tuple[float, ...] = (0, 0.01, 0.1, 0.3, 0.7, 1.0)
+) -> list[dict[str, Any]]:
     if not values:
         return []
     counts = [0] * (len(bands) - 1)
@@ -228,7 +234,9 @@ def vocabulary_summary(
 ) -> dict[str, Any]:
     semantic_names = sum(1 for counts in classification_counters.values() if counts.get("semantic", 0) > 0)
     placeholder_names = sum(1 for counts in classification_counters.values() if counts.get("placeholder", 0) > 0)
-    most_reused_name, most_reused_count = document_frequency_counter.most_common(1)[0] if document_frequency_counter else ("", 0)
+    most_reused_name, most_reused_count = (
+        document_frequency_counter.most_common(1)[0] if document_frequency_counter else ("", 0)
+    )
     return {
         "uniqueNames": len(occurrence_counter),
         "totalOccurrences": int(sum(occurrence_counter.values())),
@@ -276,8 +284,7 @@ def name_reuse_distribution(document_frequency_counter: Counter[str], model_coun
     ]
     values = list(document_frequency_counter.values())
     return [
-        {"label": label, "count": sum(1 for value in values if lower <= value < upper)}
-        for label, lower, upper in bands
+        {"label": label, "count": sum(1 for value in values if lower <= value < upper)} for label, lower, upper in bands
     ]
 
 
@@ -469,8 +476,12 @@ class CorpusStatisticsAccumulator:
         self.topic_model_rows: list[dict[str, Any]] = []
         self.sample_models: list[dict[str, Any]] = []
         self.unique_name_doc_freq: Counter[str] = Counter()
-        self.label_pipeline_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
-        self.label_pipeline_doc_freq: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = Counter()
+        self.label_pipeline_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = (
+            Counter()
+        )
+        self.label_pipeline_doc_freq: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = (
+            Counter()
+        )
 
     def add(self, record: ModelRecord) -> None:
         self.node_counts.append(record.node_count)
@@ -612,8 +623,7 @@ class CorpusStatisticsAccumulator:
         for element_type in major_types:
             concepts = self.type_concept_counter.get(element_type, Counter())
             type_links.extend(
-                {"type": element_type, "concept": concept, "count": count}
-                for concept, count in concepts.most_common(8)
+                {"type": element_type, "concept": concept, "count": count} for concept, count in concepts.most_common(8)
             )
 
         type_counter = self.entry_type_counter

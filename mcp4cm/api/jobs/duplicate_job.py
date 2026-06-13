@@ -6,12 +6,12 @@ import uuid
 from typing import Any
 
 from mcp4cm.api.http import paginate_items, parse_positive_int
+from mcp4cm.api.services.datasets import get_duplicate_detection_dataset
 from mcp4cm.api.services.duplicate_pipeline import (
     handle_duplicates,
     raise_no_duplicate_technique_error,
     selected_duplicate_techniques,
 )
-from mcp4cm.api.services.datasets import get_duplicate_detection_dataset
 from mcp4cm.api.state import DUPLICATE_JOBS, DUPLICATE_JOBS_LOCK, LOG
 from mcp4cm.runtime_store import RUNTIME_DIR, load_dataset_duplicate_detection, save_dataset_duplicate_detection
 from mcp4cm.utils import elapsed_ms, pair_lookup_key
@@ -88,7 +88,12 @@ def run_duplicate_job(job_id: str, body: dict[str, Any]) -> None:
             finishedAt=finished_at,
             elapsedMs=elapsed_ms,
         )
-        LOG.info("duplicate_job_complete job_id=%s duplicate_pairs=%s elapsed_ms=%s", job_id, result["duplicatePairs"], elapsed_ms)
+        LOG.info(
+            "duplicate_job_complete job_id=%s duplicate_pairs=%s elapsed_ms=%s",
+            job_id,
+            result["duplicatePairs"],
+            elapsed_ms,
+        )
     except Exception as exc:
         LOG.exception("duplicate_job_error job_id=%s", job_id)
         report(status="error", message=str(exc), error=str(exc), currentTechnique="", finishedAt=time.time())
@@ -141,7 +146,9 @@ def get_duplicate_result_for_job(job_id: str) -> dict[str, Any]:
         result = (job or {}).get("result")
     if isinstance(result, dict):
         return result
-    raise ValueError("Unknown duplicate detection result. The job has not completed or the persisted result is unavailable.")
+    raise ValueError(
+        "Unknown duplicate detection result. The job has not completed or the persisted result is unavailable."
+    )
 
 
 def build_duplicate_groups_page(result: dict[str, Any], *, page: int, page_size: int, query: str) -> dict[str, Any]:
@@ -149,11 +156,14 @@ def build_duplicate_groups_page(result: dict[str, Any], *, page: int, page_size:
     if query:
         query_lower = query.lower()
         groups = [
-            group for group in groups
+            group
+            for group in groups
             if query_lower in str(group.get("groupId", "")).lower()
             or any(query_lower in str(model_id).lower() for model_id in group.get("modelIds", []))
         ]
-    groups.sort(key=lambda group: (int(group.get("size") or 0), int(group.get("approvedInternalPairs") or 0)), reverse=True)
+    groups.sort(
+        key=lambda group: (int(group.get("size") or 0), int(group.get("approvedInternalPairs") or 0)), reverse=True
+    )
     return paginate_items(groups, page=page, page_size=page_size, item_key="groups")
 
 
@@ -174,13 +184,15 @@ def build_duplicate_pairs_page(
     if group_id:
         group_lookup = result.get("pairGroupLookup") or {}
         pairs = [
-            pair for pair in pairs
+            pair
+            for pair in pairs
             if group_lookup.get(pair_lookup_key(str(pair.get("leftId")), str(pair.get("rightId")))) == group_id
         ]
     if query:
         query_lower = query.lower()
         pairs = [
-            pair for pair in pairs
+            pair
+            for pair in pairs
             if query_lower in str(pair.get("leftId", "")).lower()
             or query_lower in str(pair.get("rightId", "")).lower()
             or any(query_lower in str(technique).lower() for technique in pair.get("techniques", []))
@@ -207,14 +219,20 @@ def get_duplicate_group_detail(job_id: str, group_id: str) -> dict[str, Any]:
     decisions = result.get("decisions") or []
     model_ids = set(group.get("modelIds") or [])
     internal_pairs = [
-        decision for decision in decisions
+        decision
+        for decision in decisions
         if decision.get("leftId") in model_ids and decision.get("rightId") in model_ids
     ]
-    internal_pairs.sort(key=lambda item: (item.get("isDuplicate") is True, int(item.get("voteCount") or 0)), reverse=True)
+    internal_pairs.sort(
+        key=lambda item: (item.get("isDuplicate") is True, int(item.get("voteCount") or 0)), reverse=True
+    )
     return {
         "group": group,
         "pairs": internal_pairs,
-        "modelSummaries": [result.get("modelSummaries", {}).get(model_id, {"modelId": model_id}) for model_id in group.get("modelIds", [])],
+        "modelSummaries": [
+            result.get("modelSummaries", {}).get(model_id, {"modelId": model_id})
+            for model_id in group.get("modelIds", [])
+        ],
     }
 
 

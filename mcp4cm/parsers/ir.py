@@ -1,8 +1,8 @@
 """Intermediate Representation (IR) for conceptual models."""
 
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Any, Tuple
 import json
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -12,10 +12,10 @@ class Node:
     id: str
     type: str
     name: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     eClass: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert node to dictionary."""
         return asdict(self)
 
@@ -28,9 +28,9 @@ class Edge:
     sourceId: str
     targetId: str
     type: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert edge to dictionary."""
         return asdict(self)
 
@@ -41,11 +41,11 @@ class IR:
 
     id: str
     language: str
-    data: Dict[str, Any] = field(default_factory=dict)
-    nodes: List[Node] = field(default_factory=list)
-    edges: List[Edge] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
+    nodes: list[Node] = field(default_factory=list)
+    edges: list[Edge] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert IR to dictionary."""
         return {
             "id": self.id,
@@ -65,7 +65,7 @@ class IR:
             f.write(self.to_json())
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "IR":
+    def from_dict(cls, data: dict[str, Any]) -> "IR":
         """Create IR from dictionary."""
         nodes = [Node(**node) for node in data.get("nodes", [])]
         edges = [Edge(**edge) for edge in data.get("edges", [])]
@@ -80,11 +80,11 @@ class IR:
     @classmethod
     def load(cls, filepath: str) -> "IR":
         """Load IR from JSON file."""
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         return cls.from_dict(data)
 
-    def validate(self) -> Tuple[bool, List[str]]:
+    def validate(self) -> tuple[bool, list[str]]:
         """
         Validate IR structure.
 
@@ -123,4 +123,3 @@ class IR:
                 errors.append(f"Edge {edge.id} references non-existent target node: {edge.targetId}")
 
         return len(errors) == 0, errors
-

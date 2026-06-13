@@ -1,29 +1,28 @@
-from io import BytesIO
-from collections import Counter
-import os
-import time
 import json
+import os
 import shutil
+import time
+from collections import Counter
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
 from mcp4cm import runtime_store
 from mcp4cm._deps import require_networkx
-from mcp4cm.api import create_app
-from mcp4cm.api import process_utils
+from mcp4cm.api import create_app, process_utils
 from mcp4cm.api.process_utils import kill_processes_on_port, pids_on_port
 from mcp4cm.api.services.datasets import top_items
 from mcp4cm.api.services.duplicate_pipeline import selected_duplicate_techniques
 from mcp4cm.api.services.upload_summary import empty_upload_summary, merge_model_diagnostics
 from mcp4cm.api.state import DATASETS, DUPLICATE_JOBS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS
 from mcp4cm.core import Dataset, ModelDiagnostics
+from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
+from mcp4cm.parsers.graph import normalize_graph_attributes
 from mcp4cm.runtime_store import (
     RUNTIME_DIR,
     deserialize_graph_from_runtime,
     serialize_graph_for_runtime,
 )
-from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
-from mcp4cm.parsers.graph import normalize_graph_attributes
 
 
 def test_top_items_returns_all_values_when_limit_is_omitted():
@@ -960,8 +959,7 @@ def test_flask_upload_dataset_route_reports_parsed_models():
     ]
 
     files = [
-        (BytesIO(json.dumps(model).encode("utf-8")), f"models/model-{index}.json")
-        for index, model in enumerate(models)
+        (BytesIO(json.dumps(model).encode("utf-8")), f"models/model-{index}.json") for index, model in enumerate(models)
     ]
 
     _, _, job = upload_and_parse_via_job(client, language="archimate", files=files)

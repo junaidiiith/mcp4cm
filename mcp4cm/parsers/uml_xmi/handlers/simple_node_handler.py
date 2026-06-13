@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, Mapping, Optional, Sequence, Set
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping, Sequence
 
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import xmi_id
@@ -20,9 +20,9 @@ class SimpleNodeHandler(ElementHandler):
         scalar_attrs: Sequence[str] = (),
         boolean_attrs: Sequence[str] = (),
         list_attrs: Sequence[str] = (),
-        rename_map: Optional[Mapping[str, str]] = None,
+        rename_map: Mapping[str, str] | None = None,
         child_ref_tags: Sequence[str] = (),
-        child_ref_rename_map: Optional[Mapping[str, str]] = None,
+        child_ref_rename_map: Mapping[str, str] | None = None,
         handled_children: Sequence[str] = (),
         include_documentation: bool = True,
         log_unhandled: bool = True,
@@ -45,7 +45,7 @@ class SimpleNodeHandler(ElementHandler):
     def element_type(self) -> str:
         return self._element_type
 
-    def get_handled_attributes(self) -> Set[str]:
+    def get_handled_attributes(self) -> set[str]:
         return {
             "name",
             *self._scalar_attrs,
@@ -53,7 +53,7 @@ class SimpleNodeHandler(ElementHandler):
             *self._list_attrs,
         }
 
-    def get_handled_children(self) -> Set[str]:
+    def get_handled_children(self) -> set[str]:
         handled = set(self._child_ref_tags)
         handled.update(self._handled_children)
         if self._include_documentation:
@@ -73,7 +73,7 @@ class SimpleNodeHandler(ElementHandler):
         if not node_id:
             return
 
-        data: Dict[str, object] = self.collect_attributes(
+        data: dict[str, object] = self.collect_attributes(
             elem,
             scalar_attrs=self._scalar_attrs,
             boolean_attrs=self._boolean_attrs,

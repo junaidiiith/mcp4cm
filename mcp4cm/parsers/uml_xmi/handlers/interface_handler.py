@@ -1,7 +1,7 @@
 """Handler for uml:Interface elements."""
 
-from typing import Any, Dict
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 
@@ -24,7 +24,7 @@ class InterfaceHandler(ElementHandler):
             return
 
         name = self.read_name(elem)
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
 
         doc = self.extract_documentation(elem)
         if doc:

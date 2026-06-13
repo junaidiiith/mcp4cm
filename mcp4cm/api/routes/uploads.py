@@ -24,9 +24,7 @@ def parser_option_payload_from_body(body: dict[str, Any], language: str, data_fo
     base_keys = {"language", "format"}
     unsupported = sorted(str(key) for key in body if key not in base_keys and key not in option_names)
     if unsupported:
-        raise ValueError(
-            f"Unsupported option(s) for {language}/{data_format}: {', '.join(unsupported)}"
-        )
+        raise ValueError(f"Unsupported option(s) for {language}/{data_format}: {', '.join(unsupported)}")
     return {key: body[key] for key in option_names if key in body}
 
 

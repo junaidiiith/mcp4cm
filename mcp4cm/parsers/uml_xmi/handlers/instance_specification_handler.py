@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import is_tool_extension, xmi_id, xsi_type
@@ -37,7 +37,7 @@ class InstanceSpecificationHandler(ElementHandler):
         if not node_id:
             return
 
-        data: Dict[str, Any] = self.collect_concept_attributes(elem)
+        data: dict[str, Any] = self.collect_concept_attributes(elem)
         data.update(self.collect_child_refs(elem, child_tags=("slot",)))
 
         doc = self.extract_documentation(elem)
@@ -65,13 +65,13 @@ class InstanceSpecificationHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_slots(self, owner: ET.Element) -> List[Dict[str, Any]]:
-        slots: List[Dict[str, Any]] = []
+    def _parse_slots(self, owner: ET.Element) -> list[dict[str, Any]]:
+        slots: list[dict[str, Any]] = []
         for slot in owner.findall("./slot"):
             if is_tool_extension(slot):
                 continue
 
-            payload: Dict[str, Any] = {}
+            payload: dict[str, Any] = {}
             slot_id = xmi_id(slot)
             if slot_id:
                 payload["id"] = slot_id
@@ -94,8 +94,8 @@ class InstanceSpecificationHandler(ElementHandler):
 
         return slots
 
-    def _parse_value_spec_children(self, owner: ET.Element, child_tag: str) -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
+    def _parse_value_spec_children(self, owner: ET.Element, child_tag: str) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
         for child in owner.findall(f"./{child_tag}"):
             if is_tool_extension(child):
                 continue
@@ -104,12 +104,12 @@ class InstanceSpecificationHandler(ElementHandler):
                 items.append(payload)
         return items
 
-    def _parse_value_spec_element(self, child: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_value_spec_element(self, child: ET.Element) -> dict[str, Any] | None:
         child_type = xsi_type(child) or ""
         if child_type and child_type not in EMBEDDED_VALUE_SPEC_TYPES:
             return None
 
-        payload: Dict[str, Any] = {}
+        payload: dict[str, Any] = {}
 
         child_id = xmi_id(child)
         if child_id:

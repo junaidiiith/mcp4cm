@@ -27,6 +27,7 @@ FILTER_ORDER: tuple[str, ...] = (
     "regex_rule",
 )
 
+
 @dataclass(frozen=True, slots=True)
 class DerivedNode:
     node_id: str
@@ -246,9 +247,7 @@ def summarize_findings(
             remaining_count = len(remaining)
         else:
             triggered_ids = tuple(
-                model_id
-                for model_id in sorted(per_model)
-                if per_model[model_id].decision == "removed"
+                model_id for model_id in sorted(per_model) if per_model[model_id].decision == "removed"
             )
             remaining_count = len(records) - len(triggered_ids)
         summaries.append(
@@ -470,7 +469,12 @@ def _eval_name_repetition(
             score=ratio,
             threshold=threshold,
             evidence=(most_name,),
-            metrics={"mostFrequentName": most_name, "mostFrequentCount": most_count, "namedNodes": len(named), "ratio": ratio},
+            metrics={
+                "mostFrequentName": most_name,
+                "mostFrequentCount": most_count,
+                "namedNodes": len(named),
+                "ratio": ratio,
+            },
         )
     return _kept_finding(
         record.model_id,
@@ -478,7 +482,12 @@ def _eval_name_repetition(
         "name_repetition_ok",
         score=ratio,
         threshold=threshold,
-        metrics={"mostFrequentName": most_name, "mostFrequentCount": most_count, "namedNodes": len(named), "ratio": ratio},
+        metrics={
+            "mostFrequentName": most_name,
+            "mostFrequentCount": most_count,
+            "namedNodes": len(named),
+            "ratio": ratio,
+        },
     )
 
 
@@ -493,7 +502,9 @@ def _eval_regex_rule(
     target_field = str(config.get("targetField") or "name")
     scope = str(config.get("scope") or "eligible_only")
     if not pattern:
-        return _kept_finding(record.model_id, filter_id, "regex_not_configured", score=0.0, threshold=float(min_matches))
+        return _kept_finding(
+            record.model_id, filter_id, "regex_not_configured", score=0.0, threshold=float(min_matches)
+        )
 
     try:
         compiled = re.compile(pattern, re.IGNORECASE)
@@ -564,6 +575,7 @@ def derive_nodes(record: ModelRecord) -> list[DerivedNode]:
         )
         for node_id, result in iter_name_slots(record)
     ]
+
 
 def named_nodes(nodes: list[DerivedNode]) -> list[DerivedNode]:
     return [node for node in nodes if node.classification != "missing"]

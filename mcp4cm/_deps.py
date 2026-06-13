@@ -37,8 +37,8 @@ def require_node2vec():
 
 def require_transformers_torch():
     try:
-        from transformers import AutoModel, AutoTokenizer
         import torch
+        from transformers import AutoModel, AutoTokenizer
     except ImportError as exc:
         raise ImportError(
             "BERT semantic duplicate detection requires transformers and torch. Install ML dependencies with "

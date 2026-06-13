@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from mcp4cm.api.state import AFTER_DUMMY_STATISTICS_JOBS, AFTER_DUMMY_STATISTICS_LOCK, DATASETS
@@ -66,7 +65,9 @@ def serialize_statistics(dataset: Dataset | RuntimeDataset) -> dict[str, Any]:
     return build_statistics_payload(dataset)
 
 
-def build_statistics_payload(records, *, skip_topic_model: bool = False, topic_model_skip_reason: str = "") -> dict[str, Any]:
+def build_statistics_payload(
+    records, *, skip_topic_model: bool = False, topic_model_skip_reason: str = ""
+) -> dict[str, Any]:
     from mcp4cm.statistics import CorpusStatisticsAccumulator
 
     accumulator = CorpusStatisticsAccumulator()

@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import tempfile
 import xml.etree.ElementTree as ET
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 try:
     from pyecore.ecore import EProxy
-    from pyecore.resources import ResourceSet, URI
+    from pyecore.resources import URI, ResourceSet
 except ImportError as exc:  # pragma: no cover - dependency is declared by the package
-    raise ImportError(
-        "pyecore is required for UML XML PyEcore parsing. Install it with: pip install pyecore"
-    ) from exc
+    raise ImportError("pyecore is required for UML XML PyEcore parsing. Install it with: pip install pyecore") from exc
 
 from mcp4cm.parsers.base import BaseParser, register_parser
 from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
-from mcp4cm.parsers.ir import Edge, IR, Node
-
+from mcp4cm.parsers.ir import IR, Edge, Node
 
 DEFAULT_UML_NS = "http://www.eclipse.org/uml2/5.0.0/UML"
 XMI_NS = "http://schema.omg.org/spec/XMI/2.1"
@@ -64,10 +62,8 @@ def default_metamodel_paths() -> UMLMetamodelPaths:
     return UMLMetamodelPaths(
         uml_ecore=root / "org.eclipse.uml2.uml/model/UML.ecore",
         types_ecore=root / "org.eclipse.uml2.types/model/Types.ecore",
-        uml_primitive_library=root
-        / "org.eclipse.uml2.uml.resources/libraries/UMLPrimitiveTypes.library.uml",
-        xml_primitive_library=root
-        / "org.eclipse.uml2.uml.resources/libraries/XMLPrimitiveTypes.library.uml",
+        uml_primitive_library=root / "org.eclipse.uml2.uml.resources/libraries/UMLPrimitiveTypes.library.uml",
+        xml_primitive_library=root / "org.eclipse.uml2.uml.resources/libraries/XMLPrimitiveTypes.library.uml",
         uml_profiles_dir=root / "org.eclipse.uml2.uml.resources/profiles",
         uml_libraries_dir=root / "org.eclipse.uml2.uml.resources/libraries",
         uml_metamodels_dir=root / "org.eclipse.uml2.uml.resources/metamodels",
@@ -164,10 +160,7 @@ def primitive_type_name_from_proxy_path(proxy_path: str | None) -> str | None:
 
 def is_primitive_types_proxy(proxy: EProxy) -> bool:
     proxy_path = getattr(proxy, "_proxy_path", None)
-    return bool(
-        proxy_path
-        and any(marker in str(proxy_path) for marker in PRIMITIVE_TYPES_URI_MARKERS)
-    )
+    return bool(proxy_path and any(marker in str(proxy_path) for marker in PRIMITIVE_TYPES_URI_MARKERS))
 
 
 def value_to_json(value: Any) -> Any:
@@ -219,8 +212,8 @@ class UMLXMLPyEcoreParser(BaseParser):
                 model_resource = rset.get_resource(URI(str(model_to_load)))
             except Exception as exc:
                 message = str(exc)
-                if "Operation not permited for \"incoming\" feature" in message or (
-                    "Operation not permited for \"outgoing\" feature" in message
+                if 'Operation not permited for "incoming" feature' in message or (
+                    'Operation not permited for "outgoing" feature' in message
                 ):
                     forced_clean_path = self._tmpdir_path() / f"{path.stem}.forced-sanitized{path.suffix}"
                     sanitize_xmi_file(
@@ -275,25 +268,23 @@ class UMLXMLPyEcoreParser(BaseParser):
         )
 
         bootstrap_rset = ResourceSet()
-        bootstrap_rset.uri_mapper[
-            "platform:/plugin/org.eclipse.emf.ecore/model/Ecore.ecore"
-        ] = "http://www.eclipse.org/emf/2002/Ecore"
-        bootstrap_rset.uri_mapper[
-            "platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"
-        ] = "http://www.eclipse.org/uml2/5.0.0/Types"
+        bootstrap_rset.uri_mapper["platform:/plugin/org.eclipse.emf.ecore/model/Ecore.ecore"] = (
+            "http://www.eclipse.org/emf/2002/Ecore"
+        )
+        bootstrap_rset.uri_mapper["platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"] = (
+            "http://www.eclipse.org/uml2/5.0.0/Types"
+        )
 
         self._types_package = bootstrap_rset.get_resource(URI(str(self.paths.types_ecore))).contents[0]
         self._patch_types_datatypes(self._types_package)
         bootstrap_rset.metamodel_registry[self._types_package.nsURI] = self._types_package
-        bootstrap_rset.metamodel_registry[
-            "platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"
-        ] = self._types_package
+        bootstrap_rset.metamodel_registry["platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"] = (
+            self._types_package
+        )
 
         self._uml_package = bootstrap_rset.get_resource(URI(str(self.paths.uml_ecore))).contents[0]
         bootstrap_rset.metamodel_registry[self._uml_package.nsURI] = self._uml_package
-        bootstrap_rset.metamodel_registry[
-            "platform:/plugin/org.eclipse.uml2.uml/model/UML.ecore"
-        ] = self._uml_package
+        bootstrap_rset.metamodel_registry["platform:/plugin/org.eclipse.uml2.uml/model/UML.ecore"] = self._uml_package
         self._initialized = True
 
     @staticmethod
@@ -332,29 +323,23 @@ class UMLXMLPyEcoreParser(BaseParser):
         rset.uri_mapper["platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"] = (
             "http://www.eclipse.org/uml2/5.0.0/Types"
         )
-        rset.uri_mapper["http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi"] = str(
-            self._sanitized_uml_primitives
-        )
+        rset.uri_mapper["http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi"] = str(self._sanitized_uml_primitives)
         rset.uri_mapper["http://www.eclipse.org/uml2/5.0.0/Types"] = str(self.paths.types_ecore)
         rset.uri_mapper["http://www.eclipse.org/uml2/5.0.0/UML"] = str(self.paths.uml_ecore)
         rset.uri_mapper["http://www.eclipse.org/uml2/4.0.0/UML"] = str(self.paths.uml_ecore)
         rset.uri_mapper["http://www.eclipse.org/uml2/3.0.0/UML"] = str(self.paths.uml_ecore)
-        rset.uri_mapper[
-            "pathmap://GENMYMODEL_LIBRARIES/GenMyModelPrimitiveTypes.library.uml"
-        ] = str(self._sanitized_xml_primitives)
+        rset.uri_mapper["pathmap://GENMYMODEL_LIBRARIES/GenMyModelPrimitiveTypes.library.uml"] = str(
+            self._sanitized_xml_primitives
+        )
         rset.uri_mapper["pathmap://UML_LIBRARIES/"] = str(self.paths.uml_libraries_dir) + "/"
         rset.uri_mapper["pathmap://UML_PROFILES/"] = str(self.paths.uml_profiles_dir) + "/"
         rset.uri_mapper["pathmap://UML_METAMODELS/"] = str(self.paths.uml_metamodels_dir) + "/"
 
         rset.metamodel_registry[self._types_package.nsURI] = self._types_package
-        rset.metamodel_registry[
-            "platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"
-        ] = self._types_package
+        rset.metamodel_registry["platform:/plugin/org.eclipse.uml2.types/model/Types.ecore"] = self._types_package
         for ns_uri in UML_NS_ALIASES:
             rset.metamodel_registry[ns_uri] = self._uml_package
-        rset.metamodel_registry[
-            "platform:/plugin/org.eclipse.uml2.uml/model/UML.ecore"
-        ] = self._uml_package
+        rset.metamodel_registry["platform:/plugin/org.eclipse.uml2.uml/model/UML.ecore"] = self._uml_package
         return rset
 
     def _sanitize_model_if_needed(self, model_path: Path) -> Path:
@@ -537,9 +522,7 @@ class UMLXMLPyEcoreParser(BaseParser):
                     )
                 )
             else:
-                nodes.append(
-                    Node(id=node_id, type=element_type, name=node_name, data=data)
-                )
+                nodes.append(Node(id=node_id, type=element_type, name=node_name, data=data))
 
         edges: list[Edge] = []
         edge_counter = 0
@@ -549,9 +532,7 @@ class UMLXMLPyEcoreParser(BaseParser):
             references = reference_cache.get(class_key)
             if references is None:
                 references = [
-                    ref
-                    for ref in source_obj.eClass.eAllReferences()
-                    if not ref.derived and not ref.transient
+                    ref for ref in source_obj.eClass.eAllReferences() if not ref.derived and not ref.transient
                 ]
                 reference_cache[class_key] = references
 

@@ -1,3 +1,5 @@
+import pytest
+
 from mcp4cm.core import Dataset
 from mcp4cm.dummy import (
     default_filter_configs,
@@ -16,15 +18,14 @@ from mcp4cm.duplicates import (
     vote_duplicate_pairs,
 )
 from mcp4cm.loading import load_eamodelset, load_modelset
-import pytest
-from mcp4cm.parsers.ir import Edge, IR, Node
-from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
-from mcp4cm.parsers.uml_xmi.parser import ParseOptions, UMLXMIParser
-from mcp4cm.parsers.catalog import ParserOptions, resolve_parser
-from mcp4cm.parsers.graph import drop_ir_edges_with_missing_nodes
-from mcp4cm.parsers.parse import parse_file
 from mcp4cm.parsers.archimate_json.parser import ArchimateJsonParser
+from mcp4cm.parsers.catalog import ParserOptions, resolve_parser
+from mcp4cm.parsers.diagnostics import ParserRunStats, WarningType
+from mcp4cm.parsers.graph import drop_ir_edges_with_missing_nodes
+from mcp4cm.parsers.ir import IR, Edge, Node
 from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
+from mcp4cm.parsers.parse import parse_file
+from mcp4cm.parsers.uml_xmi.parser import ParseOptions, UMLXMIParser
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
 
 
@@ -141,9 +142,15 @@ def test_duplicate_hash_modes_use_names_and_name_types():
 
 def test_duplicate_hash_ignores_raw_extracted_xmi_vocabulary_when_available():
     parser = ArchimateJsonParser()
-    first = parser.parse({"elements": [{"id": "a", "name": "Graph A", "type": "Class"}], "relationships": []}, model_id="first")
-    second = parser.parse({"elements": [{"id": "b", "name": "Graph B", "type": "Class"}], "relationships": []}, model_id="second")
-    reordered = parser.parse({"elements": [{"id": "c", "name": "Graph C", "type": "Class"}], "relationships": []}, model_id="reordered")
+    first = parser.parse(
+        {"elements": [{"id": "a", "name": "Graph A", "type": "Class"}], "relationships": []}, model_id="first"
+    )
+    second = parser.parse(
+        {"elements": [{"id": "b", "name": "Graph B", "type": "Class"}], "relationships": []}, model_id="second"
+    )
+    reordered = parser.parse(
+        {"elements": [{"id": "c", "name": "Graph C", "type": "Class"}], "relationships": []}, model_id="reordered"
+    )
     for record in (first, second):
         record.metadata["extracted_names"] = ["http server", "empty name", "customer id"]
         record.metadata["extracted_typed_names"] = ["class: http server", "class: empty name", "comment: customer id"]
@@ -159,7 +166,10 @@ def test_duplicate_hash_ignores_raw_extracted_xmi_vocabulary_when_available():
 def test_duplicate_hash_reports_progress():
     parser = ArchimateJsonParser()
     records = [
-        parser.parse({"elements": [{"id": str(index), "name": "Order", "type": "BusinessObject"}], "relationships": []}, model_id=str(index))
+        parser.parse(
+            {"elements": [{"id": str(index), "name": "Order", "type": "BusinessObject"}], "relationships": []},
+            model_id=str(index),
+        )
         for index in range(3)
     ]
     events = []
@@ -357,10 +367,7 @@ def uml_record(names, *, model_id="uml", node_type="Class"):
             "ids": model_id,
             "graph": {
                 "directed": True,
-                "nodes": [
-                    {"id": str(index), "name": name, "type": node_type}
-                    for index, name in enumerate(names)
-                ],
+                "nodes": [{"id": str(index), "name": name, "type": node_type} for index, name in enumerate(names)],
                 "edges": [],
             },
         },
@@ -475,10 +482,7 @@ def test_eamodelset_loading_filters_by_natural_language(tmp_path):
         model_dir = tmp_path / model_id
         model_dir.mkdir()
         (model_dir / "model.json").write_text(
-            (
-                '{"archimateId": "%s", "name": "%s", "language": "%s", '
-                '"elements": [], "relationships": []}'
-            )
+            ('{"archimateId": "%s", "name": "%s", "language": "%s", "elements": [], "relationships": []}')
             % (model_id, model_id, language),
             encoding="utf-8",
         )
@@ -523,10 +527,7 @@ def test_language_filter_accepts_multiple_values(tmp_path):
         model_dir = tmp_path / model_id
         model_dir.mkdir()
         (model_dir / "model.json").write_text(
-            (
-                '{"archimateId": "%s", "name": "%s", "language": "%s", '
-                '"elements": [], "relationships": []}'
-            )
+            ('{"archimateId": "%s", "name": "%s", "language": "%s", "elements": [], "relationships": []}')
             % (model_id, model_id, language),
             encoding="utf-8",
         )
@@ -982,10 +983,14 @@ def test_uml_xmi_adapter_keeps_raw_record_name_model_placeholder(tmp_path):
     model_path.write_text(xmi, encoding="utf-8")
 
     descriptor = resolve_parser("uml", "xmi")
-    record = descriptor.create_adapter().parse_file(
-        model_path,
-        model_id=model_path.stem,
-        options=ParserOptions({"include_model_root_node": False}),
-    ).record
+    record = (
+        descriptor.create_adapter()
+        .parse_file(
+            model_path,
+            model_id=model_path.stem,
+            options=ParserOptions({"include_model_root_node": False}),
+        )
+        .record
+    )
 
     assert record.name == "model"

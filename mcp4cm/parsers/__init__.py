@@ -6,7 +6,7 @@ from mcp4cm.parsers.catalog import (
     resolve_parser,
 )
 from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
-from mcp4cm.parsers.ir import Edge, IR, Node
+from mcp4cm.parsers.ir import IR, Edge, Node
 
 __all__ = [
     "CannotParseError",

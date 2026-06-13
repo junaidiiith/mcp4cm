@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from mcp4cm._deps import require_networkx
-from mcp4cm.core import ModelRecord, ModelingLanguage
+from mcp4cm.core import ModelingLanguage, ModelRecord
 
 
 class ArchimateJsonParser:
@@ -36,9 +36,7 @@ class ArchimateJsonParser:
             labels=tuple(str(tag) for tag in tags),
             name=raw.get("name"),
             raw_text=" ".join(
-                value
-                for value in [str(raw.get("name") or ""), str(raw.get("description") or "")]
-                if value
+                value for value in [str(raw.get("name") or ""), str(raw.get("description") or "")] if value
             ),
             metadata={
                 "identifier": raw.get("identifier"),

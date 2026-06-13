@@ -4,9 +4,9 @@ import xml.etree.ElementTree as ET
 
 from mcp4cm.parsers.uml_xmi.handlers.base_handler import ElementHandler
 from mcp4cm.parsers.uml_xmi.xmi_utils import (
-    xmi_id,
-    is_tool_extension,
     XMI_NS,
+    is_tool_extension,
+    xmi_id,
 )
 
 

@@ -6,8 +6,9 @@ Each concept declares the attributes and children that are intentionally handled
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Dict, FrozenSet, Literal, Mapping, Optional, Tuple
+from typing import Literal
 
 HandlerKind = Literal["custom", "simple_node", "directed_edge"]
 
@@ -17,20 +18,20 @@ class UMLHandlerSpec:
     """Runtime parsing specification for a UML concept."""
 
     kind: HandlerKind
-    handler_name: Optional[str] = None
-    node_type: Optional[str] = None
-    edge_type: Optional[str] = None
-    scalar_attrs: Tuple[str, ...] = ()
-    boolean_attrs: Tuple[str, ...] = ()
-    list_attrs: Tuple[str, ...] = ()
+    handler_name: str | None = None
+    node_type: str | None = None
+    edge_type: str | None = None
+    scalar_attrs: tuple[str, ...] = ()
+    boolean_attrs: tuple[str, ...] = ()
+    list_attrs: tuple[str, ...] = ()
     rename_map: Mapping[str, str] = field(default_factory=dict)
-    child_ref_tags: Tuple[str, ...] = ()
+    child_ref_tags: tuple[str, ...] = ()
     child_ref_rename_map: Mapping[str, str] = field(default_factory=dict)
-    handled_children: Tuple[str, ...] = ()
-    source_attr: Optional[str] = None
-    target_attr: Optional[str] = None
-    source_child_tag: Optional[str] = None
-    target_child_tag: Optional[str] = None
+    handled_children: tuple[str, ...] = ()
+    source_attr: str | None = None
+    target_attr: str | None = None
+    source_child_tag: str | None = None
+    target_child_tag: str | None = None
     include_name: bool = True
     skip_href_without_id: bool = False
     custom_kwargs: Mapping[str, str] = field(default_factory=dict)
@@ -40,19 +41,19 @@ class UMLHandlerSpec:
 class UMLParseContract:
     """Concept-level parse contract consumed by handlers."""
 
-    node_type: Optional[str] = None
-    edge_type: Optional[str] = None
-    scalar_attrs: Tuple[str, ...] = ()
-    boolean_attrs: Tuple[str, ...] = ()
-    list_attrs: Tuple[str, ...] = ()
+    node_type: str | None = None
+    edge_type: str | None = None
+    scalar_attrs: tuple[str, ...] = ()
+    boolean_attrs: tuple[str, ...] = ()
+    list_attrs: tuple[str, ...] = ()
     rename_map: Mapping[str, str] = field(default_factory=dict)
-    child_ref_tags: Tuple[str, ...] = ()
+    child_ref_tags: tuple[str, ...] = ()
     child_ref_rename_map: Mapping[str, str] = field(default_factory=dict)
-    handled_children: Tuple[str, ...] = ()
-    source_attr: Optional[str] = None
-    target_attr: Optional[str] = None
-    source_child_tag: Optional[str] = None
-    target_child_tag: Optional[str] = None
+    handled_children: tuple[str, ...] = ()
+    source_attr: str | None = None
+    target_attr: str | None = None
+    source_child_tag: str | None = None
+    target_child_tag: str | None = None
     include_documentation: bool = True
     include_name: bool = True
 
@@ -62,11 +63,11 @@ class UMLConceptSpec:
     """Specification of a supported UML concept."""
 
     concept_id: str
-    allowed_attributes: FrozenSet[str]
-    allowed_children: FrozenSet[str]
+    allowed_attributes: frozenset[str]
+    allowed_children: frozenset[str]
     produces: str
-    handler: Optional[UMLHandlerSpec] = None
-    parse_contract: Optional[UMLParseContract] = None
+    handler: UMLHandlerSpec | None = None
+    parse_contract: UMLParseContract | None = None
 
 
 SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
@@ -84,18 +85,22 @@ SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
     ),
     "uml:Class": UMLConceptSpec(
         concept_id="uml:Class",
-        allowed_attributes=frozenset({"name", "visibility", "isAbstract", "isLeaf", "href", "templateParameter", "owningTemplateParameter"}),
-        allowed_children=frozenset({
-            "ownedAttribute",
-            "ownedOperation",
-            "generalization",
-            "interfaceRealization",
-            "ownedComment",
-            "nestedClassifier",
-            "ownedTemplateSignature",
-            "templateBinding",
-            "elementImport",
-        }),
+        allowed_attributes=frozenset(
+            {"name", "visibility", "isAbstract", "isLeaf", "href", "templateParameter", "owningTemplateParameter"}
+        ),
+        allowed_children=frozenset(
+            {
+                "ownedAttribute",
+                "ownedOperation",
+                "generalization",
+                "interfaceRealization",
+                "ownedComment",
+                "nestedClassifier",
+                "ownedTemplateSignature",
+                "templateBinding",
+                "elementImport",
+            }
+        ),
         produces="Node(type=Class)",
     ),
     "uml:ClassifierTemplateParameter": UMLConceptSpec(
@@ -113,16 +118,18 @@ SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
     "uml:Interface": UMLConceptSpec(
         concept_id="uml:Interface",
         allowed_attributes=frozenset({"name", "visibility", "isAbstract", "href"}),
-        allowed_children=frozenset({
-            "ownedOperation",
-            "ownedAttribute",
-            "generalization",
-            "ownedComment",
-            "nestedClassifier",
-            "ownedTemplateSignature",
-            "templateBinding",
-            "elementImport",
-        }),
+        allowed_children=frozenset(
+            {
+                "ownedOperation",
+                "ownedAttribute",
+                "generalization",
+                "ownedComment",
+                "nestedClassifier",
+                "ownedTemplateSignature",
+                "templateBinding",
+                "elementImport",
+            }
+        ),
         produces="Node(type=Interface)",
     ),
     "uml:Enumeration": UMLConceptSpec(
@@ -140,15 +147,17 @@ SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
     "uml:Component": UMLConceptSpec(
         concept_id="uml:Component",
         allowed_attributes=frozenset({"name", "visibility", "isAbstract", "isLeaf"}),
-        allowed_children=frozenset({
-            "ownedUseCase",
-            "packagedElement",
-            "nestedClassifier",
-            "generalization",
-            "ownedComment",
-            "ownedTemplateSignature",
-            "ownedAttribute",
-        }),
+        allowed_children=frozenset(
+            {
+                "ownedUseCase",
+                "packagedElement",
+                "nestedClassifier",
+                "generalization",
+                "ownedComment",
+                "ownedTemplateSignature",
+                "ownedAttribute",
+            }
+        ),
         produces="Node(type=Component)",
     ),
     "uml:Port": UMLConceptSpec(
@@ -171,7 +180,9 @@ SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
     "uml:UseCase": UMLConceptSpec(
         concept_id="uml:UseCase",
         allowed_attributes=frozenset({"name", "visibility", "isAbstract", "isLeaf", "href"}),
-        allowed_children=frozenset({"include", "extend", "extensionPoint", "generalization", "ownedComment", "ownedUseCase"}),
+        allowed_children=frozenset(
+            {"include", "extend", "extensionPoint", "generalization", "ownedComment", "ownedUseCase"}
+        ),
         produces="Node(type=UseCase)",
     ),
     "uml:Actor": UMLConceptSpec(
@@ -509,7 +520,17 @@ SUPPORTED_UML_CONCEPTS: Mapping[str, UMLConceptSpec] = {
     "uml:Message": UMLConceptSpec(
         concept_id="uml:Message",
         allowed_attributes=frozenset(
-            {"name", "sendEvent", "receiveEvent", "interaction", "messageSort", "messageKind", "connector", "visibility", "signature"}
+            {
+                "name",
+                "sendEvent",
+                "receiveEvent",
+                "interaction",
+                "messageSort",
+                "messageKind",
+                "connector",
+                "visibility",
+                "signature",
+            }
         ),
         allowed_children=frozenset({"ownedComment", "argument"}),
         produces="Edge(type=Message)",
@@ -560,13 +581,13 @@ def _custom_handler_spec(handler_name: str, **kwargs: str) -> UMLHandlerSpec:
 def _simple_node_handler_spec(
     *,
     node_type: str,
-    scalar_attrs: Tuple[str, ...] = (),
-    boolean_attrs: Tuple[str, ...] = (),
-    list_attrs: Tuple[str, ...] = (),
-    rename_map: Optional[Mapping[str, str]] = None,
-    child_ref_tags: Tuple[str, ...] = (),
-    child_ref_rename_map: Optional[Mapping[str, str]] = None,
-    handled_children: Tuple[str, ...] = (),
+    scalar_attrs: tuple[str, ...] = (),
+    boolean_attrs: tuple[str, ...] = (),
+    list_attrs: tuple[str, ...] = (),
+    rename_map: Mapping[str, str] | None = None,
+    child_ref_tags: tuple[str, ...] = (),
+    child_ref_rename_map: Mapping[str, str] | None = None,
+    handled_children: tuple[str, ...] = (),
     skip_href_without_id: bool = False,
 ) -> UMLHandlerSpec:
     return UMLHandlerSpec(
@@ -588,14 +609,14 @@ def _directed_edge_handler_spec(
     edge_type: str,
     source_attr: str,
     target_attr: str,
-    source_child_tag: Optional[str] = None,
-    target_child_tag: Optional[str] = None,
-    scalar_attrs: Tuple[str, ...] = (),
-    list_attrs: Tuple[str, ...] = (),
-    rename_map: Optional[Mapping[str, str]] = None,
-    child_ref_tags: Tuple[str, ...] = (),
-    child_ref_rename_map: Optional[Mapping[str, str]] = None,
-    handled_children: Tuple[str, ...] = (),
+    source_child_tag: str | None = None,
+    target_child_tag: str | None = None,
+    scalar_attrs: tuple[str, ...] = (),
+    list_attrs: tuple[str, ...] = (),
+    rename_map: Mapping[str, str] | None = None,
+    child_ref_tags: tuple[str, ...] = (),
+    child_ref_rename_map: Mapping[str, str] | None = None,
+    handled_children: tuple[str, ...] = (),
     include_name: bool = True,
 ) -> UMLHandlerSpec:
     return UMLHandlerSpec(
@@ -618,13 +639,13 @@ def _directed_edge_handler_spec(
 def _node_parse_contract(
     *,
     node_type: str,
-    scalar_attrs: Tuple[str, ...] = (),
-    boolean_attrs: Tuple[str, ...] = (),
-    list_attrs: Tuple[str, ...] = (),
-    rename_map: Optional[Mapping[str, str]] = None,
-    child_ref_tags: Tuple[str, ...] = (),
-    child_ref_rename_map: Optional[Mapping[str, str]] = None,
-    handled_children: Tuple[str, ...] = (),
+    scalar_attrs: tuple[str, ...] = (),
+    boolean_attrs: tuple[str, ...] = (),
+    list_attrs: tuple[str, ...] = (),
+    rename_map: Mapping[str, str] | None = None,
+    child_ref_tags: tuple[str, ...] = (),
+    child_ref_rename_map: Mapping[str, str] | None = None,
+    handled_children: tuple[str, ...] = (),
     include_documentation: bool = True,
 ) -> UMLParseContract:
     return UMLParseContract(
@@ -644,16 +665,16 @@ def _node_parse_contract(
 def _edge_parse_contract(
     *,
     edge_type: str,
-    source_attr: Optional[str] = None,
-    target_attr: Optional[str] = None,
-    source_child_tag: Optional[str] = None,
-    target_child_tag: Optional[str] = None,
-    scalar_attrs: Tuple[str, ...] = (),
-    list_attrs: Tuple[str, ...] = (),
-    rename_map: Optional[Mapping[str, str]] = None,
-    child_ref_tags: Tuple[str, ...] = (),
-    child_ref_rename_map: Optional[Mapping[str, str]] = None,
-    handled_children: Tuple[str, ...] = (),
+    source_attr: str | None = None,
+    target_attr: str | None = None,
+    source_child_tag: str | None = None,
+    target_child_tag: str | None = None,
+    scalar_attrs: tuple[str, ...] = (),
+    list_attrs: tuple[str, ...] = (),
+    rename_map: Mapping[str, str] | None = None,
+    child_ref_tags: tuple[str, ...] = (),
+    child_ref_rename_map: Mapping[str, str] | None = None,
+    handled_children: tuple[str, ...] = (),
     include_name: bool = True,
 ) -> UMLParseContract:
     return UMLParseContract(
@@ -673,7 +694,7 @@ def _edge_parse_contract(
     )
 
 
-def _parse_contract_from_handler_spec(handler_spec: UMLHandlerSpec) -> Optional[UMLParseContract]:
+def _parse_contract_from_handler_spec(handler_spec: UMLHandlerSpec) -> UMLParseContract | None:
     if handler_spec.kind == "simple_node":
         if not handler_spec.node_type:
             return None
@@ -1145,11 +1166,9 @@ CUSTOM_CONCEPT_PARSE_CONTRACTS: Mapping[str, UMLParseContract] = {
 _missing_handler_specs = sorted(set(SUPPORTED_UML_CONCEPTS) - set(CONCEPT_HANDLER_SPECS))
 _extra_handler_specs = sorted(set(CONCEPT_HANDLER_SPECS) - set(SUPPORTED_UML_CONCEPTS))
 if _missing_handler_specs or _extra_handler_specs:
-    raise ValueError(
-        f"UML handler spec mismatch (missing={_missing_handler_specs}, extra={_extra_handler_specs})"
-    )
+    raise ValueError(f"UML handler spec mismatch (missing={_missing_handler_specs}, extra={_extra_handler_specs})")
 
-CONCEPT_PARSE_CONTRACTS: Mapping[str, Optional[UMLParseContract]] = {
+CONCEPT_PARSE_CONTRACTS: Mapping[str, UMLParseContract | None] = {
     concept_id: CUSTOM_CONCEPT_PARSE_CONTRACTS.get(
         concept_id, _parse_contract_from_handler_spec(CONCEPT_HANDLER_SPECS[concept_id])
     )
@@ -1174,7 +1193,7 @@ SUPPORTED_UML_CONCEPTS = {
 }
 
 
-TAG_TO_CONCEPT: Dict[str, str] = {
+TAG_TO_CONCEPT: dict[str, str] = {
     "Model": "uml:Model",
     "generalization": "uml:Generalization",
     "interfaceRealization": "uml:InterfaceRealization",
@@ -1192,7 +1211,7 @@ TAG_TO_CONCEPT: Dict[str, str] = {
 }
 
 
-CONTAINMENT_CHILD_TAGS: FrozenSet[str] = frozenset(
+CONTAINMENT_CHILD_TAGS: frozenset[str] = frozenset(
     {
         "packagedElement",
         "ownedUseCase",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
-import re
 from typing import Literal
 
 from mcp4cm.core import ModelRecord
@@ -105,7 +105,9 @@ class ExtractedLabel:
     classification: NameClassification
 
 
-def extract_node_labels(record: ModelRecord, config: LabelPipelineConfig = DEFAULT_LABEL_CONFIG) -> list[ExtractedLabel]:
+def extract_node_labels(
+    record: ModelRecord, config: LabelPipelineConfig = DEFAULT_LABEL_CONFIG
+) -> list[ExtractedLabel]:
     return [
         extract_node_label(
             model_id=str(record.model_id),
@@ -117,7 +119,9 @@ def extract_node_labels(record: ModelRecord, config: LabelPipelineConfig = DEFAU
     ]
 
 
-def iter_name_slots(record: ModelRecord, config: LabelPipelineConfig = DEFAULT_LABEL_CONFIG) -> Iterator[tuple[str, ExtractedLabel]]:
+def iter_name_slots(
+    record: ModelRecord, config: LabelPipelineConfig = DEFAULT_LABEL_CONFIG
+) -> Iterator[tuple[str, ExtractedLabel]]:
     for label in extract_node_labels(record, config=config):
         yield label.element_id, label
 
@@ -154,8 +158,12 @@ def classify_name_slot(
 ) -> ExtractedLabel:
     raw_name_text = str(raw_name or "")
     raw_type_text = str(raw_type or "")
-    normalized_name_text = normalize_name(raw_name_text, config.normalizer) if normalized_name is None else normalized_name
-    normalized_type_text = normalize_type(raw_type_text, config.normalizer) if normalized_type is None else normalized_type
+    normalized_name_text = (
+        normalize_name(raw_name_text, config.normalizer) if normalized_name is None else normalized_name
+    )
+    normalized_type_text = (
+        normalize_type(raw_type_text, config.normalizer) if normalized_type is None else normalized_type
+    )
     name_token_tuple = tokenize_label(normalized_name_text, config.tokenizer) if name_tokens is None else name_tokens
     type_token_tuple = tokenize_label(normalized_type_text, config.tokenizer) if type_tokens is None else type_tokens
     classification = classify_normalized_name(
