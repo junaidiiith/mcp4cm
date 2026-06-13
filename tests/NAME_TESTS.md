@@ -1,9 +1,9 @@
-# Golden Tests for Extracted Labels
+# Name Classification Test Contract
 
-This document specifies the golden tests for the shared label pipeline described
-in `docs/PIPELINE.md`. The tests should be implemented before migrating
-statistics, dummy cleansing, and duplicate detection to the shared
-implementation.
+This document records the test contract for the shared name-classification
+pipeline described in `docs/PIPELINE.md`. The implementation is shared by
+statistics, dummy cleansing, and duplicate detection, so these fixtures guard
+the behavior that downstream stages rely on.
 
 The target behavior is intentionally small and stable:
 
@@ -24,7 +24,7 @@ multi-word semantic labels; one such case is enough.
 
 ## Test Subject
 
-The main golden assertion should compare the full `ExtractedLabel` output:
+Golden assertions compare the full `ExtractedLabel` output:
 
 ```text
 ExtractedLabel
@@ -40,13 +40,13 @@ ExtractedLabel
   classification
 ```
 
-Tests may call lower-level normalizer, tokenizer, and classifier functions, but
-the primary fixture should prove that the composed extraction path returns the
-same result.
+Tests also call lower-level normalizer, tokenizer, and classifier functions
+where that makes failures easier to diagnose. The composed extraction path must
+stay aligned with those lower-level contracts.
 
 ## Default Configuration
 
-Unless a test explicitly overrides configuration, use the pipeline default:
+Unless a test explicitly overrides configuration, the pipeline default is:
 
 ```yaml
 normalizer:
@@ -79,7 +79,7 @@ default. Deduplication is an explicit tokenizer option, not default behavior.
 
 ## Normalization Contract
 
-Golden tests should assert these rules directly and through `ExtractedLabel`.
+Tests assert these rules directly and through `ExtractedLabel`.
 
 | Raw Value | Expected Normalized | Purpose |
 |---|---|---|
@@ -133,8 +133,8 @@ Configuration variant tests:
 
 ## Type Normalization Contract
 
-Types are normalized and tokenized for downstream text/vector features, but
-tests should assert them separately so placeholder behavior is easy to diagnose.
+Types are normalized and tokenized for downstream text/vector features. Tests
+assert them separately so placeholder behavior is easy to diagnose.
 Protected metamodel atoms such as Ecore classifier names remain unsplit; this
 avoids noisy tokens such as `e` and prevents false overlap between Ecore
 `EClass` and UML `Class`.
@@ -150,10 +150,9 @@ avoids noisy tokens such as `e` and prevents false overlap between Ecore
 | `EAttribute` | `eattribute` | `("eattribute",)` | protected Ecore structural feature atom |
 | `EReference` | `ereference` | `("ereference",)` | protected Ecore reference atom |
 
-The protected metamodel atom set should be explicit configuration, not a broad
-change to camel/Pascal splitting. It should include at least common Ecore atoms
-such as `EClass`, `EAttribute`, `EReference`, `EPackage`, `EDataType`, and
-`EEnum`.
+The protected metamodel atom set is explicit configuration, not a broad change
+to camel/Pascal splitting. It includes common Ecore atoms such as `EClass`,
+`EAttribute`, `EReference`, `EPackage`, `EDataType`, and `EEnum`.
 
 ## Classification Contract
 
@@ -173,7 +172,7 @@ copied type labels such as `Junction (copy)`.
 
 ## ExtractedLabel Golden Cases
 
-Each row should be implemented as one node fixture and asserted as a full
+Each row is implemented as one node fixture and asserted as a full
 `ExtractedLabel`.
 
 | Case ID | Source Inspiration | Raw Name | Raw Type | Expected Normalized Name | Expected Normalized Type | Expected Name Tokens | Expected Type Tokens | Expected Classification | Behavior Covered |
@@ -204,7 +203,7 @@ Each row should be implemented as one node fixture and asserted as a full
 
 ## Classifier Unit Tests
 
-Classifier tests should isolate classification from extraction by passing
+Classifier tests isolate classification from extraction by passing
 already-normalized names/types and token tuples.
 
 Required edge cases:
@@ -227,7 +226,7 @@ Required edge cases:
 ## Record-Level Golden Fixtures
 
 These fixtures test aggregation behavior without requiring large real models.
-They should be built as small in-memory IR graphs or `ModelRecord` fixtures.
+They are built as small in-memory IR graphs or `ModelRecord` fixtures.
 
 ### Domain UML Fixture
 
@@ -246,8 +245,8 @@ Expected aggregate behavior:
 - missing and placeholder counts are `0`;
 - vocabulary includes `shopping`, `cart`, `line`, `item`, `creation`, `date`,
   `order`, and `status`;
-- this fixture should not trigger dummy filters based on placeholder ratio or
-  low vocabulary.
+- this fixture does not trigger dummy filters based on placeholder ratio or low
+  vocabulary.
 
 ### UML Control-Node Fixture
 
@@ -304,8 +303,7 @@ Expected aggregate behavior:
 
 ## Cross-Stage Consistency Tests
 
-After the shared label module exists, add tests proving that downstream stages
-consume the same labels:
+The suite includes tests proving that downstream stages consume the same labels:
 
 - statistics uses `ExtractedLabel.normalized_name`, `name_tokens`, and
   `classification` for node-label summaries;
@@ -341,5 +339,5 @@ Expected consistency:
 - No synonym handling.
 - No parser-specific special cases unless they are explicitly added to the
   shared configuration and covered by golden tests.
-- No edge-label classification in this document. Edge label profiling should
-  have separate tests once `EdgeLabelProfile` is implemented.
+- No edge-label classification in this document. Edge label profiling belongs
+  in a separate test contract once `EdgeLabelProfile` is implemented.
