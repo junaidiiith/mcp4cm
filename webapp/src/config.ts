@@ -15,9 +15,8 @@ export const filterLabels: Record<string, [string, string]> = {
   min_size: ["Minimum size", "Remove models below node/edge thresholds."],
   too_few_named_elements: ["Naming density", "Minimum number of semantic names required."],
   short_median_name_length: ["Short median name", "Median semantic name length must meet the minimum."],
-  placeholder_name_ratio: ["Placeholder ratio", "Placeholder names among named nodes must stay below threshold."],
+  placeholder_name_ratio: ["Placeholder ratio", "Placeholder/non-semantic names among named nodes must stay below threshold."],
   low_vocabulary: ["Low vocabulary", "Minimum unique token count across semantic names."],
-  type_like_name_ratio: ["Type-like ratio", "Type-like names among named nodes must stay below threshold."],
   name_repetition_ratio: ["Name repetition", "Most frequent normalized name ratio among named nodes."],
   regex_rule: ["Regex rule", "Custom regex rule over names/types."],
 };
@@ -27,7 +26,6 @@ export const filterGroups: Record<string, string> = {
   too_few_named_elements: "Naming Density",
   short_median_name_length: "Naming Density",
   placeholder_name_ratio: "Placeholder Detection",
-  type_like_name_ratio: "Placeholder Detection",
   name_repetition_ratio: "Placeholder Detection",
   low_vocabulary: "Vocabulary",
   regex_rule: "Custom",
@@ -39,7 +37,6 @@ export const filterFormulaPreviews: Record<string, string> = {
   short_median_name_length: "median(semanticNameLength) < minMedianLength",
   placeholder_name_ratio: "placeholderCount / namedCount >= threshold",
   low_vocabulary: "uniqueSemanticTokens < minUniqueWords",
-  type_like_name_ratio: "typeLikeCount / namedCount >= threshold",
   name_repetition_ratio: "mostFrequentNameCount / namedCount >= threshold",
   regex_rule: "regexMatchCount(targetField, scope) >= minMatches",
 };
@@ -50,7 +47,6 @@ const canonicalPreset: FilterConfig[] = [
   { id: "short_median_name_length", enabled: true, minMedianLength: 4 },
   { id: "placeholder_name_ratio", enabled: true, threshold: 0.3 },
   { id: "low_vocabulary", enabled: true, minUniqueWords: 3 },
-  { id: "type_like_name_ratio", enabled: true, threshold: 0.7 },
   { id: "name_repetition_ratio", enabled: true, threshold: 0.5 },
   { id: "regex_rule", enabled: false, pattern: "", targetField: "name", scope: "eligible_only", minMatches: 1 },
 ];

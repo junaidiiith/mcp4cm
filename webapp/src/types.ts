@@ -168,13 +168,13 @@ export interface VisualizationPayload {
   modelQualityWatchlists: ModelQualityWatchlists;
   topConcepts: StatisticItem[];
   topConceptDocumentFrequency: StatisticItem[];
-  topConceptsWithoutTypePlaceholders: StatisticItem[];
-  topConceptDocumentFrequencyWithoutTypePlaceholders: StatisticItem[];
+  topConceptsWithoutPlaceholders: StatisticItem[];
+  topConceptDocumentFrequencyWithoutPlaceholders: StatisticItem[];
   vocabularySummary: {
     uniqueNames: number;
     totalOccurrences: number;
     semanticNames: number;
-    placeholderOrTypeLikeNames: number;
+    placeholderNames: number;
     singletonNames: number;
     mostReusedName: string;
     mostReusedDocumentFrequency: number;
@@ -218,8 +218,7 @@ export interface VocabularyRankingRow {
   occurrencesPerUsedModel: number;
   semantic: number;
   placeholder: number;
-  typeLike: number;
-  classification: "semantic" | "placeholder" | "typeLike" | "mixed" | "unknown";
+  classification: "semantic" | "placeholder" | "mixed" | "unknown";
 }
 
 export interface LabelPipelineRow {
@@ -229,7 +228,7 @@ export interface LabelPipelineRow {
   rawType: string;
   normalizedType: string;
   typeTokens: string[];
-  classification: "semantic" | "placeholder" | "type_like" | "missing";
+  classification: "semantic" | "placeholder" | "missing";
   occurrences: number;
   documentFrequency: number;
 }
@@ -249,7 +248,6 @@ export interface TypeQualityRow {
   semantic: number;
   missing: number;
   placeholder: number;
-  typeLike: number;
 }
 
 export interface ModelQualityWatchlists {
@@ -506,11 +504,6 @@ export interface LowVocabularyFilterConfig extends BaseFilterConfig {
   minUniqueWords: number;
 }
 
-export interface TypeLikeNameRatioFilterConfig extends BaseFilterConfig {
-  id: "type_like_name_ratio";
-  threshold: number;
-}
-
 export interface NameRepetitionRatioFilterConfig extends BaseFilterConfig {
   id: "name_repetition_ratio";
   threshold: number;
@@ -530,7 +523,6 @@ export type FilterConfig =
   | ShortMedianNameLengthFilterConfig
   | PlaceholderNameRatioFilterConfig
   | LowVocabularyFilterConfig
-  | TypeLikeNameRatioFilterConfig
   | NameRepetitionRatioFilterConfig
   | RegexRuleFilterConfig;
 

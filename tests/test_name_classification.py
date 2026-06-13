@@ -88,8 +88,8 @@ def test_tokenizer_configuration_variants():
     ("normalized_name", "normalized_type", "name_tokens", "expected"),
     [
         ("", "class", (), "missing"),
-        ("class", "class", ("class",), "type_like"),
-        ("class 2", "class", ("class",), "type_like"),
+        ("class", "class", ("class",), "placeholder"),
+        ("class 2", "class", ("class",), "placeholder"),
         ("entity 1", "business object", ("entity",), "placeholder"),
         ("aggregate 1", "grouping", ("aggregate",), "placeholder"),
         ("class a", "class", ("class", "a"), "placeholder"),
@@ -119,10 +119,10 @@ def test_classifier_contract(normalized_name, normalized_type, name_tokens, expe
         ("missing-empty", "", "Class", "", "class", (), ("class",), "missing"),
         ("missing-whitespace", "   ", "Class", "", "class", (), ("class",), "missing"),
         ("missing-punctuation", "...", "BusinessObject", "", "business object", (), ("business", "object"), "missing"),
-        ("type-exact", "InitialNode", "InitialNode", "initial node", "initial node", ("initial", "node"), ("initial", "node"), "type_like"),
-        ("type-numbered-suffix", "DecisionNode2", "DecisionNode", "decision node2", "decision node", ("decision", "node2"), ("decision", "node"), "type_like"),
-        ("type-spaced-vs-camel", "Business Process", "BusinessProcess", "business process", "business process", ("business", "process"), ("business", "process"), "type_like"),
-        ("type-model-root", "model", "Model", "model", "model", ("model",), ("model",), "type_like"),
+        ("type-exact", "InitialNode", "InitialNode", "initial node", "initial node", ("initial", "node"), ("initial", "node"), "placeholder"),
+        ("type-numbered-suffix", "DecisionNode2", "DecisionNode", "decision node2", "decision node", ("decision", "node2"), ("decision", "node"), "placeholder"),
+        ("type-spaced-vs-camel", "Business Process", "BusinessProcess", "business process", "business process", ("business", "process"), ("business", "process"), "placeholder"),
+        ("type-model-root", "model", "Model", "model", "model", ("model",), ("model",), "placeholder"),
         ("placeholder-numbered-entity", "entity 1", "BusinessObject", "entity 1", "business object", ("entity",), ("business", "object"), "placeholder"),
         ("placeholder-numbered-class", "class 1", "ApplicationComponent", "class 1", "application component", ("class",), ("application", "component"), "placeholder"),
         ("placeholder-operation-template", "privateOperation", "Operation", "private operation", "operation", ("private", "operation"), ("operation",), "placeholder"),
@@ -187,7 +187,7 @@ def test_record_level_domain_fixture_keeps_statistics_dummy_and_duplicates_align
     graph = nx.DiGraph()
     graph.add_node("semantic-class", name="ShoppingCart", type="Class")
     graph.add_node("semantic-property", name="creationDate", type="Property")
-    graph.add_node("type-like", name="DecisionNode2", type="DecisionNode")
+    graph.add_node("type-derived", name="DecisionNode2", type="DecisionNode")
     graph.add_node("placeholder", name="publicAttribute", type="Property")
     graph.add_node("missing", name="...", type="BusinessObject")
     record = ModelRecord(model_id="domain", language="uml", graph=graph)
@@ -205,7 +205,7 @@ def test_record_level_domain_fixture_keeps_statistics_dummy_and_duplicates_align
     assert labels["semantic-class"].classification == "semantic"
     assert labels["semantic-class"].name_tokens == ("shopping", "cart")
     assert labels["semantic-property"].classification == "semantic"
-    assert labels["type-like"].classification == "type_like"
+    assert labels["type-derived"].classification == "placeholder"
     assert labels["placeholder"].classification == "placeholder"
     assert labels["missing"].classification == "missing"
     assert statistics_entries == dummy_nodes
@@ -242,8 +242,8 @@ def test_record_level_placeholder_fixture_drives_dummy_and_duplicate_decisions_f
     dataset = Dataset([first, second], "uml")
 
     labels = {label.element_id: label for label in extract_node_labels(first)}
-    assert {label.classification for label in labels.values()} == {"type_like", "placeholder"}
-    assert labels["class"].classification == "type_like"
+    assert {label.classification for label in labels.values()} == {"placeholder"}
+    assert labels["class"].classification == "placeholder"
     assert labels["entity"].name_tokens == ("entity",)
     assert labels["attribute"].name_tokens == ("att", "b")
     assert labels["copy"].normalized_name == "junction copy"
@@ -256,7 +256,6 @@ def test_record_level_placeholder_fixture_drives_dummy_and_duplicate_decisions_f
             {"id": "too_few_named_elements", "enabled": False},
             {"id": "short_median_name_length", "enabled": False},
             {"id": "low_vocabulary", "enabled": False},
-            {"id": "type_like_name_ratio", "enabled": False},
             {"id": "name_repetition_ratio", "enabled": False},
             {"id": "regex_rule", "enabled": False},
         ],

@@ -202,7 +202,7 @@ function visualizationCategories(
         {
           id: "name-classification-by-type",
           title: "Name Classification by Normalized Type",
-          description: "Semantic, missing, placeholder, and type-like names grouped by normalized node type.",
+          description: "Semantic, missing, and placeholder names grouped by normalized node type.",
           render: () => <TypeQualityTable rows={data.elementTypeQualityMatrix || []} />,
         },
         {
@@ -392,7 +392,7 @@ function VocabularySummary({ summary }: { summary?: VisualizationPayload["vocabu
       <SummaryStat label="Unique Names" value={summary.uniqueNames} />
       <SummaryStat label="Occurrences" value={summary.totalOccurrences} />
       <SummaryStat label="Semantic Names" value={summary.semanticNames} />
-      <SummaryStat label="Placeholder / Type-like" value={summary.placeholderOrTypeLikeNames} />
+      <SummaryStat label="Placeholder Names" value={summary.placeholderNames} />
       <SummaryStat label="Singleton Names" value={summary.singletonNames} />
       <SummaryStat
         label="Most Reused"
@@ -493,7 +493,7 @@ function LabelPipelineTable({ rows }: { rows: VisualizationPayload["labelPipelin
                 <td><TokenList tokens={row.nameTokens} /></td>
                 <td><TokenList tokens={row.typeTokens} /></td>
                 <td>
-                  <span className={`vocabularyBadge ${classificationClassName(row.classification)}`}>
+                  <span className={`vocabularyBadge ${row.classification}`}>
                     {classificationDisplayLabel(row.classification)}
                   </span>
                 </td>
@@ -511,16 +511,11 @@ function TokenList({ tokens }: { tokens: string[] }) {
   return <span className="tokenList">{tokens.map((token, index) => <b key={`${token}:${index}`}>{token}</b>)}</span>;
 }
 
-function classificationClassName(classification: VisualizationPayload["labelPipelineRows"][number]["classification"]) {
-  return classification === "type_like" ? "typeLike" : classification;
-}
-
 function classificationDisplayLabel(classification: VisualizationPayload["labelPipelineRows"][number]["classification"]) {
-  if (classification === "type_like") return "Type-like";
   return classification.charAt(0).toUpperCase() + classification.slice(1);
 }
 
-type VocabularyFilter = "all" | "semantic" | "placeholder" | "typeLike" | "nonSemantic" | "excludeNonSemantic";
+type VocabularyFilter = "all" | "semantic" | "placeholder" | "excludePlaceholder";
 type VocabularySortKey =
   | "name"
   | "occurrences"
@@ -533,9 +528,7 @@ const vocabularyFilters: Array<{ key: VocabularyFilter; label: string }> = [
   { key: "all", label: "All" },
   { key: "semantic", label: "Semantic" },
   { key: "placeholder", label: "Placeholder" },
-  { key: "typeLike", label: "Type-like" },
-  { key: "nonSemantic", label: "Placeholder + Type-like" },
-  { key: "excludeNonSemantic", label: "Exclude Placeholder / Type-like" },
+  { key: "excludePlaceholder", label: "Exclude Placeholder" },
 ];
 
 const vocabularyColumns: Array<{ key: VocabularySortKey; label: string }> = [
@@ -648,9 +641,7 @@ function VocabularyRanking({ rows }: { rows: VisualizationPayload["vocabularyRan
 function vocabularyFilterMatches(row: VisualizationPayload["vocabularyRanking"][number], filter: VocabularyFilter) {
   if (filter === "semantic") return row.classification === "semantic";
   if (filter === "placeholder") return row.placeholder > 0;
-  if (filter === "typeLike") return row.typeLike > 0;
-  if (filter === "nonSemantic") return row.placeholder > 0 || row.typeLike > 0;
-  if (filter === "excludeNonSemantic") return row.placeholder === 0 && row.typeLike === 0;
+  if (filter === "excludePlaceholder") return row.placeholder === 0;
   return true;
 }
 
@@ -668,7 +659,7 @@ function VocabularyClassification({ row }: { row: VisualizationPayload["vocabula
   return (
     <span
       className={`vocabularyBadge ${row.classification}`}
-      title={`Semantic ${row.semantic.toLocaleString()}, placeholder ${row.placeholder.toLocaleString()}, type-like ${row.typeLike.toLocaleString()}`}
+      title={`Semantic ${row.semantic.toLocaleString()}, placeholder ${row.placeholder.toLocaleString()}`}
     >
       {label}
     </span>
@@ -676,7 +667,6 @@ function VocabularyClassification({ row }: { row: VisualizationPayload["vocabula
 }
 
 function vocabularyClassificationLabel(classification: VisualizationPayload["vocabularyRanking"][number]["classification"]) {
-  if (classification === "typeLike") return "Type-like";
   if (classification === "semantic") return "Semantic";
   if (classification === "placeholder") return "Placeholder";
   if (classification === "mixed") return "Mixed";
@@ -687,7 +677,6 @@ const qualitySegments = [
   { key: "semantic", label: "Semantic", className: "semantic" },
   { key: "missing", label: "Missing", className: "missing" },
   { key: "placeholder", label: "Placeholder", className: "placeholder" },
-  { key: "typeLike", label: "Type-like", className: "typeLike" },
 ] as const;
 
 function NameClassificationOverview({ items }: { items: Array<StatisticItem & { key?: string }> }) {
@@ -719,7 +708,7 @@ function NameClassificationOverview({ items }: { items: Array<StatisticItem & { 
   );
 }
 
-type TypeQualityCountKey = "semantic" | "missing" | "placeholder" | "typeLike";
+type TypeQualityCountKey = "semantic" | "missing" | "placeholder";
 type TypeQualitySortKey =
   | "type"
   | "total"
@@ -736,8 +725,6 @@ const typeQualityColumns: Array<{ key: TypeQualitySortKey; label: string }> = [
   { key: "missingRate", label: "Missing %" },
   { key: "placeholder", label: "Placeholder Count" },
   { key: "placeholderRate", label: "Placeholder %" },
-  { key: "typeLike", label: "Type-like Count" },
-  { key: "typeLikeRate", label: "Type-like %" },
 ];
 
 function TypeQualityTable({ rows }: { rows: VisualizationPayload["elementTypeQualityMatrix"] }) {
@@ -793,8 +780,6 @@ function TypeQualityTable({ rows }: { rows: VisualizationPayload["elementTypeQua
               <QualityRateCell value={row.missing} total={row.total} kind="missing" />
               <td>{row.placeholder.toLocaleString()}</td>
               <QualityRateCell value={row.placeholder} total={row.total} kind="placeholder" />
-              <td>{row.typeLike.toLocaleString()}</td>
-              <QualityRateCell value={row.typeLike} total={row.total} kind="typeLike" />
             </tr>
           ))}
         </tbody>
@@ -809,7 +794,6 @@ function typeQualitySortValue(row: VisualizationPayload["elementTypeQualityMatri
   if (key === "semanticRate") return row.semantic / Math.max(row.total, 1);
   if (key === "missingRate") return row.missing / Math.max(row.total, 1);
   if (key === "placeholderRate") return row.placeholder / Math.max(row.total, 1);
-  if (key === "typeLikeRate") return row.typeLike / Math.max(row.total, 1);
   return row[key];
 }
 
@@ -820,7 +804,7 @@ function QualityRateCell({
 }: {
   value: number;
   total: number;
-  kind: "semantic" | "missing" | "placeholder" | "typeLike";
+  kind: "semantic" | "missing" | "placeholder";
 }) {
   const rate = value / Math.max(total, 1);
   return (

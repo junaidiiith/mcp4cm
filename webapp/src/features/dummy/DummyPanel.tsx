@@ -192,15 +192,11 @@ function DummyCleansingInfoModal({ onClose }: { onClose: () => void }) {
               <strong>`missing`</strong>: raw node name is empty or whitespace after trimming.
             </li>
             <li>
-              <strong>`type_like`</strong>: normalized name matches normalized node type (for example `Class`,
-              `Class1`, `Business Object`).
+              <strong>`placeholder`</strong>: normalized name matches placeholder patterns, keywords, or the normalized
+              node type (for example `Class`, `Class1`, `Business Object`, `dummy`, `my class`, `att1`).
             </li>
             <li>
-              <strong>`placeholder`</strong>: normalized name matches placeholder patterns or keywords (for example
-              `dummy`, `my class`, `att1`).
-            </li>
-            <li>
-              <strong>`semantic`</strong>: name is present and is neither `type_like` nor `placeholder`.
+              <strong>`semantic`</strong>: name is present and is not recognized as a placeholder.
             </li>
           </ul>
           <h4>Important Terms</h4>

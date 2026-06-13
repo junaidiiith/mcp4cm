@@ -8,7 +8,7 @@ from typing import Literal
 from mcp4cm.core import ModelRecord
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL
 
-NameClassification = Literal["missing", "type_like", "placeholder", "semantic"]
+NameClassification = Literal["missing", "placeholder", "semantic"]
 ElementKind = Literal["node"]
 
 PROTECTED_TYPE_ATOMS = frozenset(
@@ -260,8 +260,6 @@ def classify_normalized_name(
 ) -> NameClassification:
     if is_missing_name(raw_name, normalized_name):
         return "missing"
-    if is_type_like_name(normalized_name, normalized_type):
-        return "type_like"
     if is_placeholder_name(normalized_name, normalized_type=normalized_type, name_tokens=name_tokens):
         return "placeholder"
     return "semantic"
@@ -273,25 +271,22 @@ def is_missing_name(raw_name: str, normalized_name: str) -> bool:
     return not normalized_name or normalized_name == EMPTY_NAME_SENTINEL
 
 
-def is_type_like_name(normalized_name: str, normalized_type: str) -> bool:
-    compact_name = compact_identifier(normalized_name)
-    compact_type = compact_identifier(normalized_type)
-    if not compact_name or not compact_type:
-        return False
-    if compact_name == compact_type:
-        return True
-    if compact_name.startswith(compact_type):
-        suffix = compact_name[len(compact_type) :]
-        return bool(suffix) and suffix.isdigit()
-    return False
-
-
 def is_placeholder_name(
     normalized_name: str,
     *,
     normalized_type: str = "",
     name_tokens: tuple[str, ...] = (),
 ) -> bool:
+    if normalized_type:
+        compact_name = compact_identifier(normalized_name)
+        compact_type = compact_identifier(normalized_type)
+        if compact_name and compact_type:
+            if compact_name == compact_type:
+                return True
+            if compact_name.startswith(compact_type):
+                suffix = compact_name[len(compact_type) :]
+                if bool(suffix) and suffix.isdigit():
+                    return True
     if normalized_name in PLACEHOLDER_KEYWORDS:
         return True
     if any(pattern.match(normalized_name) for pattern in PLACEHOLDER_PATTERNS):

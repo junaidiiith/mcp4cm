@@ -183,7 +183,7 @@ For each node, the pipeline creates an `ExtractedLabel` with:
 - raw name and raw type;
 - normalized name and normalized type;
 - ordered name tokens and type tokens;
-- classification: `missing`, `type_like`, `placeholder`, or `semantic`.
+- classification: `missing`, `placeholder`, or `semantic`.
 
 Name extraction reads `name`. Type extraction reads `type`, with `eClass` used
 only as a fallback when `type` is empty.
@@ -239,32 +239,28 @@ Examples:
 Name classification is evaluated in this order:
 
 1. `missing`
-2. `type_like`
-3. `placeholder`
-4. `semantic`
+2. `placeholder`
+3. `semantic`
 
-The order matters. For example, a node named `Class` with type `Class` is
-`type_like`, not merely a generic placeholder.
+Type-derived names are part of placeholder detection. For example, a node named
+`Class` or `Class1` with type `Class` is a placeholder.
 
 ```mermaid
 flowchart TD
   A[Node name] --> B{Empty or punctuation only?}
   B -- yes --> M[missing]
-  B -- no --> C{Name equivalent to type?}
-  C -- yes --> T[type_like]
-  C -- no --> D{Generic/template name?}
-  D -- yes --> P[placeholder]
-  D -- no --> S[semantic]
+  B -- no --> C{Name equivalent to type, generic, or template-like?}
+  C -- yes --> P[placeholder]
+  C -- no --> S[semantic]
 ```
 
 The classes mean:
 
 - `missing`: no meaningful node name, such as empty text, whitespace, or
   punctuation-only labels.
-- `type_like`: name repeats the node type, including simple numeric variants
-  such as `Class1` for type `Class`.
 - `placeholder`: low-information names such as `todo`, `dummy`, `my class`,
-  `entity 1`, `attB`, `publicAttribute`, or `Junction (copy)`.
+  `entity 1`, `attB`, `publicAttribute`, `Junction (copy)`, or type-derived
+  names such as `Class1` for type `Class`.
 - `semantic`: names that appear to carry domain meaning, such as
   `ShoppingCart`, `creationDate`, or `Approve invoice`.
 
@@ -333,9 +329,8 @@ Filters run in a fixed order:
 3. `short_median_name_length`
 4. `placeholder_name_ratio`
 5. `low_vocabulary`
-6. `type_like_name_ratio`
-7. `name_repetition_ratio`
-8. `regex_rule`
+6. `name_repetition_ratio`
+7. `regex_rule`
 
 The frontend waterfall view is cumulative: once a model is removed by an
 earlier filter, it is no longer counted as remaining for later filter summaries.
@@ -349,9 +344,8 @@ For each model, `primaryRemovalReason` is the first triggered filter, while
 | Minimum size | Node and edge counts are at least the configured minimums. |
 | Naming density | There are enough semantic names. |
 | Short median name | Median length of semantic names is not too short. |
-| Placeholder ratio | Placeholder names are not too common among named nodes. |
+| Placeholder ratio | Placeholder/non-semantic names are not too common among named nodes. |
 | Low vocabulary | Semantic-name tokens contain enough unique words. |
-| Type-like ratio | Type-like names are not too common among named nodes. |
 | Name repetition | One normalized name does not dominate the model. |
 | Regex rule | Optional custom regex over names, types, or name+type. |
 

@@ -14,7 +14,6 @@ DEFAULT_MIN_NAMES = 5
 DEFAULT_MIN_MEDIAN_LENGTH = 4
 DEFAULT_PLACEHOLDER_THRESHOLD = 0.30
 DEFAULT_MIN_UNIQUE_WORDS = 3
-DEFAULT_TYPE_LIKE_THRESHOLD = 0.70
 DEFAULT_NAME_REPETITION_THRESHOLD = 0.50
 DEFAULT_REGEX_MIN_MATCHES = 1
 
@@ -24,7 +23,6 @@ FILTER_ORDER: tuple[str, ...] = (
     "short_median_name_length",
     "placeholder_name_ratio",
     "low_vocabulary",
-    "type_like_name_ratio",
     "name_repetition_ratio",
     "regex_rule",
 )
@@ -100,7 +98,6 @@ def default_filter_configs() -> list[dict[str, Any]]:
             "threshold": DEFAULT_PLACEHOLDER_THRESHOLD,
         },
         {"id": "low_vocabulary", "enabled": True, "minUniqueWords": DEFAULT_MIN_UNIQUE_WORDS},
-        {"id": "type_like_name_ratio", "enabled": True, "threshold": DEFAULT_TYPE_LIKE_THRESHOLD},
         {
             "id": "name_repetition_ratio",
             "enabled": True,
@@ -277,8 +274,6 @@ def evaluate_filter(record: ModelRecord, derived_nodes: list[DerivedNode], confi
         return _eval_placeholder_name_ratio(record, derived_nodes, filter_id, config)
     if filter_id == "low_vocabulary":
         return _eval_low_vocabulary(record, derived_nodes, filter_id, config)
-    if filter_id == "type_like_name_ratio":
-        return _eval_type_like_ratio(record, derived_nodes, filter_id, config)
     if filter_id == "name_repetition_ratio":
         return _eval_name_repetition(record, derived_nodes, filter_id, config)
     if filter_id == "regex_rule":
@@ -444,37 +439,6 @@ def _eval_low_vocabulary(
         score=float(token_count),
         threshold=float(min_unique_words),
         metrics={"uniqueTokenCount": token_count, "minUniqueWords": min_unique_words},
-    )
-
-
-def _eval_type_like_ratio(
-    record: ModelRecord,
-    derived_nodes: list[DerivedNode],
-    filter_id: str,
-    config: dict[str, Any],
-) -> DummyFinding:
-    threshold = float(config.get("threshold", DEFAULT_TYPE_LIKE_THRESHOLD))
-    named = named_nodes(derived_nodes)
-    hits = [node for node in named if node.classification == "type_like"]
-    ratio = len(hits) / len(named) if named else 0.0
-    if named and ratio >= threshold:
-        return _removed_finding(
-            record.model_id,
-            filter_id,
-            "type_like_ratio_above_threshold",
-            score=ratio,
-            threshold=threshold,
-            evidence=tuple(node.normalized_name for node in hits[:10]),
-            evidence_nodes=tuple(node.node_id for node in hits[:10]),
-            metrics={"typeLikeCount": len(hits), "namedNodes": len(named), "ratio": ratio},
-        )
-    return _kept_finding(
-        record.model_id,
-        filter_id,
-        "type_like_ratio_ok",
-        score=ratio,
-        threshold=threshold,
-        metrics={"typeLikeCount": len(hits), "namedNodes": len(named), "ratio": ratio},
     )
 
 

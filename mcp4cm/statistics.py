@@ -177,7 +177,7 @@ def percentile(values: list[float | int], fraction: float, *, round_digits: int 
 
 
 def classification_items(counter: Counter[str]) -> list[dict[str, Any]]:
-    labels = (("semantic", "Semantic"), ("missing", "Missing"), ("placeholder", "Placeholder"), ("type_like", "Type-like"))
+    labels = (("semantic", "Semantic"), ("missing", "Missing"), ("placeholder", "Placeholder"))
     return [{"label": label, "key": key, "count": int(counter.get(key, 0))} for key, label in labels]
 
 
@@ -195,7 +195,6 @@ def vocabulary_ranking_items(
         counts = classification_counters.get(name, Counter())
         semantic = int(counts.get("semantic", 0))
         placeholder = int(counts.get("placeholder", 0))
-        type_like = int(counts.get("type_like", 0))
         rows.append(
             {
                 "name": name,
@@ -206,15 +205,14 @@ def vocabulary_ranking_items(
                 "occurrencesPerUsedModel": round(occurrences / doc_frequency, 6) if doc_frequency else 0,
                 "semantic": semantic,
                 "placeholder": placeholder,
-                "typeLike": type_like,
-                "classification": vocabulary_classification_label(semantic, placeholder, type_like),
+                "classification": vocabulary_classification_label(semantic, placeholder),
             }
         )
     return rows
 
 
-def vocabulary_classification_label(semantic: int, placeholder: int, type_like: int) -> str:
-    counts = {"semantic": semantic, "placeholder": placeholder, "typeLike": type_like}
+def vocabulary_classification_label(semantic: int, placeholder: int) -> str:
+    counts = {"semantic": semantic, "placeholder": placeholder}
     non_zero = [key for key, value in counts.items() if value > 0]
     if not non_zero:
         return "unknown"
@@ -229,17 +227,13 @@ def vocabulary_summary(
     classification_counters: dict[str, Counter[str]],
 ) -> dict[str, Any]:
     semantic_names = sum(1 for counts in classification_counters.values() if counts.get("semantic", 0) > 0)
-    placeholder_or_type_like_names = sum(
-        1
-        for counts in classification_counters.values()
-        if counts.get("placeholder", 0) > 0 or counts.get("type_like", 0) > 0
-    )
+    placeholder_names = sum(1 for counts in classification_counters.values() if counts.get("placeholder", 0) > 0)
     most_reused_name, most_reused_count = document_frequency_counter.most_common(1)[0] if document_frequency_counter else ("", 0)
     return {
         "uniqueNames": len(occurrence_counter),
         "totalOccurrences": int(sum(occurrence_counter.values())),
         "semanticNames": semantic_names,
-        "placeholderOrTypeLikeNames": placeholder_or_type_like_names,
+        "placeholderNames": placeholder_names,
         "singletonNames": sum(1 for count in document_frequency_counter.values() if count == 1),
         "mostReusedName": most_reused_name,
         "mostReusedDocumentFrequency": int(most_reused_count),
@@ -322,7 +316,6 @@ def type_quality_items(
                 "semantic": int(counts.get("semantic", 0)),
                 "missing": int(counts.get("missing", 0)),
                 "placeholder": int(counts.get("placeholder", 0)),
-                "typeLike": int(counts.get("type_like", 0)),
             }
         )
     return rows
@@ -576,7 +569,7 @@ class CorpusStatisticsAccumulator:
             for token in entry.get("nameTokens", tuple(str(concept).split())):
                 token_counter[token] += 1
             model_concepts.add(concept)
-            if classification != "type_like":
+            if classification != "placeholder":
                 self.filtered_concept_counter[concept] += 1
                 filtered_concepts.add(concept)
         for concept in model_concepts:
@@ -674,8 +667,8 @@ class CorpusStatisticsAccumulator:
             "modelQualityWatchlists": model_quality_watchlists(self.model_quality_rows),
             "topConcepts": counter_items(self.concept_counter),
             "topConceptDocumentFrequency": counter_items(self.concept_doc_freq),
-            "topConceptsWithoutTypePlaceholders": counter_items(self.filtered_concept_counter),
-            "topConceptDocumentFrequencyWithoutTypePlaceholders": counter_items(self.filtered_concept_doc_freq),
+            "topConceptsWithoutPlaceholders": counter_items(self.filtered_concept_counter),
+            "topConceptDocumentFrequencyWithoutPlaceholders": counter_items(self.filtered_concept_doc_freq),
             "vocabularySummary": vocabulary_summary(
                 self.concept_counter,
                 self.concept_doc_freq,

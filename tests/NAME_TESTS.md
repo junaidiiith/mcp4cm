@@ -10,7 +10,7 @@ The target behavior is intentionally small and stable:
 - extract raw node names and types into `ExtractedLabel`;
 - normalize names and types deterministically;
 - tokenize normalized labels with a shared default tokenizer;
-- classify node names as `missing`, `type_like`, `placeholder`, or `semantic`.
+- classify node names as `missing`, `placeholder`, or `semantic`.
 
 Examples are based on observed labels from:
 
@@ -63,7 +63,6 @@ tokenizer:
 classifier:
   classification_order:
     - missing
-    - type_like
     - placeholder
     - semantic
 ```
@@ -135,7 +134,7 @@ Configuration variant tests:
 ## Type Normalization Contract
 
 Types are normalized and tokenized for downstream text/vector features, but
-tests should assert them separately so type-like behavior is easy to diagnose.
+tests should assert them separately so placeholder behavior is easy to diagnose.
 Protected metamodel atoms such as Ecore classifier names remain unsplit; this
 avoids noisy tokens such as `e` and prevents false overlap between Ecore
 `EClass` and UML `Class`.
@@ -161,18 +160,16 @@ such as `EClass`, `EAttribute`, `EReference`, `EPackage`, `EDataType`, and
 Classification order is fixed:
 
 1. `missing`
-2. `type_like`
-3. `placeholder`
-4. `semantic`
+2. `placeholder`
+3. `semantic`
 
-This order matters. For example, `Class` with type `Class` is `type_like`, not
-`placeholder`. The categories intentionally stay separate:
+Type-derived names are included in placeholder classification. For example,
+`Class` with type `Class`, `Class1` with type `Class`, and `ClassA` with type
+`Class` are placeholders.
 
-- `type_like` is for exact normalized type equivalence and numeric index
-  variants such as `Class1` or `DecisionNode2`;
-- `placeholder` is for generic/generated low-information names, including
-  type-derived non-index variants such as `ClassA` and copied type labels such
-  as `Junction (copy)`.
+`placeholder` covers exact normalized type equivalence, numeric type indexes,
+generic/generated low-information names, type-derived non-index variants, and
+copied type labels such as `Junction (copy)`.
 
 ## ExtractedLabel Golden Cases
 
@@ -184,10 +181,10 @@ Each row should be implemented as one node fixture and asserted as a full
 | `missing-empty` | synthetic | `` | `Class` | `` | `class` | `()` | `("class",)` | `missing` | empty name |
 | `missing-whitespace` | synthetic | `   ` | `Class` | `` | `class` | `()` | `("class",)` | `missing` | whitespace-only name |
 | `missing-punctuation` | EA labels | `...` | `BusinessObject` | `` | `business object` | `()` | `("business", "object")` | `missing` | punctuation-only observed label |
-| `type-exact` | UML labels | `InitialNode` | `InitialNode` | `initial node` | `initial node` | `("initial", "node")` | `("initial", "node")` | `type_like` | exact type-like name |
-| `type-numbered-suffix` | UML labels | `DecisionNode2` | `DecisionNode` | `decision node2` | `decision node` | `("decision", "node2")` | `("decision", "node")` | `type_like` | type plus index |
-| `type-spaced-vs-camel` | EA labels | `Business Process` | `BusinessProcess` | `business process` | `business process` | `("business", "process")` | `("business", "process")` | `type_like` | spacing/camel equivalence |
-| `type-model-root` | UML labels | `model` | `Model` | `model` | `model` | `("model",)` | `("model",)` | `type_like` | root/default model name |
+| `type-exact` | UML labels | `InitialNode` | `InitialNode` | `initial node` | `initial node` | `("initial", "node")` | `("initial", "node")` | `placeholder` | exact placeholder name |
+| `type-numbered-suffix` | UML labels | `DecisionNode2` | `DecisionNode` | `decision node2` | `decision node` | `("decision", "node2")` | `("decision", "node")` | `placeholder` | type plus index |
+| `type-spaced-vs-camel` | EA labels | `Business Process` | `BusinessProcess` | `business process` | `business process` | `("business", "process")` | `("business", "process")` | `placeholder` | spacing/camel equivalence |
+| `type-model-root` | UML labels | `model` | `Model` | `model` | `model` | `("model",)` | `("model",)` | `placeholder` | root/default model name |
 | `placeholder-numbered-entity` | EA labels | `entity 1` | `BusinessObject` | `entity 1` | `business object` | `("entity",)` | `("business", "object")` | `placeholder` | generic numbered placeholder |
 | `placeholder-numbered-class` | EA labels | `class 1` | `ApplicationComponent` | `class 1` | `application component` | `("class",)` | `("application", "component")` | `placeholder` | class placeholder with non-class type |
 | `placeholder-operation-template` | UML labels | `privateOperation` | `Operation` | `private operation` | `operation` | `("private", "operation")` | `("operation",)` | `placeholder` | visibility-plus-kind generated name |
@@ -215,11 +212,11 @@ Required edge cases:
 | Normalized Name | Normalized Type | Name Tokens | Expected | Purpose |
 |---|---|---|---|---|
 | `` | `class` | `()` | `missing` | empty after normalization |
-| `class` | `class` | `("class",)` | `type_like` | type-like before placeholder |
-| `class 2` | `class` | `("class",)` | `type_like` | type with numeric index |
+| `class` | `class` | `("class",)` | `placeholder` | exact type-derived placeholder |
+| `class 2` | `class` | `("class",)` | `placeholder` | type with numeric index |
 | `entity 1` | `business object` | `("entity",)` | `placeholder` | generic numbered placeholder |
 | `aggregate 1` | `grouping` | `("aggregate",)` | `placeholder` | ArchiMate-style generated group |
-| `class a` | `class` | `("class", "a")` | `placeholder` | generic type plus letter suffix is not type-like |
+| `class a` | `class` | `("class", "a")` | `placeholder` | generic type plus letter suffix |
 | `junction copy` | `junction` | `("junction", "copy")` | `placeholder` | copied type label |
 | `test` | `class` | `("test",)` | `placeholder` | keyword placeholder |
 | `todo` | `action` | `("todo",)` | `placeholder` | keyword placeholder |
@@ -246,11 +243,11 @@ Nodes:
 Expected aggregate behavior:
 
 - semantic count is `4`;
-- missing, type-like, and placeholder counts are `0`;
+- missing and placeholder counts are `0`;
 - vocabulary includes `shopping`, `cart`, `line`, `item`, `creation`, `date`,
   `order`, and `status`;
-- this fixture should not trigger dummy filters based on placeholder ratio,
-  type-like ratio, or low vocabulary.
+- this fixture should not trigger dummy filters based on placeholder ratio or
+  low vocabulary.
 
 ### UML Control-Node Fixture
 
@@ -258,14 +255,14 @@ Nodes:
 
 | Raw Name | Raw Type | Expected Classification |
 |---|---|---|
-| `InitialNode` | `InitialNode` | `type_like` |
-| `DecisionNode2` | `DecisionNode` | `type_like` |
-| `MergeNode2` | `MergeNode` | `type_like` |
-| `ActivityFinalNode` | `ActivityFinalNode` | `type_like` |
+| `InitialNode` | `InitialNode` | `placeholder` |
+| `DecisionNode2` | `DecisionNode` | `placeholder` |
+| `MergeNode2` | `MergeNode` | `placeholder` |
+| `ActivityFinalNode` | `ActivityFinalNode` | `placeholder` |
 
 Expected aggregate behavior:
 
-- type-like count is `4`;
+- placeholder count is `4`;
 - semantic count is `0`;
 - semantic-only text builders emit no name tokens;
 - a model dominated by this fixture is low-information for dummy cleansing.
@@ -312,8 +309,8 @@ consume the same labels:
 
 - statistics uses `ExtractedLabel.normalized_name`, `name_tokens`, and
   `classification` for node-label summaries;
-- dummy cleansing uses the same labels for named counts, placeholder ratio,
-  type-like ratio, and vocabulary metrics;
+- dummy cleansing uses the same labels for named counts, placeholder ratio, and
+  vocabulary metrics;
 - duplicate detection name/type methods use the same normalized names and types
   rather than reading raw graph attributes directly.
 
@@ -322,7 +319,7 @@ A single mixed fixture is enough:
 | Raw Name | Raw Type | Expected Classification |
 |---|---|---|
 | `` | `Class` | `missing` |
-| `InitialNode` | `InitialNode` | `type_like` |
+| `InitialNode` | `InitialNode` | `placeholder` |
 | `entity 1` | `BusinessObject` | `placeholder` |
 | `ShoppingCart` | `Class` | `semantic` |
 | `Gestão de SLA` | `BusinessProcess` | `semantic` |
@@ -330,18 +327,17 @@ A single mixed fixture is enough:
 Expected consistency:
 
 - every stage sees exactly five node labels;
-- classification counts are `missing=1`, `type_like=1`, `placeholder=1`,
-  `semantic=2`;
+- classification counts are `missing=1`, `placeholder=2`, `semantic=2`;
 - semantic-only token text includes tokens from `ShoppingCart` and
   `Gestão de SLA` only;
-- all-name text excludes missing names but includes type-like and placeholder
+- all-name text excludes missing names but includes placeholder
   names only when the stage configuration explicitly asks for them.
 
 ## Non-Goals
 
 - No stemming or lemmatization.
 - No language detection.
-- No generated-name classification beyond `placeholder` and `type_like`.
+- No generated-name classification beyond `placeholder`.
 - No synonym handling.
 - No parser-specific special cases unless they are explicitly added to the
   shared configuration and covered by golden tests.
