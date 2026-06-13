@@ -180,10 +180,10 @@ export interface VisualizationPayload {
     mostReusedDocumentFrequency: number;
   };
   vocabularyRanking: VocabularyRankingRow[];
+  typeVocabularyTable: TypeVocabularyRow[];
   labelPipelineRows: LabelPipelineRow[];
   nameReuseDistribution: StatisticItem[];
   elementTypeTreemap: StatisticItem[];
-  vocabularyHeatmap: { tokens: string[]; rows: Array<{ label: string; values: number[] }> };
   typeConceptLinks: Array<{ type: string; concept: string; count: number }>;
   modelVocabularyScatter: Array<{
     id: string;
@@ -218,6 +218,18 @@ export interface VocabularyRankingRow {
   classification: "semantic" | "placeholder" | "mixed" | "unknown";
 }
 
+export interface TypeVocabularyRow {
+  type: string;
+  totalOccurrences: number;
+  namedOccurrences: number;
+  names: Array<{
+    name: string;
+    occurrences: number;
+    share: number;
+    classification: "semantic" | "placeholder" | "mixed" | "unknown";
+  }>;
+}
+
 export interface LabelPipelineRow {
   rawName: string;
   normalizedName: string;
@@ -228,6 +240,16 @@ export interface LabelPipelineRow {
   classification: "semantic" | "placeholder" | "missing";
   occurrences: number;
   documentFrequency: number;
+}
+
+export interface LabelPipelinePage {
+  datasetId: string;
+  snapshot: "before" | "after";
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  rows: LabelPipelineRow[];
 }
 
 export interface RatioSummary {
@@ -250,6 +272,7 @@ export interface TypeQualityRow {
 export interface ModelQualityWatchlists {
   fewSemanticNames: ModelQualityRow[];
   highMissingRatio: ModelQualityRow[];
+  highPlaceholderRatio: ModelQualityRow[];
   highNameDominance: ModelQualityRow[];
 }
 
@@ -257,7 +280,9 @@ export interface ModelQualityRow {
   id: string;
   nameSlots: number;
   semanticNames: number;
+  placeholderNames: number;
   missingRatio: number;
+  placeholderRatio: number;
   dominantName: string;
   dominantNameRatio: number;
 }
