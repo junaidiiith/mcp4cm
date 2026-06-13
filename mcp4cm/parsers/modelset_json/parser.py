@@ -23,10 +23,7 @@ class ModelSetJsonParser:
 
         graph = self._parse_graph(graph_payload)
         labels = raw.get("labels", ())
-        if isinstance(labels, str):
-            labels = (labels,)
-        else:
-            labels = tuple(str(label) for label in labels)
+        labels = (labels,) if isinstance(labels, str) else tuple(str(label) for label in labels)
 
         return ModelRecord(
             model_id=model_id or str(raw.get("ids") or raw.get("id") or ""),

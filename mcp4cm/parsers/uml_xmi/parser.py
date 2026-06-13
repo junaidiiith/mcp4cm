@@ -504,7 +504,8 @@ class UMLXMIParser(BaseParser):
                     elif current_pkg_id and current_pkg_id in ctx.nodes_by_id and child_id not in ctx.nodes_by_id:
                         ctx.warn(
                             WarningType.UNRESOLVED_REFERENCE,
-                            f"Skipping containment edge {current_pkg_id} -> {child_id} ({child_type}) due missing target node.",
+                            f"Skipping containment edge {current_pkg_id} -> {child_id} "
+                            f"({child_type}) due to missing target node.",
                         )
 
             self._walk_containment(ctx, child, current_pkg_id=next_pkg_id)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -391,10 +392,8 @@ class UMLXMLPyEcoreParser(BaseParser):
         for proxy in proxies:
             if proxy.resolved:
                 continue
-            try:
+            with suppress(Exception):
                 proxy.force_resolve()
-            except Exception:
-                pass
             if proxy.resolved or is_primitive_types_proxy(proxy):
                 continue
             unresolved += 1

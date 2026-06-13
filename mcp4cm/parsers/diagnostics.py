@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 
 from mcp4cm.core import ModelDiagnostics
@@ -14,7 +14,7 @@ class CannotParseError(Exception):
     """Raised when a parser cannot parse a file in its expected format."""
 
 
-class WarningType(str, Enum):
+class WarningType(StrEnum):
     """Types of warnings that can occur during parsing."""
 
     UNKNOWN_NODE_TYPE = "UNKNOWN_NODE_TYPE"

@@ -636,10 +636,7 @@ def hashable_name_tokens(
             tokens.append(f"{label.normalized_name}\t{label.normalized_type}")
         else:
             tokens.append(label.normalized_name)
-    if deduplicate_name_tokens:
-        tokens = sorted(set(tokens))
-    else:
-        tokens = sorted(tokens)
+    tokens = sorted(set(tokens)) if deduplicate_name_tokens else sorted(tokens)
     return tokens
 
 
@@ -822,18 +819,12 @@ def _graph_for_isomorphism(
     prepared = graph.copy(as_view=False)
 
     if ignore_direction and prepared.is_directed():
-        if prepared.is_multigraph():
-            prepared = nx.MultiGraph(prepared)
-        else:
-            prepared = nx.Graph(prepared)
+        prepared = nx.MultiGraph(prepared) if prepared.is_multigraph() else nx.Graph(prepared)
 
     if match_parallel_edge_multiplicity:
         return prepared
 
-    if prepared.is_directed():
-        collapsed = nx.DiGraph()
-    else:
-        collapsed = nx.Graph()
+    collapsed = nx.DiGraph() if prepared.is_directed() else nx.Graph()
 
     collapsed.add_nodes_from(prepared.nodes(data=True))
     for source, target, attrs in prepared.edges(data=True):

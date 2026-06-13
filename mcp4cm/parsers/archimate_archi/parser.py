@@ -73,13 +73,13 @@ class ArchiMateArchiParser(BaseParser):
                     f"File does not appear to be an ArchiMate model created with Archi. Root tag: {root.tag}"
                 )
         except ET.ParseError as e:
-            raise CannotParseError(f"Invalid XML format: {e}")
+            raise CannotParseError(f"Invalid XML format: {e}") from e
         except StopIteration:
-            raise CannotParseError("File appears to be empty or invalid XML")
+            raise CannotParseError("File appears to be empty or invalid XML") from None
         except Exception as e:
             if isinstance(e, CannotParseError):
                 raise
-            raise CannotParseError(f"Cannot parse file: {e}")
+            raise CannotParseError(f"Cannot parse file: {e}") from e
 
     def _parse_model_data(self, root: ET.Element, filepath: str) -> dict:
         """

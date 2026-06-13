@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from contextlib import suppress
 from typing import Any
 
 from mcp4cm.api.services.datasets import get_duplicate_detection_dataset, model_summary_lookup
@@ -324,10 +325,8 @@ def build_duplicate_groups(
                     rejected_internal += 1
                 techniques.update(str(item) for item in decision.get("techniques", []))
                 for score in (decision.get("scores") or {}).values():
-                    try:
+                    with suppress(TypeError, ValueError):
                         score_values.append(float(score))
-                    except (TypeError, ValueError):
-                        pass
 
         possible_pairs = pair_count(len(model_ids))
         missing_pairs = max(possible_pairs - approved_internal - rejected_internal, 0)
@@ -483,7 +482,8 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
             if bucket != last_logged_algorithm_percent.get(technique):
                 last_logged_algorithm_percent[technique] = bucket
                 LOG.info(
-                    "duplicate_algorithm_progress technique=%s label=%s phase=%s progress=%s%% current=%s total=%s message=%s",
+                    "duplicate_algorithm_progress technique=%s label=%s phase=%s "
+                    "progress=%s%% current=%s total=%s message=%s",
                     technique,
                     duplicate_technique_label(technique),
                     event.get("phase", ""),
@@ -529,7 +529,8 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         }
         counts = model_counts.get(technique, {})
         LOG.info(
-            "duplicate_algorithm_complete technique=%s label=%s status=%s pairs=%s duplicate_models=%s unique_models=%s completed=%s/%s elapsed_ms=%s reason=%s",
+            "duplicate_algorithm_complete technique=%s label=%s status=%s pairs=%s "
+            "duplicate_models=%s unique_models=%s completed=%s/%s elapsed_ms=%s reason=%s",
             technique,
             duplicate_technique_label(technique),
             status,

@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 
-class ModelingLanguage(str, Enum):
+class ModelingLanguage(StrEnum):
     UML = "uml"
     ECORE = "ecore"
     ARCHIMATE = "archimate"
     BPMN = "bpmn"
 
 
-class DatasetType(str, Enum):
+class DatasetType(StrEnum):
     MODELSET = "modelset"
     MODELSET_UML = "modelset_uml"
     MODELSET_ECORE = "modelset_ecore"

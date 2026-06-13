@@ -6,6 +6,7 @@ import tempfile
 import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
+from contextlib import suppress
 from dataclasses import dataclass
 from itertools import chain
 from pathlib import Path
@@ -32,8 +33,8 @@ try:
         ETypeParameter,
     )
     from pyecore.resources import URI, ResourceSet
-except ImportError:
-    raise ImportError("pyecore is required for Ecore parsing. Install it with: pip install pyecore")
+except ImportError as exc:
+    raise ImportError("pyecore is required for Ecore parsing. Install it with: pip install pyecore") from exc
 
 from mcp4cm.parsers.base import BaseParser, register_parser
 from mcp4cm.parsers.diagnostics import CannotParseError, ParserRunStats, WarningType
@@ -139,10 +140,8 @@ class EcoreParser(BaseParser):
         self._enable_scoped_uri_mappings = bool(enabled)
         if not self._enable_scoped_uri_mappings:
             # Ensure any previously discovered mappings don't keep enabling resolution.
-            try:
+            with suppress(Exception):
                 self._shared_rset.uri_mapper.clear()
-            except Exception:
-                pass
             # Also clear any already-cached resources; in fast mode we do per-file ResourceSets.
             try:
                 for res in list(self._shared_rset.resources.values()):
@@ -181,10 +180,8 @@ class EcoreParser(BaseParser):
         if use_shared_rset:
             # Do not let metamodel registrations accumulate across thousands of parses.
             # (ChainMap: first map is local to this ResourceSet instance)
-            try:
+            with suppress(Exception):
                 rset.metamodel_registry.maps[0].clear()
-            except Exception:
-                pass
 
         resource = None
         try:
@@ -205,17 +202,14 @@ class EcoreParser(BaseParser):
         except Exception as e:
             if isinstance(e, CannotParseError):
                 raise
-            raise CannotParseError(f"Failed to load Ecore model: {e}")
+            raise CannotParseError(f"Failed to load Ecore model: {e}") from e
         finally:
             if use_shared_rset and resource is not None:
                 # Keep shared referenced resources in the ResourceSet cache, but evict
                 # the "main" model resource to avoid unbounded growth of rset.resources.
-                try:
+                with suppress(Exception):
                     rset.remove_resource(resource)
-                except Exception:
-                    pass
 
-        primary_root = mm_roots[0]
         root_packages_meta = [
             {"name": pkg.name or "", "nsURI": pkg.nsURI or "", "nsPrefix": pkg.nsPrefix or ""} for pkg in mm_roots
         ]
@@ -387,10 +381,8 @@ class EcoreParser(BaseParser):
             fallback_path.unlink(missing_ok=True)
 
         # The original resource failed to load; remove it from the shared ResourceSet.
-        try:
+        with suppress(Exception):
             rset.remove_resource(resource)
-        except Exception:
-            pass
 
         for action, count in compat_actions:
             self.warn(
@@ -596,10 +588,9 @@ class EcoreParser(BaseParser):
                     continue
                 if isinstance(etype, EEnum):
                     continue  # already handled as normal node via eAllContents
-                if isinstance(etype, EDataType) or isinstance(etype, ExternalDataTypeRef):
-                    if etype not in existing:
-                        existing.add(etype)
-                        extra.append(etype)
+                if isinstance(etype, (EDataType, ExternalDataTypeRef)) and etype not in existing:
+                    existing.add(etype)
+                    extra.append(etype)
 
         return node_eobjects + extra
 
@@ -1211,23 +1202,22 @@ class EcoreParser(BaseParser):
                         {"feature": "eType", "kind": "return"},
                         ("eType", "return"),
                     )
-            elif isinstance(obj, EParameter):
-                if obj.eType is not None:
-                    target = self._normalize_etype(obj.eType)
-                    if target is None:
-                        self._report_invalid_type_reference(
-                            obj.eType,
-                            context=f"{_safe_obj_label(obj)}.eType",
-                            as_skip=True,
-                        )
-                        continue
-                    add_edge(
-                        "Type",
-                        obj,
-                        target,
-                        {"feature": "eType", "kind": "parameter"},
-                        ("eType", "parameter"),
+            elif isinstance(obj, EParameter) and obj.eType is not None:
+                target = self._normalize_etype(obj.eType)
+                if target is None:
+                    self._report_invalid_type_reference(
+                        obj.eType,
+                        context=f"{_safe_obj_label(obj)}.eType",
+                        as_skip=True,
                     )
+                    continue
+                add_edge(
+                    "Type",
+                    obj,
+                    target,
+                    {"feature": "eType", "kind": "parameter"},
+                    ("eType", "parameter"),
+                )
 
         return edges
 
