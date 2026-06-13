@@ -482,8 +482,8 @@ def test_eamodelset_loading_filters_by_natural_language(tmp_path):
         model_dir = tmp_path / model_id
         model_dir.mkdir()
         (model_dir / "model.json").write_text(
-            ('{"archimateId": "%s", "name": "%s", "language": "%s", "elements": [], "relationships": []}')
-            % (model_id, model_id, language),
+            f'{{"archimateId": "{model_id}", "name": "{model_id}", "language": "{language}", '
+            '"elements": [], "relationships": []}',
             encoding="utf-8",
         )
 
@@ -527,8 +527,8 @@ def test_language_filter_accepts_multiple_values(tmp_path):
         model_dir = tmp_path / model_id
         model_dir.mkdir()
         (model_dir / "model.json").write_text(
-            ('{"archimateId": "%s", "name": "%s", "language": "%s", "elements": [], "relationships": []}')
-            % (model_id, model_id, language),
+            f'{{"archimateId": "{model_id}", "name": "{model_id}", "language": "{language}", '
+            '"elements": [], "relationships": []}',
             encoding="utf-8",
         )
 

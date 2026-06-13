@@ -120,9 +120,7 @@ class AssociationHandler(ElementHandler):
         self.log_unhandled_attributes(ctx, elem, handled_attrs)
         self.log_unhandled_children(ctx, elem, handled_children)
 
-    def _parse_association_end(
-        self, ctx, end: ET.Element, fallback_id: str | None = None
-    ) -> dict[str, Any] | None:
+    def _parse_association_end(self, ctx, end: ET.Element, fallback_id: str | None = None) -> dict[str, Any] | None:
         """Parse an association end and return its data."""
         end_id = xmi_id(end) or fallback_id
         if not end_id:
