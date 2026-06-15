@@ -1,8 +1,26 @@
 # Parsers
 
-MCP4CM parses modeling files into a common `ModelRecord`: a model id, language, metadata, and a NetworkX graph. The same parsers are used by the Python API, dataset loaders, and web upload flow.
+MCP4CM parses modeling files into a common `ModelRecord`: a model id, language, metadata, and a NetworkX graph. The same parsers are used by the Python API, dataset loaders, and web upload flow. ss
 
 For dataset download and preparation instructions, see [DOWNLOAD_DATASETS.md](DOWNLOAD_DATASETS.md).
+
+## Table of Contents
+
+- [Parsers](#parsers)
+  - [Table of Contents](#table-of-contents)
+  - [Supported Parsers](#supported-parsers)
+  - [Downloadable Datasets](#downloadable-datasets)
+  - [Loading Examples](#loading-examples)
+  - [Input Examples](#input-examples)
+    - [UML JSON and Ecore JSON](#uml-json-and-ecore-json)
+    - [UML XMI](#uml-xmi)
+    - [UML XML with PyEcore](#uml-xml-with-pyecore)
+    - [Ecore `.ecore](#ecore-ecore)`
+    - [ArchiMate JSON](#archimate-json)
+    - [ArchiMate Archi XML](#archimate-archi-xml)
+    - [BPMN Signavio JSON](#bpmn-signavio-json)
+  - [Output Shape](#output-shape)
+  - [Upload Notes](#upload-notes)
 
 ## Supported Parsers
 
