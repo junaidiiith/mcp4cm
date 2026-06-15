@@ -51,6 +51,19 @@ class GraphSimilarPair:
 
 
 @dataclass(frozen=True, slots=True)
+class GraphSimilarityFeatures:
+    node_names: frozenset[str]
+    node_types: frozenset[str]
+    edge_types: frozenset[str]
+    degree_histogram: Counter[int]
+    node_count: int
+    edge_count: int
+    density: float
+    in_degree_histogram: Counter[int] | None = None
+    out_degree_histogram: Counter[int] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DuplicateDecision:
     left_id: str
     right_id: str
@@ -241,13 +254,39 @@ def graph_similarity_pairs(
 
     weights = weights or default_graph_similarity_weights(use_directed_metrics=use_directed_metrics)
 
+    feature_cache: dict[str, GraphSimilarityFeatures] = {}
+    total_records = len(records)
+    _report_progress(
+        progress,
+        phase="features",
+        current=0,
+        total=total_records,
+        message="Computing graph similarity features.",
+    )
+    for index, record in enumerate(records, start=1):
+        feature_cache[record.model_id] = graph_similarity_features(
+            record,
+            use_directed_metrics=use_directed_metrics,
+        )
+        _report_progress(
+            progress,
+            phase="features",
+            current=index,
+            total=total_records,
+            message=f"Computed {index} of {total_records} feature sets.",
+        )
+
     pairs: list[GraphSimilarPair] = []
     total_pairs = pair_count(len(records))
     _report_progress(
         progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph similarity pairs."
     )
     for index, (left, right) in enumerate(combinations(records, 2), start=1):
-        metrics = graph_similarity_metrics(left, right, use_directed_metrics=use_directed_metrics)
+        metrics = graph_similarity_metrics_from_features(
+            feature_cache[left.model_id],
+            feature_cache[right.model_id],
+            use_directed_metrics=use_directed_metrics,
+        )
         score = weighted_score(metrics, weights)
         if score >= threshold:
             pairs.append(GraphSimilarPair(left.model_id, right.model_id, score, metrics))
@@ -308,9 +347,9 @@ def graph_embedding_pairs(
     dataset: Dataset,
     *,
     threshold: float = 0.9,
-    dimensions: int = 64,
-    walk_length: int = 10,
-    num_walks: int = 20,
+    dimensions: int = 32,
+    walk_length: int = 5,
+    num_walks: int = 5,
     workers: int = 1,
     seed: int = 42,
     use_node_names: bool = True,
@@ -351,12 +390,20 @@ def graph_embedding_pairs(
     if embedding_graph.number_of_nodes() == 0 or embedding_graph.number_of_edges() == 0:
         embeddings = [np.zeros(_pooled_embedding_dimensions(dimensions, pooling), dtype=float) for _ in records]
     else:
+        node_count = embedding_graph.number_of_nodes()
+        edge_count = embedding_graph.number_of_edges()
+        walk_count = node_count * num_walks
+        walk_tokens = walk_count * walk_length
         _report_progress(
             progress,
             phase="embedding",
             current=1,
             total=len(records) + 1,
-            message="Training shared Node2Vec model.",
+            message=(
+                "Training shared Node2Vec model "
+                f"on {_compact_count(node_count)} node(s), {_compact_count(edge_count)} edge(s), "
+                f"~{_compact_count(walk_count)} walk(s), ~{_compact_count(walk_tokens)} walk token(s)."
+            ),
         )
         node2vec = Node2Vec(
             embedding_graph,
@@ -519,28 +566,70 @@ def are_graphs_isomorphic(
     return nx.is_isomorphic(left_graph, right_graph, node_match=node_match, edge_match=edge_match)
 
 
+def graph_similarity_features(
+    record: ModelRecord,
+    *,
+    use_directed_metrics: bool = False,
+) -> GraphSimilarityFeatures:
+    labels = extract_node_labels(record)
+    node_name_set = frozenset(label.normalized_name for label in labels if label.normalized_name)
+    node_type_set = frozenset(label.normalized_type for label in labels if label.normalized_type)
+    edge_type_set = frozenset(edge_types(record))
+    in_degree: Counter[int] | None = None
+    out_degree: Counter[int] | None = None
+    if use_directed_metrics:
+        in_degree = in_degree_histogram(record)
+        out_degree = out_degree_histogram(record)
+    return GraphSimilarityFeatures(
+        node_names=node_name_set,
+        node_types=node_type_set,
+        edge_types=edge_type_set,
+        degree_histogram=degree_histogram(record),
+        node_count=record.node_count,
+        edge_count=record.edge_count,
+        density=graph_density(record),
+        in_degree_histogram=in_degree,
+        out_degree_histogram=out_degree,
+    )
+
+
+def graph_similarity_metrics_from_features(
+    left: GraphSimilarityFeatures,
+    right: GraphSimilarityFeatures,
+    *,
+    use_directed_metrics: bool = False,
+) -> dict[str, float]:
+    metrics = {
+        "node_name_jaccard": jaccard(left.node_names, right.node_names),
+        "node_type_jaccard": jaccard(left.node_types, right.node_types),
+        "edge_type_jaccard": jaccard(left.edge_types, right.edge_types),
+        "degree_histogram_similarity": cosine_counter(left.degree_histogram, right.degree_histogram),
+        "size_similarity": cached_size_similarity(left, right),
+        "density_similarity": cached_density_similarity(left, right),
+    }
+    if use_directed_metrics:
+        metrics["in_degree_histogram_similarity"] = cosine_counter(
+            left.in_degree_histogram or Counter(),
+            right.in_degree_histogram or Counter(),
+        )
+        metrics["out_degree_histogram_similarity"] = cosine_counter(
+            left.out_degree_histogram or Counter(),
+            right.out_degree_histogram or Counter(),
+        )
+    return metrics
+
+
 def graph_similarity_metrics(
     left: ModelRecord,
     right: ModelRecord,
     *,
     use_directed_metrics: bool = False,
 ) -> dict[str, float]:
-    metrics = {
-        "node_name_jaccard": jaccard(node_names(left), node_names(right)),
-        "node_type_jaccard": jaccard(node_types(left), node_types(right)),
-        "edge_type_jaccard": jaccard(edge_types(left), edge_types(right)),
-        "degree_histogram_similarity": cosine_counter(degree_histogram(left), degree_histogram(right)),
-        "size_similarity": size_similarity(left, right),
-        "density_similarity": density_similarity(left, right),
-    }
-    if use_directed_metrics:
-        metrics["in_degree_histogram_similarity"] = cosine_counter(
-            in_degree_histogram(left), in_degree_histogram(right)
-        )
-        metrics["out_degree_histogram_similarity"] = cosine_counter(
-            out_degree_histogram(left), out_degree_histogram(right)
-        )
-    return metrics
+    return graph_similarity_metrics_from_features(
+        graph_similarity_features(left, use_directed_metrics=use_directed_metrics),
+        graph_similarity_features(right, use_directed_metrics=use_directed_metrics),
+        use_directed_metrics=use_directed_metrics,
+    )
 
 
 def default_graph_similarity_weights(*, use_directed_metrics: bool = False) -> dict[str, float]:
@@ -1003,6 +1092,17 @@ def density_similarity(left: ModelRecord, right: ModelRecord) -> float:
     return 1 - (abs(left_density - right_density) / denominator)
 
 
+def cached_size_similarity(left: GraphSimilarityFeatures, right: GraphSimilarityFeatures) -> float:
+    node_score = ratio_similarity(left.node_count, right.node_count)
+    edge_score = ratio_similarity(left.edge_count, right.edge_count)
+    return (node_score + edge_score) / 2
+
+
+def cached_density_similarity(left: GraphSimilarityFeatures, right: GraphSimilarityFeatures) -> float:
+    denominator = max(left.density, right.density, 1e-12)
+    return 1 - (abs(left.density - right.density) / denominator)
+
+
 def graph_density(record: ModelRecord) -> float:
     node_count = record.node_count
     if node_count <= 1:
@@ -1083,6 +1183,14 @@ def _report_pair_progress(progress: ProgressCallback | None, current: int, total
             total=total,
             message=f"{current} of {total} {unit}.",
         )
+
+
+def _compact_count(value: int) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.1f}k"
+    return str(value)
 
 
 def hash_tokens(tokens: Iterable[str], algorithm: str = "sha256") -> str:

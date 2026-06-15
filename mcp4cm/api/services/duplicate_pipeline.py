@@ -258,9 +258,8 @@ def graph_similarity_weights(
         "size_similarity": float(weights.get("sizeSimilarity", 0.15)),
         "density_similarity": float(weights.get("densitySimilarity", 0.10)),
     }
-    if use_directed_metrics or "inDegreeHistogram" in weights:
+    if use_directed_metrics:
         parsed["in_degree_histogram_similarity"] = float(weights.get("inDegreeHistogram", 0.15))
-    if use_directed_metrics or "outDegreeHistogram" in weights:
         parsed["out_degree_histogram_similarity"] = float(weights.get("outDegreeHistogram", 0.15))
     return parsed
 
@@ -621,9 +620,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                 pairs = graph_embedding_pairs(
                     projected_dataset,
                     threshold=float(thresholds.get("graphEmbeddingThreshold", thresholds.get("graphEmbedding", 0.9))),
-                    dimensions=int(thresholds.get("graphEmbeddingDimensions", 64)),
-                    walk_length=int(thresholds.get("graphEmbeddingWalkLength", 10)),
-                    num_walks=int(thresholds.get("graphEmbeddingNumWalks", 20)),
+                    dimensions=int(thresholds.get("graphEmbeddingDimensions", 32)),
+                    walk_length=int(thresholds.get("graphEmbeddingWalkLength", 5)),
+                    num_walks=int(thresholds.get("graphEmbeddingNumWalks", 5)),
                     workers=int(thresholds.get("graphEmbeddingWorkers", 1)),
                     seed=int(thresholds.get("graphEmbeddingSeed", 42)),
                     use_node_names=parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),
@@ -732,12 +731,19 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "minDf": parse_min_df(thresholds.get("minDf", 1)),
         "ngramRange": list(parse_ngram_range(thresholds.get("ngramRange", [1, 1]))),
         "stopwordsMode": parse_stopwords_mode(thresholds.get("stopwordsMode", "none")),
+        "graphSimilarity": float(thresholds.get("graphSimilarity", 0.85)),
+        "graphWeights": graph_similarity_weights(
+            thresholds,
+            use_directed_metrics=parse_bool(thresholds.get("useDirectedMetrics"), default=False),
+        ),
+        "useDirectedMetrics": parse_bool(thresholds.get("useDirectedMetrics"), default=False),
+        "normalizeParallelEdges": parse_bool(thresholds.get("normalizeParallelEdges"), default=False),
         "graphEmbeddingThreshold": float(
             thresholds.get("graphEmbeddingThreshold", thresholds.get("graphEmbedding", 0.9))
         ),
-        "graphEmbeddingDimensions": int(thresholds.get("graphEmbeddingDimensions", 64)),
-        "graphEmbeddingWalkLength": int(thresholds.get("graphEmbeddingWalkLength", 10)),
-        "graphEmbeddingNumWalks": int(thresholds.get("graphEmbeddingNumWalks", 20)),
+        "graphEmbeddingDimensions": int(thresholds.get("graphEmbeddingDimensions", 32)),
+        "graphEmbeddingWalkLength": int(thresholds.get("graphEmbeddingWalkLength", 5)),
+        "graphEmbeddingNumWalks": int(thresholds.get("graphEmbeddingNumWalks", 5)),
         "graphEmbeddingWorkers": int(thresholds.get("graphEmbeddingWorkers", 1)),
         "graphEmbeddingSeed": int(thresholds.get("graphEmbeddingSeed", 42)),
         "graphEmbeddingUseNodeNames": parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),

@@ -700,6 +700,28 @@ def test_graph_similarity_weights_include_directed_defaults_when_enabled():
     assert weights["out_degree_histogram_similarity"] == 0.15
 
 
+def test_graph_similarity_weights_ignore_directed_frontend_weights_when_disabled():
+    weights = graph_similarity_weights(
+        {
+            "graphWeights": {
+                "nodeNameJaccard": 0.25,
+                "nodeTypeJaccard": 0.2,
+                "edgeTypeJaccard": 0.15,
+                "degreeHistogram": 0.15,
+                "sizeSimilarity": 0.15,
+                "densitySimilarity": 0.1,
+                "inDegreeHistogram": 0.15,
+                "outDegreeHistogram": 0.15,
+            }
+        },
+        use_directed_metrics=False,
+    )
+
+    assert "in_degree_histogram_similarity" not in weights
+    assert "out_degree_histogram_similarity" not in weights
+    assert sum(weights.values()) == 1.0
+
+
 def test_graph_similarity_weights_use_explicit_directed_weights():
     weights = graph_similarity_weights(
         {

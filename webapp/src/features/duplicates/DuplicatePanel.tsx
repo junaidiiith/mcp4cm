@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { ChevronLeft, ChevronRight, Download, Eye, GitCompare, Layers3, Loader2, Plus, SlidersHorizontal } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Download,
+  Eye,
+  GitCompare,
+  Layers3,
+  Loader2,
+  Plus,
+  SlidersHorizontal,
+  SkipForward,
+} from "lucide-react";
 import { getDuplicateGroupDetail, getDuplicateGroups, getDuplicatePairs } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -573,31 +587,158 @@ function TechniqueConfig({
   return null;
 }
 
+type TechniqueRunStatus = "queued" | "running" | "complete" | "skipped" | "error";
+
+interface TechniqueRunInfo {
+  id: string;
+  status: TechniqueRunStatus;
+  detail: string;
+  reason?: string;
+}
+
 function DuplicateProgress({ progress }: { progress: DuplicateProgressState }) {
   const overallProgress = Math.max(0, Math.min(100, Number(progress.progress || 0)));
   const completed = (progress.completedTechniques || []).length;
-  const total = progress.totalTechniques || 0;
+  const total = progress.totalTechniques || progress.selectedTechniques?.length || 0;
+  const techniqueItems = buildTechniqueRunList(progress);
+  const activeTechnique = techniqueItems.find((item) => item.status === "running");
+  const techniqueProgress = Math.max(0, Math.min(100, Number(progress.techniqueProgress || 0)));
+  const processedItems = progress.processedItems || 0;
+  const totalItems = progress.totalItems || 0;
   const message =
     progress.message ||
-    (progress.status === "complete" ? "Duplicate detection complete." : "Running duplicate detection.");
+    (progress.status === "complete"
+      ? "Duplicate detection complete."
+      : progress.status === "error"
+        ? "Duplicate detection failed."
+        : "Running duplicate detection.");
+  const showSubProgress = Boolean(activeTechnique && progress.status === "running");
+
   return (
     <div className="progressPanel">
       <div className="progressHeader">
         <div>
           <h3>{message}</h3>
           <p>
-            {progress.totalModels || 0} models, {completed} of {total} techniques complete, {" "}
+            {progress.totalModels || 0} models, {completed} of {total} techniques complete,{" "}
             {formatDuration(progress.elapsedMs || 0)} elapsed
           </p>
-          {progress.currentTechnique && <p>Current technique: {techniqueLabel(progress.currentTechnique)}</p>}
         </div>
         <strong>{overallProgress}%</strong>
       </div>
       <div className="progressTrack">
         <div className="progressFill" style={{ width: `${overallProgress}%` }} />
       </div>
+      {techniqueItems.length > 0 && (
+        <div className="techniqueProgressGrid" aria-label="Duplicate detection techniques">
+          {techniqueItems.map((item) => (
+            <div key={item.id} className={`techniqueProgress ${techniqueProgressClass(item.status)}`}>
+              <TechniqueStatusIcon status={item.status} />
+              <div className="techniqueProgressCopy">
+                <strong>{techniqueLabel(item.id)}</strong>
+                <small>{techniqueStatusLabel(item)}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {showSubProgress && activeTechnique && (
+        <div className="subProgress">
+          <span>{subProgressCaption(progress, processedItems, totalItems)}</span>
+          <strong>{techniqueProgress}%</strong>
+          <div className="progressTrack">
+            <div className="progressFill secondary" style={{ width: `${techniqueProgress}%` }} />
+          </div>
+        </div>
+      )}
+      {progress.status === "error" && progress.error && <p className="progressError">{progress.error}</p>}
     </div>
   );
+}
+
+function buildTechniqueRunList(progress: DuplicateProgressState): TechniqueRunInfo[] {
+  const selected = progress.selectedTechniques || [];
+  const completedSet = new Set(progress.completedTechniques || []);
+  const current = progress.currentTechnique || "";
+  const finalStatus = progress.result?.techniqueStatus || {};
+  const ids = selected.length
+    ? selected
+    : [
+        ...(progress.completedTechniques || []),
+        ...(current && !completedSet.has(current) ? [current] : []),
+      ];
+
+  return ids.map((id) => {
+    const final = finalStatus[id];
+    if (final) {
+      return {
+        id,
+        status: normalizeTechniqueStatus(final.status),
+        detail: techniqueResultDetail(final),
+        reason: final.reason,
+      };
+    }
+    if (current === id) {
+      return { id, status: "running", detail: "In progress" };
+    }
+    if (completedSet.has(id)) {
+      return { id, status: "complete", detail: "Finished" };
+    }
+    return { id, status: "queued", detail: "Waiting" };
+  });
+}
+
+function normalizeTechniqueStatus(status: string): TechniqueRunStatus {
+  if (status === "ok") return "complete";
+  if (status === "skipped") return "skipped";
+  if (status === "error") return "error";
+  return "complete";
+}
+
+function techniqueResultDetail(final: {
+  status: string;
+  pairCount?: number;
+  elapsedMs?: number;
+  reason?: string;
+}) {
+  const parts: string[] = [];
+  if (typeof final.pairCount === "number") {
+    parts.push(`${final.pairCount.toLocaleString()} pair${final.pairCount === 1 ? "" : "s"}`);
+  }
+  if (typeof final.elapsedMs === "number") {
+    parts.push(formatDuration(final.elapsedMs));
+  }
+  if (!parts.length && final.status === "skipped") return "Skipped";
+  if (!parts.length && final.status === "error") return "Failed";
+  return parts.join(" · ");
+}
+
+function techniqueProgressClass(status: TechniqueRunStatus) {
+  if (status === "running") return "active";
+  if (status === "complete") return "done";
+  if (status === "skipped") return "skipped";
+  if (status === "error") return "error";
+  return "queued";
+}
+
+function techniqueStatusLabel(item: TechniqueRunInfo) {
+  if (item.status === "error" && item.reason) return item.reason;
+  return item.detail;
+}
+
+function subProgressCaption(progress: DuplicateProgressState, processedItems: number, totalItems: number) {
+  if (totalItems > 0) {
+    return `${processedItems.toLocaleString()} of ${totalItems.toLocaleString()} items`;
+  }
+  return progress.message || "Working…";
+}
+
+function TechniqueStatusIcon({ status }: { status: TechniqueRunStatus }) {
+  if (status === "running") return <Loader2 className="spin techniqueProgressIcon" size={15} />;
+  if (status === "complete") return <Check className="techniqueProgressIcon" size={15} />;
+  if (status === "skipped") return <SkipForward className="techniqueProgressIcon" size={15} />;
+  if (status === "error") return <AlertTriangle className="techniqueProgressIcon" size={15} />;
+  return <Circle className="techniqueProgressIcon" size={15} />;
 }
 
 function DuplicateResults({
