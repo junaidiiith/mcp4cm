@@ -593,6 +593,56 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
 }
 .duplicateChartCard h3 { margin-bottom: 12px; }
 .duplicateChartCard p { margin-top: 12px; font-size: 12px; font-weight: 700; }
+.groupQualityBreakdown {
+  border: 1px solid #dbe4ec;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdff;
+  display: grid;
+  gap: 12px;
+}
+.groupQualityBreakdown > div:first-child span,
+.groupQualityBreakdown > div:first-child strong {
+  display: block;
+}
+.groupQualityBreakdown > div:first-child span {
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.groupQualityBreakdown > div:first-child strong {
+  margin-top: 3px;
+  color: #203945;
+  font-size: 20px;
+  line-height: 1.1;
+}
+.groupQualityGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+.groupQualityCard {
+  border: 1px solid #dbe4ec;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fff;
+}
+.groupQualityCard strong,
+.groupQualityCard small {
+  display: block;
+}
+.groupQualityCard strong {
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.1;
+}
+.groupQualityCard small {
+  margin-top: 5px;
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 700;
+}
 .duplicateDecisionTable {
   max-height: 440px;
   overflow: auto;
@@ -695,6 +745,23 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   padding: 14px;
   background: #fbfdff;
 }
+.duplicateGroupDetailRegion {
+  scroll-margin-top: 18px;
+}
+.duplicateGroupDetailLoading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #236868;
+}
+.duplicateGroupDetailLoading h3 {
+  margin: 0 0 4px;
+}
+.duplicateGroupDetailLoading p {
+  margin: 0;
+  color: #60717f;
+  font-weight: 700;
+}
 .duplicateGroupDetailHeader {
   display: flex;
   justify-content: space-between;
@@ -709,43 +776,35 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   color: #60717f;
   font-weight: 700;
 }
+.duplicateGroupDetailHeader .representativeModelName {
+  margin-bottom: 5px;
+  color: #203945;
+}
+.duplicateGroupDetailHeader .representativeModelName strong {
+  font-size: 15px;
+}
 .duplicateGroupDetailHeader label {
   display: grid;
   gap: 5px;
   min-width: 280px;
   font-weight: 800;
 }
-.duplicateGroupModels {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
+.duplicateGroupModelsTable {
+  max-height: 260px;
   margin-bottom: 12px;
 }
-.canonicalModelChip {
-  text-align: left;
-  border: 1px solid #dbe4ec;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #fff;
-  color: #203040;
-  cursor: pointer;
-}
-.canonicalModelChip.active {
-  border-color: #2d7d7d;
+.representativeModelRow {
   background: #edf7f6;
 }
-.canonicalModelChip strong,
-.canonicalModelChip span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.canonicalModelChip span {
-  color: #60717f;
+.modelIdCell {
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 12px;
   font-weight: 700;
-  margin-top: 4px;
+}
+.mutedCell {
+  color: #60717f;
+  font-size: 12px;
+  font-weight: 800;
 }
 .duplicateInternalPairs {
   max-height: 360px;
@@ -1446,27 +1505,6 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   font-size: 11px;
   color: #566b7a;
 }
-.pairGraphLegend {
-  display: flex !important;
-  align-items: center;
-  gap: 12px;
-}
-.pairGraphLegend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  font-weight: 700;
-}
-.pairGraphLegend i {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  display: inline-block;
-}
-.pairGraphLegend .shared { background: #16a34a; }
-.pairGraphLegend .left { background: #2563eb; }
-.pairGraphLegend .right { background: #f97316; }
 .truncHint {
   margin-top: 6px;
   font-size: 11px;

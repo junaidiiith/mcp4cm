@@ -106,11 +106,6 @@ export default function PairGraphCompareView({
           <strong>Unique</strong>
           <span>{leftNodes.unique} left node(s), {rightNodes.unique} right node(s)</span>
         </div>
-        <div className="pairGraphLegend" aria-label="Compare legend">
-          <span><i className="shared" />Shared</span>
-          <span><i className="left" />Left only</span>
-          <span><i className="right" />Right only</span>
-        </div>
       </div>
       <div className="pairCompareGrid">
         <div className="pairComparePane">
@@ -118,14 +113,14 @@ export default function PairGraphCompareView({
             <h4>Left</h4>
             <p>{left.model.id}</p>
           </div>
-          <ModelGraphPreview payload={left} mode="compare" compareAnnotations={leftAnnotations} />
+          <ModelGraphPreview payload={left} mode="compare" />
         </div>
         <div className="pairComparePane">
           <div className="pairComparePaneHeader">
             <h4>Right</h4>
             <p>{right.model.id}</p>
           </div>
-          <ModelGraphPreview payload={right} mode="compare" compareAnnotations={rightAnnotations} />
+          <ModelGraphPreview payload={right} mode="compare" />
         </div>
       </div>
     </div>

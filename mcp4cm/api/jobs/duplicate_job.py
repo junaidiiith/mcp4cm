@@ -115,7 +115,7 @@ def duplicate_job_elapsed_ms(job_id: str, finished_at: float | None = None) -> i
 def duplicate_result_response_preview(result: dict[str, Any]) -> dict[str, Any]:
     preview = dict(result)
     pairs_page = build_duplicate_pairs_page(result, page=1, page_size=50, decision="all", query="", group_id="")
-    groups_page = build_duplicate_groups_page(result, page=1, page_size=25, query="")
+    groups_page = build_duplicate_groups_page(result, page=1, page_size=25, query="", quality="")
     preview["decisions"] = pairs_page["pairs"]
     preview["pairsPage"] = pairs_page
     preview["groupsPage"] = groups_page
@@ -151,8 +151,12 @@ def get_duplicate_result_for_job(job_id: str) -> dict[str, Any]:
     )
 
 
-def build_duplicate_groups_page(result: dict[str, Any], *, page: int, page_size: int, query: str) -> dict[str, Any]:
+def build_duplicate_groups_page(
+    result: dict[str, Any], *, page: int, page_size: int, query: str, quality: str
+) -> dict[str, Any]:
     groups = list(result.get("groups") or [])
+    if quality in {"complete", "linked", "mixed", "weak"}:
+        groups = [group for group in groups if str(group.get("confidence") or "") == quality]
     if query:
         query_lower = query.lower()
         groups = [
@@ -208,6 +212,7 @@ def get_duplicate_groups_page(job_id: str, args: Any) -> dict[str, Any]:
         page=parse_positive_int(args.get("page"), 1),
         page_size=parse_positive_int(args.get("pageSize"), 25),
         query=str(args.get("query") or "").strip(),
+        quality=str(args.get("quality") or "").strip().lower(),
     )
 
 

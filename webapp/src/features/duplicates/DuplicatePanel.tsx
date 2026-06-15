@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import {
   AlertTriangle,
   Check,
@@ -23,10 +23,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { techniques } from "../../config";
 import type {
   BusyState,
-  DuplicateCanonicalSelection,
+  DuplicateCanonicalSelection as DuplicateRepresentativeSelection,
   DuplicateGroup,
   DuplicateGroupDetail,
   DuplicateGroupsPage,
+  DuplicateModelSummary,
   DuplicatePairDecision,
   DuplicatePairsPage,
   DuplicateProgressState,
@@ -807,6 +808,15 @@ function DuplicateReviewTabs({
   );
 }
 
+type DuplicateGroupQuality = "complete" | "linked" | "mixed" | "weak";
+
+const groupQualityOptions: Array<{ id: DuplicateGroupQuality; label: string; explanation: string }> = [
+  { id: "complete", label: "Complete", explanation: "All internal links approved." },
+  { id: "linked", label: "Linked", explanation: "Connected through approved links but not every pair has direct evidence." },
+  { id: "mixed", label: "Mixed", explanation: "Contains rejected internal candidate links." },
+  { id: "weak", label: "Weak", explanation: "At least one approved link has low vote support." },
+];
+
 function DuplicateGroupsReview({
   result,
   onInspectModel,
@@ -830,20 +840,28 @@ function DuplicateGroupsReview({
   );
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const [quality, setQuality] = useState<DuplicateGroupQuality | "all">("all");
   const [groupsPage, setGroupsPage] = useState<DuplicateGroupsPage>(initialPage);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupDetail, setGroupDetail] = useState<DuplicateGroupDetail | null>(null);
-  const [canonicalOverrides, setCanonicalOverrides] = useState<Record<string, string>>({});
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [representativeOverrides, setRepresentativeOverrides] = useState<Record<string, string>>({});
+  const [detailPending, startDetailTransition] = useTransition();
+  const detailRegionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setPage(1);
     setQuery("");
+    setQuality("all");
     setGroupsPage(initialPage);
     setSelectedGroupId(null);
     setGroupDetail(null);
-    setCanonicalOverrides({});
+    setDetailLoading(false);
+    setDetailError("");
+    setRepresentativeOverrides({});
   }, [initialPage]);
 
   useEffect(() => {
@@ -853,7 +871,12 @@ function DuplicateGroupsReview({
       setLoading(true);
       setLoadError("");
       try {
-        const next = await getDuplicateGroups(jobId, { page, pageSize: 25, query: query.trim() });
+        const next = await getDuplicateGroups(jobId, {
+          page,
+          pageSize: 25,
+          query: query.trim(),
+          quality: quality === "all" ? undefined : quality,
+        });
         if (!cancelled) setGroupsPage(next);
       } catch (err) {
         if (!cancelled) setLoadError(errorText(err, "Could not load duplicate groups."));
@@ -865,18 +888,26 @@ function DuplicateGroupsReview({
     return () => {
       cancelled = true;
     };
-  }, [jobId, page, query]);
+  }, [jobId, page, query, quality]);
 
   useEffect(() => {
     if (!jobId || !selectedGroupId) return;
     const groupId = selectedGroupId;
     let cancelled = false;
     async function loadDetail() {
+      setDetailLoading(true);
+      setDetailError("");
       try {
         const detail = await getDuplicateGroupDetail(jobId, groupId);
-        if (!cancelled) setGroupDetail(detail);
+        if (!cancelled) {
+          startDetailTransition(() => {
+            setGroupDetail(detail);
+          });
+        }
       } catch (err) {
-        if (!cancelled) setLoadError(errorText(err, "Could not load duplicate group detail."));
+        if (!cancelled) setDetailError(errorText(err, "Could not load duplicate group detail."));
+      } finally {
+        if (!cancelled) setDetailLoading(false);
       }
     }
     loadDetail();
@@ -885,25 +916,50 @@ function DuplicateGroupsReview({
     };
   }, [jobId, selectedGroupId]);
 
-  function canonicalFor(group: DuplicateGroup) {
-    return canonicalOverrides[group.groupId] || group.canonicalModelId;
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    window.requestAnimationFrame(() => {
+      detailRegionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [selectedGroupId]);
+
+  function representativeFor(group: DuplicateGroup) {
+    return representativeOverrides[group.groupId] || group.canonicalModelId;
   }
 
-  async function exportCanonicalSelections() {
+  async function exportRepresentativeSelections() {
     const groups = await loadAllGroupsForExport(jobId, result, groupsPage);
-    const selections: DuplicateCanonicalSelection[] = groups.map((group) => {
-      const canonicalModelId = canonicalOverrides[group.groupId] || group.canonicalModelId;
+    const selections: DuplicateRepresentativeSelection[] = groups.map((group) => {
+      const representativeModelId = representativeOverrides[group.groupId] || group.canonicalModelId;
       return {
         groupId: group.groupId,
-        canonicalModelId,
-        duplicateModelIds: group.modelIds.filter((modelId) => modelId !== canonicalModelId),
+        canonicalModelId: representativeModelId,
+        duplicateModelIds: group.modelIds.filter((modelId) => modelId !== representativeModelId),
       };
     });
-    downloadText("duplicate-canonical-selection.json", JSON.stringify({ selections }, null, 2), "application/json");
+    downloadText("duplicate-representative-selection.json", JSON.stringify({ selections }, null, 2), "application/json");
   }
+
+  function inspectGroup(groupId: string) {
+    if (selectedGroupId === groupId) {
+      window.requestAnimationFrame(() => {
+        detailRegionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return;
+    }
+    setSelectedGroupId(groupId);
+    setGroupDetail(null);
+    setDetailError("");
+  }
+
+  const selectedGroupSummary = selectedGroupId
+    ? groupsPage.groups.find((group) => group.groupId === selectedGroupId)
+    : undefined;
+  const showDetailLoading = Boolean(selectedGroupId && (detailLoading || detailPending || !groupDetail) && !detailError);
 
   return (
     <div className="duplicateReview">
+      <GroupQualityBreakdown result={result} />
       <div className="duplicateToolbar">
         <Input
           value={query}
@@ -913,9 +969,27 @@ function DuplicateGroupsReview({
             setPage(1);
           }}
         />
-        <Button type="button" variant="secondary" onClick={exportCanonicalSelections} disabled={!groupsPage.total}>
+        <select
+          aria-label="Filter duplicate groups by quality"
+          value={quality}
+          onChange={(event) => {
+            setQuality(event.target.value as DuplicateGroupQuality | "all");
+            setPage(1);
+            setSelectedGroupId(null);
+            setGroupDetail(null);
+            setDetailError("");
+          }}
+        >
+          <option value="all">All qualities</option>
+          {groupQualityOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <Button type="button" variant="secondary" onClick={exportRepresentativeSelections} disabled={!groupsPage.total}>
           <Download size={16} />
-          Export canonical JSON
+          Export representative JSON
         </Button>
       </div>
       {loadError && <div className="error">{loadError}</div>}
@@ -924,9 +998,10 @@ function DuplicateGroupsReview({
           <thead>
             <tr>
               <th>Group</th>
-              <th>Evidence</th>
+              <th>Name</th>
+              <th>Approved pairs</th>
               <th>Quality</th>
-              <th>Canonical model</th>
+              <th>Representative model</th>
               <th>Methods</th>
               <th>Review</th>
             </tr>
@@ -937,6 +1012,10 @@ function DuplicateGroupsReview({
                 <td>
                   <strong>{group.groupId}</strong>
                   <small>{group.size} models</small>
+                </td>
+                <td>
+                  <strong>{modelDisplayName(representativeModelSummary(group, representativeFor(group)))}</strong>
+                  <small>{representativeFor(group)}</small>
                 </td>
                 <td>
                   <strong>
@@ -952,9 +1031,9 @@ function DuplicateGroupsReview({
                 </td>
                 <td>
                   <select
-                    value={canonicalFor(group)}
+                    value={representativeFor(group)}
                     onChange={(event) =>
-                      setCanonicalOverrides((current) => ({ ...current, [group.groupId]: event.target.value }))
+                      setRepresentativeOverrides((current) => ({ ...current, [group.groupId]: event.target.value }))
                     }
                   >
                     {(group.modelSummaries || group.modelIds.map((modelId) => ({ modelId }))).map((model) => (
@@ -963,7 +1042,7 @@ function DuplicateGroupsReview({
                       </option>
                     ))}
                   </select>
-                  <small>{group.canonicalReason || "Suggested canonical model"}</small>
+                  <small>{representativeReason(group.canonicalReason)}</small>
                 </td>
                 <td>
                   <div className="scoreChips">
@@ -975,63 +1054,161 @@ function DuplicateGroupsReview({
                   </div>
                 </td>
                 <td>
-                  <button type="button" className="tableInfoButton" onClick={() => setSelectedGroupId(group.groupId)}>
-                    <Eye size={15} />
-                    Inspect group
+                  <button
+                    type="button"
+                    className="tableInfoButton"
+                    onClick={() => inspectGroup(group.groupId)}
+                    disabled={selectedGroupId === group.groupId && showDetailLoading}
+                  >
+                    {selectedGroupId === group.groupId && showDetailLoading ? (
+                      <Loader2 className="spin" size={15} />
+                    ) : (
+                      <Eye size={15} />
+                    )}
+                    {selectedGroupId === group.groupId && showDetailLoading ? "Loading group" : "Inspect group"}
                   </button>
                 </td>
               </tr>
             ))}
             {!loading && !groupsPage.groups.length && (
               <tr>
-                <td colSpan={6}>No duplicate groups match the current filter.</td>
+                <td colSpan={7}>No duplicate groups match the current filter.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
       <Pagination page={groupsPage.page} totalPages={groupsPage.totalPages} loading={loading} onPageChange={setPage} />
-      {selectedGroupId && groupDetail && (
-        <DuplicateGroupDetailPanel
-          detail={groupDetail}
-          canonicalModelId={canonicalOverrides[groupDetail.group.groupId] || groupDetail.group.canonicalModelId}
-          onCanonicalChange={(modelId) =>
-            setCanonicalOverrides((current) => ({ ...current, [groupDetail.group.groupId]: modelId }))
-          }
-          onInspectModel={onInspectModel}
-          onInspectBoth={onInspectBoth}
-        />
+      {selectedGroupId && (
+        <div ref={detailRegionRef} className="duplicateGroupDetailRegion" aria-live="polite">
+          {showDetailLoading ? (
+            <DuplicateGroupDetailLoading groupId={selectedGroupId} groupSize={selectedGroupSummary?.size} />
+          ) : detailError ? (
+            <div className="error">{detailError}</div>
+          ) : groupDetail ? (
+            <DuplicateGroupDetailPanel
+              detail={groupDetail}
+              representativeModelId={
+                representativeOverrides[groupDetail.group.groupId] || groupDetail.group.canonicalModelId
+              }
+              onRepresentativeChange={(modelId) =>
+                setRepresentativeOverrides((current) => ({ ...current, [groupDetail.group.groupId]: modelId }))
+              }
+              onInspectModel={onInspectModel}
+              onInspectBoth={onInspectBoth}
+            />
+          ) : null}
+        </div>
       )}
+    </div>
+  );
+}
+
+function GroupQualityBreakdown({ result }: { result: DuplicateResult }) {
+  const fallbackCounts = countGroupQualities(result.groups || result.groupsPage?.groups || []);
+  const counts: Record<DuplicateGroupQuality, number> = {
+    complete: result.groupSummary?.completeGroups ?? fallbackCounts.complete,
+    linked: result.groupSummary?.linkedGroups ?? fallbackCounts.linked,
+    mixed: result.groupSummary?.mixedGroups ?? fallbackCounts.mixed,
+    weak: result.groupSummary?.weakGroups ?? fallbackCounts.weak,
+  };
+  const total = result.groupSummary?.totalGroups ?? Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+  if (!total) return null;
+
+  return (
+    <div className="groupQualityBreakdown">
+      <div>
+        <span>Group Quality Breakdown</span>
+        <strong>{total.toLocaleString()} group{total === 1 ? "" : "s"}</strong>
+      </div>
+      <div className="groupQualityGrid">
+        {groupQualityOptions.map((option) => (
+          <div key={option.id} className="groupQualityCard">
+            <span className={`qualityPill ${option.id}`}>{option.label}</span>
+            <strong>{counts[option.id].toLocaleString()}</strong>
+            <small>{option.explanation}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function countGroupQualities(groups: DuplicateGroup[]): Record<DuplicateGroupQuality, number> {
+  return groups.reduce<Record<DuplicateGroupQuality, number>>(
+    (counts, group) => {
+      if (isGroupQuality(group.confidence)) counts[group.confidence] += 1;
+      return counts;
+    },
+    { complete: 0, linked: 0, mixed: 0, weak: 0 },
+  );
+}
+
+function isGroupQuality(value: string): value is DuplicateGroupQuality {
+  return value === "complete" || value === "linked" || value === "mixed" || value === "weak";
+}
+
+function representativeReason(reason: string | undefined) {
+  return reason ? reason.replace("canonical model", "representative model") : "Suggested representative model";
+}
+
+function representativeModelSummary(group: DuplicateGroup, representativeModelId: string): DuplicateModelSummary | undefined {
+  return group.modelSummaries?.find((model) => model.modelId === representativeModelId);
+}
+
+function modelDisplayName(model: DuplicateModelSummary | undefined) {
+  const name = model?.name?.trim();
+  return name || "Unnamed model";
+}
+
+function DuplicateGroupDetailLoading({ groupId, groupSize }: { groupId: string; groupSize?: number }) {
+  return (
+    <div className="duplicateGroupDetail duplicateGroupDetailLoading" aria-busy="true">
+      <Loader2 className="spin" size={22} />
+      <div>
+        <h3>Loading {groupId}</h3>
+        <p>
+          Fetching full group details
+          {typeof groupSize === "number" ? ` for ${groupSize.toLocaleString()} models` : ""}. Large groups can take a
+          moment to render.
+        </p>
+      </div>
     </div>
   );
 }
 
 function DuplicateGroupDetailPanel({
   detail,
-  canonicalModelId,
-  onCanonicalChange,
+  representativeModelId,
+  onRepresentativeChange,
   onInspectModel,
   onInspectBoth,
 }: {
   detail: DuplicateGroupDetail;
-  canonicalModelId: string;
-  onCanonicalChange: (modelId: string) => void;
+  representativeModelId: string;
+  onRepresentativeChange: (modelId: string) => void;
   onInspectModel: (modelId: string) => void;
   onInspectBoth: (leftId: string, rightId: string) => void;
 }) {
+  const representativeSummary = detail.modelSummaries.find((model) => model.modelId === representativeModelId);
+
   return (
     <div className="duplicateGroupDetail">
       <div className="duplicateGroupDetailHeader">
         <div>
           <h3>{detail.group.groupId}</h3>
+          <p className="representativeModelName">
+            Name: <strong>{modelDisplayName(representativeSummary)}</strong>
+          </p>
           <p>
             {detail.group.size} models, {detail.group.approvedInternalPairs} approved internal pair(s),{" "}
             {detail.group.candidateRejectedInternalPairs} candidate warning(s)
           </p>
         </div>
         <label>
-          Canonical
-          <select value={canonicalModelId} onChange={(event) => onCanonicalChange(event.target.value)}>
+          Representative
+          <select value={representativeModelId} onChange={(event) => onRepresentativeChange(event.target.value)}>
             {detail.modelSummaries.map((model) => (
               <option key={model.modelId} value={model.modelId}>
                 {model.modelId}
@@ -1040,20 +1217,44 @@ function DuplicateGroupDetailPanel({
           </select>
         </label>
       </div>
-      <div className="duplicateGroupModels">
-        {detail.modelSummaries.map((model) => (
-          <button
-            key={model.modelId}
-            type="button"
-            className={model.modelId === canonicalModelId ? "canonicalModelChip active" : "canonicalModelChip"}
-            onClick={() => onInspectModel(model.modelId)}
-          >
-            <strong>{model.modelId}</strong>
-            <span>
-              {model.nodeCount ?? 0} nodes, {model.edgeCount ?? 0} edges
-            </span>
-          </button>
-        ))}
+      <div className="duplicateDecisionTable duplicateGroupModelsTable">
+        <table>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Model ID</th>
+              <th>Name</th>
+              <th>Nodes</th>
+              <th>Edges</th>
+              <th>Inspect</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.modelSummaries.map((model) => (
+              <tr key={model.modelId} className={model.modelId === representativeModelId ? "representativeModelRow" : ""}>
+                <td>
+                  {model.modelId === representativeModelId ? (
+                    <span className="qualityPill linked">Representative</span>
+                  ) : (
+                    <span className="mutedCell">Duplicate</span>
+                  )}
+                </td>
+                <td className="modelIdCell">{model.modelId}</td>
+                <td>
+                  <strong>{modelDisplayName(model)}</strong>
+                </td>
+                <td>{model.nodeCount ?? 0}</td>
+                <td>{model.edgeCount ?? 0}</td>
+                <td>
+                  <button type="button" className="tableInfoButton" onClick={() => onInspectModel(model.modelId)}>
+                    <Eye size={15} />
+                    Inspect
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <div className="duplicateDecisionTable duplicateInternalPairs">
         <table>

@@ -52,12 +52,13 @@ export async function pollDuplicateJob(
 
 export async function getDuplicateGroups(
   jobId: string,
-  options?: { page?: number; pageSize?: number; query?: string },
+  options?: { page?: number; pageSize?: number; query?: string; quality?: string },
 ): Promise<DuplicateGroupsPage> {
   const query = new URLSearchParams();
   if (options?.page) query.set("page", String(options.page));
   if (options?.pageSize) query.set("pageSize", String(options.pageSize));
   if (options?.query) query.set("query", options.query);
+  if (options?.quality) query.set("quality", options.quality);
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return getJson<DuplicateGroupsPage>(`/api/duplicates/jobs/${encodeURIComponent(jobId)}/groups${suffix}`);
 }
