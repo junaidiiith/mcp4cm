@@ -51,10 +51,11 @@ import { DummyPanel } from "./features/dummy/DummyPanel";
 import { DuplicatePanel } from "./features/duplicates/DuplicatePanel";
 import {
   ModelGraphDrawer,
-  PairCompareModal,
+  useDeferredEnable,
   useModelInspect,
   WarningInspectorDrawer,
 } from "./features/inspector/Inspector";
+import { PairCompareInspector, type PairCompareInspectorHandle } from "./features/inspector/PairCompareInspector";
 
 type UploadSessionPayload = {
   language: Language;
@@ -85,7 +86,7 @@ export default function App() {
   const [duplicateResult, setDuplicateResult] = useState<DuplicateResult | null>(null);
   const [duplicateProgress, setDuplicateProgress] = useState<DuplicateProgressState | null>(null);
   const [pairInspectModelId, setPairInspectModelId] = useState<string | null>(null);
-  const [pairInspectBoth, setPairInspectBoth] = useState<{ leftId: string; rightId: string } | null>(null);
+  const pairCompareRef = useRef<PairCompareInspectorHandle>(null);
   const [selected, setSelected] = useState<string[]>(["hash", "tfidf"]);
   const [mandatory, setMandatory] = useState<string[]>(["hash"]);
   const [minVotes, setMinVotes] = useState(2);
@@ -107,10 +108,14 @@ export default function App() {
   const afterDummyStatsRequestRef = useRef(0);
 
   const selectedInspectModelId = selectedModel?.modelId || null;
-  const selectedModelInspect = useModelInspect(datasetId, selectedInspectModelId);
-  const pairModelInspect = useModelInspect(datasetId, pairInspectModelId);
-  const leftPairModelInspect = useModelInspect(datasetId, pairInspectBoth?.leftId || null);
-  const rightPairModelInspect = useModelInspect(datasetId, pairInspectBoth?.rightId || null);
+  const selectedModelInspectEnabled = Boolean(selectedModel) && inspectorTab === "model";
+  const selectedModelInspect = useModelInspect(datasetId, selectedInspectModelId, {
+    enabled: selectedModelInspectEnabled,
+  });
+  const pairInspectFetchReady = useDeferredEnable(Boolean(pairInspectModelId));
+  const pairModelInspect = useModelInspect(datasetId, pairInspectModelId, {
+    enabled: pairInspectFetchReady,
+  });
 
   const canRun = Boolean(datasetId);
   const selectedTechniques = useMemo(() => new Set(selected), [selected]);
@@ -226,7 +231,7 @@ export default function App() {
     setDuplicateResult(null);
     setDuplicateProgress(null);
     setPairInspectModelId(null);
-    setPairInspectBoth(null);
+    pairCompareRef.current?.close();
     closeModelInspector();
 
     try {
@@ -320,7 +325,7 @@ export default function App() {
     setDuplicateResult(null);
     setDuplicateProgress(null);
     setPairInspectModelId(null);
-    setPairInspectBoth(null);
+    pairCompareRef.current?.close();
 
     try {
       if (!selected.length) {
@@ -375,7 +380,7 @@ export default function App() {
   }
 
   const openGraphInspector = useCallback((modelId: string) => {
-    setPairInspectBoth(null);
+    pairCompareRef.current?.close();
     setPairInspectModelId(modelId);
   }, []);
 
@@ -412,7 +417,7 @@ export default function App() {
     setUploadedFiles(0);
     closeModelInspector();
     setPairInspectModelId(null);
-    setPairInspectBoth(null);
+    pairCompareRef.current?.close();
     if (nextLanguage !== "uml") {
       setRepresentation({
         includeAttributes: true,
@@ -438,7 +443,7 @@ export default function App() {
     setSelectedOutcomeModelId(null);
     closeModelInspector();
     setPairInspectModelId(null);
-    setPairInspectBoth(null);
+    pairCompareRef.current?.close();
     if (!(language === "uml" && nextFormat === "xmi")) {
       setRepresentation({
         includeAttributes: true,
@@ -575,7 +580,7 @@ export default function App() {
               onInspectModel={openGraphInspector}
               onInspectBoth={(leftId, rightId) => {
                 setPairInspectModelId(null);
-                setPairInspectBoth({ leftId, rightId });
+                pairCompareRef.current?.open(leftId, rightId);
               }}
             />
           </section>
@@ -599,24 +604,12 @@ export default function App() {
           title="Duplicate Pair Model Inspect"
           modelId={pairInspectModelId}
           onClose={() => setPairInspectModelId(null)}
-          inspectLoading={pairModelInspect.loading}
+          inspectLoading={!pairInspectFetchReady || pairModelInspect.loading}
           inspectError={pairModelInspect.error}
           inspectModel={pairModelInspect.payload}
         />
       )}
-      {pairInspectBoth && (
-        <PairCompareModal
-          leftId={pairInspectBoth.leftId}
-          rightId={pairInspectBoth.rightId}
-          onClose={() => setPairInspectBoth(null)}
-          leftInspectLoading={leftPairModelInspect.loading}
-          leftInspectError={leftPairModelInspect.error}
-          leftInspectModel={leftPairModelInspect.payload}
-          rightInspectLoading={rightPairModelInspect.loading}
-          rightInspectError={rightPairModelInspect.error}
-          rightInspectModel={rightPairModelInspect.payload}
-        />
-      )}
+      <PairCompareInspector ref={pairCompareRef} datasetId={datasetId} />
     </SidebarProvider>
   );
 }

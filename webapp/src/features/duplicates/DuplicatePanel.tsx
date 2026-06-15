@@ -36,6 +36,8 @@ import type {
 } from "../../types";
 import { formatDuration, round, techniqueLabel } from "../../utils";
 
+const disabledDuplicateTechniques = new Set(["graph_embedding", "graph_isomorphism"]);
+
 export function DuplicatePanel({
   canRun,
   busy,
@@ -85,6 +87,7 @@ export function DuplicatePanel({
                 <input
                   type="checkbox"
                   checked={selected.includes(technique.id)}
+                  disabled={disabledDuplicateTechniques.has(technique.id)}
                   onChange={() => onToggleSelection(technique.id)}
                 />
                 <span>{technique.label}</span>
@@ -94,7 +97,7 @@ export function DuplicatePanel({
                 <input
                   type="checkbox"
                   checked={mandatory.includes(technique.id)}
-                  disabled={!selected.includes(technique.id)}
+                  disabled={!selected.includes(technique.id) || disabledDuplicateTechniques.has(technique.id)}
                   onChange={() => onToggleMandatory(technique.id)}
                 />
                 Mandatory

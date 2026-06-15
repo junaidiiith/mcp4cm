@@ -21,32 +21,76 @@ export interface ModelInspectState {
   error: string;
 }
 
-export function useModelInspect(datasetId: string, modelId: string | null): ModelInspectState {
+const INSPECT_DRAWER_ANIMATION_MS = 300;
+
+/** Wait until a surface is active before enabling heavier work (e.g. graph fetch). */
+export function useDeferredEnable(active: boolean, delayMs = INSPECT_DRAWER_ANIMATION_MS): boolean {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setEnabled(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setEnabled(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [active, delayMs]);
+
+  return enabled;
+}
+
+export function useModelInspect(
+  datasetId: string,
+  modelId: string | null,
+  options?: { enabled?: boolean },
+): ModelInspectState {
+  const enabled = options?.enabled ?? true;
   const [payload, setPayload] = useState<ModelInspectPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    setPayload(null);
+    setError("");
+  }, [modelId]);
+
+  useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      if (!modelId) {
-        setPayload(null);
-        setError("");
-        setLoading(false);
-        return;
-      }
-      if (!datasetId) {
-        setPayload(null);
-        setError("Process selected models to inspect parsed graph details.");
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
+    if (!modelId) {
+      setPayload(null);
       setError("");
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!enabled) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!datasetId) {
+      setPayload(null);
+      setError("Process selected models to inspect parsed graph details.");
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    setError("");
+
+    const inspectModelId = modelId;
+
+    async function load() {
       try {
-        const response = await getModelInspect(datasetId, modelId, {
+        const response = await getModelInspect(datasetId, inspectModelId, {
           includeAttrs: true,
         });
         if (!cancelled) {
@@ -69,9 +113,11 @@ export function useModelInspect(datasetId: string, modelId: string | null): Mode
     return () => {
       cancelled = true;
     };
-  }, [datasetId, modelId]);
+  }, [datasetId, enabled, modelId]);
 
-  return { payload, loading, error };
+  const awaitingData = Boolean(enabled && modelId && datasetId && !payload && !error);
+
+  return { payload, loading: loading || awaitingData, error };
 }
 
 export function WarningInspectorDrawer({
@@ -201,32 +247,44 @@ export function ModelGraphDrawer({
 }
 
 export function PairCompareModal({
+  open,
   leftId,
   rightId,
-  onClose,
+  onOpenChange,
   leftInspectLoading,
   leftInspectError,
   leftInspectModel,
   rightInspectLoading,
   rightInspectError,
   rightInspectModel,
+  showCompareGraph,
 }: {
+  open: boolean;
   leftId: string;
   rightId: string;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   leftInspectLoading: boolean;
   leftInspectError: string;
   leftInspectModel: ModelInspectPayload | null;
   rightInspectLoading: boolean;
   rightInspectError: string;
   rightInspectModel: ModelInspectPayload | null;
+  showCompareGraph: boolean;
 }) {
+  const bothReady = Boolean(
+    leftInspectModel &&
+      rightInspectModel &&
+      !leftInspectLoading &&
+      !rightInspectLoading &&
+      !leftInspectError &&
+      !rightInspectError,
+  );
+  const isLoading = leftInspectLoading || rightInspectLoading;
+
   return (
     <Dialog
-      open
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <DialogContent className="pairCompareModal">
         <DialogHeader>
@@ -235,7 +293,7 @@ export function PairCompareModal({
             {leftId} {"<->"} {rightId}
           </DialogDescription>
         </DialogHeader>
-        {leftInspectModel && rightInspectModel && !leftInspectLoading && !rightInspectLoading && !leftInspectError && !rightInspectError ? (
+        {showCompareGraph && bothReady && leftInspectModel && rightInspectModel ? (
           <Suspense
             fallback={
               <div className="inspectState">
@@ -246,30 +304,31 @@ export function PairCompareModal({
           >
             <LazyPairGraphCompareView left={leftInspectModel} right={rightInspectModel} />
           </Suspense>
+        ) : isLoading ? (
+          <div className="inspectState">
+            <Loader2 className="spin" size={16} />
+            Loading models for comparison...
+          </div>
         ) : (
-          <div className="pairCompareGrid">
-            <div className="pairComparePane">
-              <div className="pairComparePaneHeader">
-                <h4>Left</h4>
-                <p>{leftId}</p>
+          <div className="pairCompareStatus">
+            {leftInspectError ? (
+              <div className="inspectState error">
+                <AlertTriangle size={16} />
+                Left model: {leftInspectError}
               </div>
-              <ModelInspectBody
-                inspectLoading={leftInspectLoading}
-                inspectError={leftInspectError}
-                inspectModel={leftInspectModel}
-              />
-            </div>
-            <div className="pairComparePane">
-              <div className="pairComparePaneHeader">
-                <h4>Right</h4>
-                <p>{rightId}</p>
+            ) : null}
+            {rightInspectError ? (
+              <div className="inspectState error">
+                <AlertTriangle size={16} />
+                Right model: {rightInspectError}
               </div>
-              <ModelInspectBody
-                inspectLoading={rightInspectLoading}
-                inspectError={rightInspectError}
-                inspectModel={rightInspectModel}
-              />
-            </div>
+            ) : null}
+            {!leftInspectError && !rightInspectError ? (
+              <div className="inspectState">
+                <Loader2 className="spin" size={16} />
+                Preparing graph comparison...
+              </div>
+            ) : null}
           </div>
         )}
       </DialogContent>

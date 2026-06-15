@@ -568,10 +568,10 @@ weights.
 For example, these two configurations have the same relative effect:
 
 
-| Node names | Node types | Edge types | Degree | Size | Density |
-| ---------- | ---------- | ---------- | ------ | ---- | ------- |
+| Node names | Node types | Edge types | Degree | Size   | Density |
+| ---------- | ---------- | ---------- | ------ | ------ | ------- |
 | `0.25`     | `0.20`     | `0.15`     | `0.15` | `0.15` | `0.10`  |
-| `25`       | `20`       | `15`       | `15`   | `15` | `10`    |
+| `25`       | `20`       | `15`       | `15`   | `15`   | `10`    |
 
 
 The default weights make node names the strongest single signal, while still allowing structural similarity to influence
@@ -580,16 +580,16 @@ the result.
 ### Metrics
 
 
-| Metric                      | What it means                                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------------------------- |
-| Node names                  | Jaccard overlap of normalized node-name sets.                                                   |
-| Node types                  | Jaccard overlap of normalized node-type sets.                                                   |
-| Edge types                  | Jaccard overlap of normalized relationship-type sets.                                           |
-| Degree histogram            | Cosine similarity of node-degree distributions.                                                 |
-| In-degree histogram         | Cosine similarity of incoming-degree distributions when **Directed metrics** is enabled.         |
-| Out-degree histogram        | Cosine similarity of outgoing-degree distributions when **Directed metrics** is enabled.         |
-| Size                        | Average ratio similarity of node counts and edge counts.                                        |
-| Density                     | Similarity of graph density, based on edge count relative to possible edge count.               |
+| Metric               | What it means                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| Node names           | Jaccard overlap of normalized node-name sets.                                            |
+| Node types           | Jaccard overlap of normalized node-type sets.                                            |
+| Edge types           | Jaccard overlap of normalized relationship-type sets.                                    |
+| Degree histogram     | Cosine similarity of node-degree distributions.                                          |
+| In-degree histogram  | Cosine similarity of incoming-degree distributions when **Directed metrics** is enabled. |
+| Out-degree histogram | Cosine similarity of outgoing-degree distributions when **Directed metrics** is enabled. |
+| Size                 | Average ratio similarity of node counts and edge counts.                                 |
+| Density              | Similarity of graph density, based on edge count relative to possible edge count.        |
 
 
 Jaccard overlap means:
@@ -610,19 +610,19 @@ For example:
 ### Parameters
 
 
-| Parameter                | UI label                 | Type                  | Default | Description                                                                                 |
-| ------------------------ | ------------------------ | --------------------- | ------- | ------------------------------------------------------------------------------------------- |
-| `graphSimilarity`        | Threshold                | Float from `0` to `1` | `0.85`  | Minimum weighted score required for Graph Metrics to vote for a pair.                       |
-| `nodeNameJaccard`        | Node names               | Non-negative number   | `0.25`  | Weight for normalized node-name overlap.                                                    |
-| `nodeTypeJaccard`        | Node types               | Non-negative number   | `0.20`  | Weight for normalized node-type overlap.                                                    |
-| `edgeTypeJaccard`        | Edge types               | Non-negative number   | `0.15`  | Weight for normalized edge-type overlap.                                                    |
-| `degreeHistogram`        | Degree histogram         | Non-negative number   | `0.15`  | Weight for overall degree-distribution similarity.                                          |
-| `inDegreeHistogram`      | In-degree histogram      | Non-negative number   | `0.15`  | Weight for incoming-degree similarity when **Directed metrics** is enabled.                  |
-| `outDegreeHistogram`     | Out-degree histogram     | Non-negative number   | `0.15`  | Weight for outgoing-degree similarity when **Directed metrics** is enabled.                  |
-| `sizeSimilarity`         | Size                     | Non-negative number   | `0.15`  | Weight for node-count and edge-count similarity.                                            |
-| `densitySimilarity`      | Density                  | Non-negative number   | `0.10`  | Weight for graph-density similarity.                                                        |
-| `useDirectedMetrics`     | Directed metrics         | Boolean               | `false` | When enabled, in-degree and out-degree histograms are included in the weighted score.        |
-| `normalizeParallelEdges` | Normalize parallel edges | Boolean               | `false` | When enabled, repeated edges with the same source, target, and type are compacted first.     |
+| Parameter                | UI label                 | Type                  | Default | Description                                                                              |
+| ------------------------ | ------------------------ | --------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `graphSimilarity`        | Threshold                | Float from `0` to `1` | `0.85`  | Minimum weighted score required for Graph Metrics to vote for a pair.                    |
+| `nodeNameJaccard`        | Node names               | Non-negative number   | `0.25`  | Weight for normalized node-name overlap.                                                 |
+| `nodeTypeJaccard`        | Node types               | Non-negative number   | `0.20`  | Weight for normalized node-type overlap.                                                 |
+| `edgeTypeJaccard`        | Edge types               | Non-negative number   | `0.15`  | Weight for normalized edge-type overlap.                                                 |
+| `degreeHistogram`        | Degree histogram         | Non-negative number   | `0.15`  | Weight for overall degree-distribution similarity.                                       |
+| `inDegreeHistogram`      | In-degree histogram      | Non-negative number   | `0.15`  | Weight for incoming-degree similarity when **Directed metrics** is enabled.              |
+| `outDegreeHistogram`     | Out-degree histogram     | Non-negative number   | `0.15`  | Weight for outgoing-degree similarity when **Directed metrics** is enabled.              |
+| `sizeSimilarity`         | Size                     | Non-negative number   | `0.15`  | Weight for node-count and edge-count similarity.                                         |
+| `densitySimilarity`      | Density                  | Non-negative number   | `0.10`  | Weight for graph-density similarity.                                                     |
+| `useDirectedMetrics`     | Directed metrics         | Boolean               | `false` | When enabled, in-degree and out-degree histograms are included in the weighted score.    |
+| `normalizeParallelEdges` | Normalize parallel edges | Boolean               | `false` | When enabled, repeated edges with the same source, target, and type are compacted first. |
 
 
 The weight fields are inside `graphWeights` in API payloads.
@@ -630,19 +630,19 @@ The weight fields are inside `graphWeights` in API payloads.
 Guidance:
 
 
-| Parameter                | When to change it                                                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graphSimilarity`        | Raise it to reduce false positives; lower it to review weaker structural or vocabulary similarity.                                                |
-| `nodeNameJaccard`        | Increase when element names are meaningful and renamed models should be penalized.                                                                |
-| `nodeTypeJaccard`        | Increase when element type consistency matters, for example distinguishing actors, objects, classes, tasks, and events.                           |
-| `edgeTypeJaccard`        | Increase when relationship vocabulary should matter, for example `Association` vs `Flow` vs `Generalization`.                                    |
-| `degreeHistogram`        | Increase when graph shape matters more than exact names.                                                                                         |
-| `inDegreeHistogram`      | Increase when incoming relationship patterns are important in directed graphs.                                                                    |
-| `outDegreeHistogram`     | Increase when outgoing relationship patterns are important in directed graphs.                                                                    |
-| `sizeSimilarity`         | Increase to avoid matching small fragments with larger models.                                                                                    |
-| `densitySimilarity`      | Increase when sparse and dense models should be separated.                                                                                        |
-| `useDirectedMetrics`     | Turn on for directed languages or datasets where incoming and outgoing relationships have different meaning.                                      |
-| `normalizeParallelEdges` | Turn on when duplicate parallel relationships are export noise; keep off when repeated relationships represent meaningful multiplicity.           |
+| Parameter                | When to change it                                                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `graphSimilarity`        | Raise it to reduce false positives; lower it to review weaker structural or vocabulary similarity.                                      |
+| `nodeNameJaccard`        | Increase when element names are meaningful and renamed models should be penalized.                                                      |
+| `nodeTypeJaccard`        | Increase when element type consistency matters, for example distinguishing actors, objects, classes, tasks, and events.                 |
+| `edgeTypeJaccard`        | Increase when relationship vocabulary should matter, for example `Association` vs `Flow` vs `Generalization`.                           |
+| `degreeHistogram`        | Increase when graph shape matters more than exact names.                                                                                |
+| `inDegreeHistogram`      | Increase when incoming relationship patterns are important in directed graphs.                                                          |
+| `outDegreeHistogram`     | Increase when outgoing relationship patterns are important in directed graphs.                                                          |
+| `sizeSimilarity`         | Increase to avoid matching small fragments with larger models.                                                                          |
+| `densitySimilarity`      | Increase when sparse and dense models should be separated.                                                                              |
+| `useDirectedMetrics`     | Turn on for directed languages or datasets where incoming and outgoing relationships have different meaning.                            |
+| `normalizeParallelEdges` | Turn on when duplicate parallel relationships are export noise; keep off when repeated relationships represent meaningful multiplicity. |
 
 
 At least one configured weight must be greater than `0`. A metric with weight `0` is ignored.
@@ -714,15 +714,15 @@ Use higher node-name weight when renamed models should be less likely to match.
 Configuration:
 
 
-| Parameter   | Value  |
-| ----------- | ------ |
-| Threshold   | `0.85` |
-| Node names  | `0.60` |
-| Node types  | `0.10` |
-| Edge types  | `0.10` |
-| Degree      | `0.10` |
-| Size        | `0.05` |
-| Density     | `0.05` |
+| Parameter  | Value  |
+| ---------- | ------ |
+| Threshold  | `0.85` |
+| Node names | `0.60` |
+| Node types | `0.10` |
+| Edge types | `0.10` |
+| Degree     | `0.10` |
+| Size       | `0.05` |
+| Density    | `0.05` |
 
 
 With the same metrics as the previous example:
@@ -768,8 +768,8 @@ Use **Directed metrics** when edge direction should affect the score.
 Models:
 
 
-| Model | Relationships                            |
-| ----- | ---------------------------------------- |
+| Model | Relationships                           |
+| ----- | --------------------------------------- |
 | A     | `Customer -> Order`, `Order -> Invoice` |
 | B     | `Order -> Customer`, `Invoice -> Order` |
 
@@ -792,10 +792,10 @@ Use **Normalize parallel edges** when repeated parallel relationships are export
 Models:
 
 
-| Model | Relationships                                              |
-| ----- | ---------------------------------------------------------- |
-| A     | one `Customer -> Order` edge with type `Association`       |
-| B     | three `Customer -> Order` edges with type `Association`    |
+| Model | Relationships                                           |
+| ----- | ------------------------------------------------------- |
+| A     | one `Customer -> Order` edge with type `Association`    |
+| B     | three `Customer -> Order` edges with type `Association` |
 
 
 With **Normalize parallel edges** off:
@@ -834,243 +834,14 @@ For best results, start with the default threshold and weights, inspect the high
 based on the type of false positives you see. Use Graph Metrics as a review and voting method, not as proof that two
 models are exactly the same.
 
-## 4) Graph Embeddings
+## 4) Graph Embeddings (currently disabled)
 
-Graph Embeddings is a near-duplicate detection method for models with similar graph structure and optional semantic
-features. It builds one shared Node2Vec graph for the selected dataset, learns node embeddings from random walks, pools
-those node embeddings into one vector per model, and compares every model pair with cosine similarity.
+TODO: currently experimental
 
-Graph Embeddings is best for exploratory duplicate detection when graph shape matters and exact matching is too strict.
-With semantic features enabled, it can also use normalized node names, node types, and edge types as part of the embedding
-signal.
+## 5) BERT
 
-Graph Embeddings does **not** prove exact graph equality. It produces a learned similarity score, so high-scoring pairs
-should be reviewed or combined with other methods through voting.
+TODO: Verify implementation and add documentation
 
-### What Graph Embeddings Compares
+## 6) Isomorphism (currently disabled)
 
-For the selected dataset, MCP4CM:
-
-1. creates one shared graph containing all selected models,
-2. prefixes each original model node with its model id, so local node ids do not collide,
-3. optionally adds shared semantic feature nodes for normalized node names, node types, and edge types,
-4. trains one Node2Vec model on the shared graph,
-5. pools the learned node vectors into one vector per model,
-6. computes cosine similarity for every model pair,
-7. reports pairs whose similarity is greater than or equal to the configured threshold.
-
-The shared graph keeps model nodes separate but lets semantic features connect related models. For example, two different
-models that both contain an `Order` element connect to the same shared feature node:
-
-
-```text
-model::A::node::n1  ->  feature::name::order
-model::B::node::x7  ->  feature::name::order
-```
-
-
-This gives Node2Vec a way to learn that the two models share a normalized concept, while still preserving each model's own
-topology.
-
-### Semantic Feature Nodes
-
-
-| Feature option              | Example feature node                 | What it adds to the embedding graph                         |
-| --------------------------- | ------------------------------------ | ----------------------------------------------------------- |
-| `graphEmbeddingUseNodeNames` | `feature::name::order`               | Shared normalized element-name signals.                     |
-| `graphEmbeddingUseNodeTypes` | `feature::type::business object`     | Shared normalized element-type signals.                     |
-| `graphEmbeddingUseEdgeTypes` | `feature::edge_type::association`    | Shared relationship-type signals represented as walk nodes. |
-
-
-When all three options are disabled, Graph Embeddings becomes topology-only. In that mode, two models with the same shape
-can look similar even if their names and types are completely different.
-
-### Parameters
-
-
-| Parameter                         | UI label    | Type                  | Default | Description                                                                                                 |
-| --------------------------------- | ----------- | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `graphEmbeddingThreshold`         | Threshold   | Float from `0` to `1` | `0.9`   | Minimum cosine similarity required for Graph Embeddings to vote for a pair.                                 |
-| `graphEmbeddingDimensions`        | Dimensions  | Integer               | `64`    | Number of dimensions learned for each Node2Vec node vector.                                                 |
-| `graphEmbeddingWalkLength`        | Walk length | Integer               | `10`    | Number of steps in each random walk.                                                                        |
-| `graphEmbeddingNumWalks`          | Walks       | Integer               | `20`    | Number of random walks generated per node.                                                                  |
-| `graphEmbeddingWorkers`           | Workers     | Integer               | `1`     | Number of worker processes used by Node2Vec. Keep at `1` for the most reproducible runs.                    |
-| `graphEmbeddingSeed`              | Seed        | Integer               | `42`    | Random seed passed to Node2Vec and Word2Vec training.                                                       |
-| `graphEmbeddingPooling`           | Pooling     | `mean` or `mean_max`  | `mean`  | How node vectors are combined into one model vector.                                                        |
-| `graphEmbeddingUseNodeNames`      | Node names  | Boolean               | `true`  | Adds shared normalized node-name feature nodes.                                                             |
-| `graphEmbeddingUseNodeTypes`      | Node types  | Boolean               | `true`  | Adds shared normalized node-type feature nodes.                                                             |
-| `graphEmbeddingUseEdgeTypes`      | Edge types  | Boolean               | `true`  | Adds shared normalized edge-type feature nodes.                                                             |
-| `graphEmbeddingPoolFeatures`      | Pool features | Boolean             | `false` | Includes feature nodes directly in the final per-model vector. By default, they influence walks only.       |
-
-
-Legacy API payloads may also use `graphEmbedding` as a threshold fallback, but new configurations should use
-`graphEmbeddingThreshold`.
-
-Guidance:
-
-
-| Parameter                         | When to change it                                                                                                                                     |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `graphEmbeddingThreshold`         | Raise it to reduce false positives; lower it to explore weaker learned similarities that require manual review.                                       |
-| `graphEmbeddingDimensions`        | Increase for larger, more varied graphs; keep modest values for small datasets to avoid noisy vectors and higher runtime.                             |
-| `graphEmbeddingWalkLength`        | Increase when broader graph context should matter; reduce for small graphs or when local neighborhoods are more important.                            |
-| `graphEmbeddingNumWalks`          | Increase for more stable sampling at the cost of runtime.                                                                                             |
-| `graphEmbeddingWorkers`           | Keep at `1` when reproducibility matters; increase only when runtime is a bigger concern than exact repeatability.                                    |
-| `graphEmbeddingSeed`              | Change only when you intentionally want another stochastic run.                                                                                        |
-| `graphEmbeddingPooling`           | Use `mean` as the default; try `mean_max` when the presence of strong local features should influence the model vector more.                          |
-| `graphEmbeddingUseNodeNames`      | Keep on when meaningful domain vocabulary should affect similarity; turn off for pure structural exploration.                                        |
-| `graphEmbeddingUseNodeTypes`      | Keep on when element kinds such as classes, actors, tasks, events, or objects should affect similarity.                                               |
-| `graphEmbeddingUseEdgeTypes`      | Keep on when relationship types such as association, flow, access, containment, or generalization should affect similarity.                          |
-| `graphEmbeddingPoolFeatures`      | Keep off by default; turn on only when shared semantic features should directly contribute to the final model vector, not only influence random walks. |
-
-
-### Examples
-
-#### Default Graph Embeddings
-
-Configuration:
-
-
-| Parameter    | Value  |
-| ------------ | ------ |
-| Threshold    | `0.9`  |
-| Node names   | On     |
-| Node types   | On     |
-| Edge types   | On     |
-| Pooling      | `mean` |
-| Pool features | Off   |
-
-
-Models:
-
-
-| Model | Nodes                                              | Edge type     |
-| ----- | -------------------------------------------------- | ------------- |
-| A     | `Order: BusinessObject`, `Customer: BusinessActor` | `Association` |
-| B     | `Order: BusinessObject`, `Customer: BusinessActor` | `Association` |
-| C     | `Invoice: BusinessObject`, `Payment: BusinessActor` | `Association` |
-
-
-Result:
-
-- A and B are likely to receive a high score because they share topology, node names, node types, and edge types.
-- C has the same small shape and edge type, but different node names, so its score against A or B should be lower than
-  the A-B score.
-
-#### Topology-Only Mode
-
-Use topology-only mode when labels are noisy, missing, generic, or intentionally ignored.
-
-Configuration:
-
-
-| Parameter  | Value |
-| ---------- | ----- |
-| Node names | Off   |
-| Node types | Off   |
-| Edge types | Off   |
-
-
-Models:
-
-
-| Model | Nodes                                              | Shape                         |
-| ----- | -------------------------------------------------- | ----------------------------- |
-| A     | `Order`, `Customer`                                | one node connected to another |
-| B     | `Invoice`, `Payment`                               | one node connected to another |
-
-
-Result:
-
-- A and B can receive a high score because their topology is the same.
-- This is useful for finding structurally similar models, but it is weaker evidence for true duplicates because semantics
-  are ignored.
-
-#### Semantic Features Separate Same-Shape Models
-
-Use the default semantic feature settings when same-shape models should not automatically match.
-
-Configuration:
-
-
-| Parameter  | Value |
-| ---------- | ----- |
-| Node names | On    |
-| Node types | On    |
-| Edge types | On    |
-
-
-Models:
-
-
-| Model | Nodes                                              | Edge type     |
-| ----- | -------------------------------------------------- | ------------- |
-| A     | `Order: BusinessObject`, `Customer: BusinessActor` | `Association` |
-| B     | `Invoice: BusinessObject`, `Payment: BusinessActor` | `Association` |
-
-
-Result:
-
-- A and B share graph shape, node types, and edge type.
-- Different node-name feature nodes lower the similarity compared with two models that also share names.
-
-#### Pool Features
-
-By default, feature nodes influence random walks but are not directly averaged into the final model vector. This avoids
-common features such as `type:class` or `edge_type:association` dominating the model embedding.
-
-Turn **Pool features** on when the feature nodes themselves should be part of the final model vector.
-
-Configuration:
-
-
-| Parameter     | Value |
-| ------------- | ----- |
-| Pool features | On    |
-
-
-Result:
-
-- Shared feature nodes have a stronger direct effect on the final cosine score.
-- Models with many common names, types, or edge types may score higher.
-- Generic shared features can also increase false positives, so inspect results carefully.
-
-#### Pooling Strategy
-
-The default `mean` pooling averages all selected node vectors for a model.
-
-Use `mean_max` when strong local signals should be preserved:
-
-
-| Pooling    | Effect                                                                 |
-| ---------- | ---------------------------------------------------------------------- |
-| `mean`     | Smooths all node vectors into one average model vector.                |
-| `mean_max` | Concatenates average features with maximum observed feature strength.  |
-
-
-`mean_max` can help when one distinctive area of the graph is important, but it also doubles the final vector size and may
-make scores less smooth.
-
-### Strengths
-
-- Uses graph topology rather than only text vocabulary.
-- Can include normalized node names, node types, and edge types through semantic feature nodes.
-- More flexible than exact Isomorphism.
-- Better suited than Graph Metrics for capturing neighborhood patterns from random walks.
-- Trains one shared embedding model, so pairwise cosine scores use one shared vector space.
-- Useful as an exploratory voting signal with Hashing, TF-IDF, Graph Metrics, or Isomorphism.
-
-### Limitations
-
-- Requires optional `node2vec` machine-learning dependencies.
-- Stochastic: fixed seeds and `workers=1` improve reproducibility but do not make the method as transparent as Hashing or
-  Graph Metrics.
-- More expensive than Hashing, TF-IDF, and Graph Metrics on large datasets.
-- Learned scores are harder to explain than metric-based scores.
-- Very small, sparse, or edgeless graphs may not produce useful embeddings.
-- Topology-only mode can match semantically unrelated models with the same shape.
-- Semantic feature nodes depend on parser quality and normalized labels; noisy labels can still produce noisy evidence.
-
-For best results, use Graph Embeddings as a candidate-generation and voting method. Keep semantic feature nodes enabled for
-normal duplicate detection, use topology-only mode only for exploration, and review high-scoring pairs in the graph
-inspector before making final cleansing decisions.
+TODO: currently experimental
