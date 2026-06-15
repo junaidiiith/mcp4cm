@@ -4,7 +4,7 @@ This document explains how MCP4CM reads names and types from parsed models, how 
 
 The goal is to help users understand what the application is measuring without needing to know the backend implementation.
 
-## Why Names and Types Matter
+## Introduction
 
 Most cleansing decisions depend on whether a parsed model contains meaningful vocabulary.
 
