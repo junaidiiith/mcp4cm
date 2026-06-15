@@ -18,10 +18,8 @@ from mcp4cm.name_classification import (
     raw_node_name,
     raw_node_type,
 )
-from mcp4cm.parsers.fingerprints import canonical_graph_hash
 from mcp4cm.utils import pair_count, pair_key, progress_percent
 
-HashMode = Literal["names", "names_types", "canonical_graph"]
 IsomorphismMode = Literal["structure", "names", "names_types"]
 TfidfTokenMode = Literal["names", "names_types_bag", "typed_name_pairs"]
 StopwordsMode = Literal["none", "english"]
@@ -60,48 +58,6 @@ class DuplicateDecision:
     required_votes: int
     techniques: tuple[str, ...]
     scores: dict[str, float]
-
-
-def detect_duplicates_by_hash(
-    dataset: Dataset,
-    *,
-    mode: HashMode = "canonical_graph",
-    progress: ProgressCallback | None = None,
-) -> list[DuplicateGroup]:
-    """Detect exact duplicates by hash.
-
-    ``mode="canonical_graph"`` keeps the original structural hash behavior.
-    Use ``mode="names"`` or ``mode="names_types"`` for exact name-based hashing.
-    """
-
-    if mode == "canonical_graph":
-        groups: dict[str, list[str]] = defaultdict(list)
-        records = list(dataset)
-        total = len(records)
-        _report_progress(
-            progress, phase="fingerprint", current=0, total=total, message="Computing exact duplicate fingerprints."
-        )
-        for index, record in enumerate(records, start=1):
-            fingerprint = canonical_graph_hash(record)
-            groups[fingerprint].append(record.model_id)
-            _report_progress(
-                progress,
-                phase="fingerprint",
-                current=index,
-                total=total,
-                message=f"Computed {index} of {total} fingerprints.",
-            )
-        return [
-            DuplicateGroup(fingerprint=fingerprint, model_ids=tuple(model_ids))
-            for fingerprint, model_ids in groups.items()
-            if len(model_ids) > 1
-        ]
-
-    return detect_duplicates_by_name_hash(
-        dataset,
-        include_types=(mode == "names_types"),
-        progress=progress,
-    )
 
 
 def detect_duplicates_by_name_hash(

@@ -8,7 +8,6 @@ from mcp4cm.dummy import (
     summarize_filters_by_language,
 )
 from mcp4cm.duplicates import (
-    detect_duplicates_by_hash,
     detect_duplicates_by_node_name_hash,
     detect_duplicates_by_node_name_type_hash,
     graph_isomorphism_pairs,
@@ -106,7 +105,7 @@ def test_hash_duplicate_detection_smoke():
     }
     first = parser.parse(raw, model_id="one")
     second = parser.parse(raw, model_id="two")
-    groups = detect_duplicates_by_hash(Dataset([first, second], "archimate"))
+    groups = detect_duplicates_by_node_name_hash(Dataset([first, second], "archimate"))
     assert len(groups) == 1
     assert groups[0].model_ids == ("one", "two")
 
