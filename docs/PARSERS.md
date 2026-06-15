@@ -15,7 +15,7 @@ For dataset download and preparation instructions, see [DOWNLOAD_DATASETS.md](DO
     - [UML JSON and Ecore JSON](#uml-json-and-ecore-json)
     - [UML XMI](#uml-xmi)
     - [UML XML with PyEcore](#uml-xml-with-pyecore)
-    - [Ecore `.ecore](#ecore-ecore)`
+    - [Ecore](#ecore)
     - [ArchiMate JSON](#archimate-json)
     - [ArchiMate Archi XML](#archimate-archi-xml)
     - [BPMN Signavio JSON](#bpmn-signavio-json)
@@ -208,7 +208,7 @@ parse_file("model.uml", language="uml", format="xml-pyecore")
 
 Use this parser when you want to compare the native UML XMI parser against PyEcore loading behavior.
 
-### Ecore `.ecore`
+### Ecore
 
 The Ecore parser reads Ecore metamodel files:
 
