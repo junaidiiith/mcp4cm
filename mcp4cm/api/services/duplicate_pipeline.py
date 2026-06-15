@@ -244,7 +244,9 @@ def add_technique_model_counts(
     }
 
 
-def graph_similarity_weights(thresholds: dict[str, Any]) -> dict[str, float] | None:
+def graph_similarity_weights(
+    thresholds: dict[str, Any], *, use_directed_metrics: bool = False
+) -> dict[str, float] | None:
     weights = thresholds.get("graphWeights")
     if not isinstance(weights, dict):
         return None
@@ -256,10 +258,10 @@ def graph_similarity_weights(thresholds: dict[str, Any]) -> dict[str, float] | N
         "size_similarity": float(weights.get("sizeSimilarity", 0.15)),
         "density_similarity": float(weights.get("densitySimilarity", 0.10)),
     }
-    if "inDegreeHistogram" in weights:
-        parsed["in_degree_histogram_similarity"] = float(weights.get("inDegreeHistogram", 0.0))
-    if "outDegreeHistogram" in weights:
-        parsed["out_degree_histogram_similarity"] = float(weights.get("outDegreeHistogram", 0.0))
+    if use_directed_metrics or "inDegreeHistogram" in weights:
+        parsed["in_degree_histogram_similarity"] = float(weights.get("inDegreeHistogram", 0.15))
+    if use_directed_metrics or "outDegreeHistogram" in weights:
+        parsed["out_degree_histogram_similarity"] = float(weights.get("outDegreeHistogram", 0.15))
     return parsed
 
 
@@ -603,11 +605,12 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
                 add_pair_evidence(technique, technique_pairs)
             elif technique == "graph_similarity":
+                use_directed_metrics = parse_bool(thresholds.get("useDirectedMetrics"), default=False)
                 pairs = graph_similarity_pairs(
                     projected_dataset,
                     threshold=float(thresholds.get("graphSimilarity", 0.85)),
-                    weights=graph_similarity_weights(thresholds),
-                    use_directed_metrics=parse_bool(thresholds.get("useDirectedMetrics"), default=False),
+                    weights=graph_similarity_weights(thresholds, use_directed_metrics=use_directed_metrics),
+                    use_directed_metrics=use_directed_metrics,
                     normalize_parallel_edges=parse_bool(thresholds.get("normalizeParallelEdges"), default=False),
                     progress=report_algorithm_progress(technique),
                 )
@@ -623,6 +626,11 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                     num_walks=int(thresholds.get("graphEmbeddingNumWalks", 20)),
                     workers=int(thresholds.get("graphEmbeddingWorkers", 1)),
                     seed=int(thresholds.get("graphEmbeddingSeed", 42)),
+                    use_node_names=parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),
+                    use_node_types=parse_bool(thresholds.get("graphEmbeddingUseNodeTypes"), default=True),
+                    use_edge_types=parse_bool(thresholds.get("graphEmbeddingUseEdgeTypes"), default=True),
+                    pool_feature_nodes=parse_bool(thresholds.get("graphEmbeddingPoolFeatures"), default=False),
+                    pooling=str(thresholds.get("graphEmbeddingPooling", "mean")),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
@@ -724,6 +732,19 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "minDf": parse_min_df(thresholds.get("minDf", 1)),
         "ngramRange": list(parse_ngram_range(thresholds.get("ngramRange", [1, 1]))),
         "stopwordsMode": parse_stopwords_mode(thresholds.get("stopwordsMode", "none")),
+        "graphEmbeddingThreshold": float(
+            thresholds.get("graphEmbeddingThreshold", thresholds.get("graphEmbedding", 0.9))
+        ),
+        "graphEmbeddingDimensions": int(thresholds.get("graphEmbeddingDimensions", 64)),
+        "graphEmbeddingWalkLength": int(thresholds.get("graphEmbeddingWalkLength", 10)),
+        "graphEmbeddingNumWalks": int(thresholds.get("graphEmbeddingNumWalks", 20)),
+        "graphEmbeddingWorkers": int(thresholds.get("graphEmbeddingWorkers", 1)),
+        "graphEmbeddingSeed": int(thresholds.get("graphEmbeddingSeed", 42)),
+        "graphEmbeddingUseNodeNames": parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),
+        "graphEmbeddingUseNodeTypes": parse_bool(thresholds.get("graphEmbeddingUseNodeTypes"), default=True),
+        "graphEmbeddingUseEdgeTypes": parse_bool(thresholds.get("graphEmbeddingUseEdgeTypes"), default=True),
+        "graphEmbeddingPoolFeatures": parse_bool(thresholds.get("graphEmbeddingPoolFeatures"), default=False),
+        "graphEmbeddingPooling": str(thresholds.get("graphEmbeddingPooling", "mean")),
     }
 
     return {

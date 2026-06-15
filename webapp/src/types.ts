@@ -13,6 +13,8 @@ export interface GraphWeights {
   nodeTypeJaccard: number;
   edgeTypeJaccard: number;
   degreeHistogram: number;
+  inDegreeHistogram: number;
+  outDegreeHistogram: number;
   sizeSimilarity: number;
   densitySimilarity: number;
 }
@@ -39,6 +41,11 @@ export interface Thresholds {
   graphEmbeddingNumWalks: number;
   graphEmbeddingWorkers: number;
   graphEmbeddingSeed: number;
+  graphEmbeddingUseNodeNames: boolean;
+  graphEmbeddingUseNodeTypes: boolean;
+  graphEmbeddingUseEdgeTypes: boolean;
+  graphEmbeddingPoolFeatures: boolean;
+  graphEmbeddingPooling: "mean" | "mean_max";
   bertSemantic: number;
   semanticTextMode: "names" | "names_types_bag" | "typed_name_pairs";
   bertModelName: string;
@@ -184,10 +191,14 @@ export interface VisualizationPayload {
   labelPipelineRows: LabelPipelineRow[];
   nameReuseDistribution: StatisticItem[];
   elementTypeTreemap: StatisticItem[];
-  typeConceptLinks: Array<{ type: string; concept: string; count: number }>;
   modelVocabularyScatter: Array<{
     id: string;
+    nodeCount?: number;
+    edgeCount?: number;
+    graphSize?: number;
     namedElements: number;
+    semanticNameCount?: number;
+    placeholderNameCount?: number;
     uniqueNames: number;
     tokens: number;
     uniqueTokens: number;
@@ -195,14 +206,6 @@ export interface VisualizationPayload {
     missingNames: number;
     missingNameRatio: number;
   }>;
-  topicModel: {
-    available: boolean;
-    reason?: string;
-    projectionMethod?: string;
-    points?: Array<{ id: string; x: number; y: number; topic: string; topicStrength: number; namedElements: number; uniqueNames: number }>;
-    prevalence?: StatisticItem[];
-  };
-  nameCountBoxplot: { min: number; q1: number; median: number; q3: number; max: number };
   topNamesPerModel: StatisticItem[];
 }
 

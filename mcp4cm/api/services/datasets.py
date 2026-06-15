@@ -83,15 +83,13 @@ def serialize_statistics(dataset: Dataset | RuntimeDataset) -> dict[str, Any]:
     return build_statistics_payload(dataset)
 
 
-def build_statistics_payload(
-    records, *, skip_topic_model: bool = False, topic_model_skip_reason: str = ""
-) -> dict[str, Any]:
+def build_statistics_payload(records) -> dict[str, Any]:
     from mcp4cm.statistics import CorpusStatisticsAccumulator
 
     accumulator = CorpusStatisticsAccumulator()
     for record in records:
         accumulator.add(record)
-    return accumulator.build_payload(skip_topic_model=skip_topic_model, topic_model_skip_reason=topic_model_skip_reason)
+    return accumulator.build_payload()
 
 
 def get_dataset_statistics(dataset_id: str) -> dict[str, Any]:

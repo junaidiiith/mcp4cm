@@ -12,7 +12,7 @@ from mcp4cm._deps import require_networkx
 from mcp4cm.api import create_app, process_utils
 from mcp4cm.api.process_utils import kill_processes_on_port, pids_on_port
 from mcp4cm.api.services.datasets import top_items
-from mcp4cm.api.services.duplicate_pipeline import selected_duplicate_techniques
+from mcp4cm.api.services.duplicate_pipeline import graph_similarity_weights, selected_duplicate_techniques
 from mcp4cm.api.services.upload_summary import empty_upload_summary, merge_model_diagnostics
 from mcp4cm.api.state import DATASETS, DUPLICATE_JOBS, UPLOAD_PARSE_JOBS, UPLOAD_SESSIONS
 from mcp4cm.core import Dataset, ModelDiagnostics
@@ -679,6 +679,40 @@ def test_selected_duplicate_techniques_accepts_cached_payload_shapes():
         "graph_embedding"
     ]
     assert selected_duplicate_techniques({"selected": [{"id": "bert_semantic"}]}) == ["bert_semantic"]
+
+
+def test_graph_similarity_weights_include_directed_defaults_when_enabled():
+    weights = graph_similarity_weights(
+        {
+            "graphWeights": {
+                "nodeNameJaccard": 0.25,
+                "nodeTypeJaccard": 0.2,
+                "edgeTypeJaccard": 0.15,
+                "degreeHistogram": 0.15,
+                "sizeSimilarity": 0.15,
+                "densitySimilarity": 0.1,
+            }
+        },
+        use_directed_metrics=True,
+    )
+
+    assert weights["in_degree_histogram_similarity"] == 0.15
+    assert weights["out_degree_histogram_similarity"] == 0.15
+
+
+def test_graph_similarity_weights_use_explicit_directed_weights():
+    weights = graph_similarity_weights(
+        {
+            "graphWeights": {
+                "inDegreeHistogram": 0.3,
+                "outDegreeHistogram": 0.4,
+            }
+        },
+        use_directed_metrics=True,
+    )
+
+    assert weights["in_degree_histogram_similarity"] == 0.3
+    assert weights["out_degree_histogram_similarity"] == 0.4
 
 
 def test_flask_upload_dataset_route():

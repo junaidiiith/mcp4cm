@@ -299,6 +299,30 @@ function TechniqueConfig({
             onChange={(event) => patchWeights({ degreeHistogram: Number(event.target.value) })}
           />
         </label>
+        {thresholds.useDirectedMetrics && (
+          <>
+            <label>
+              In-degree histogram
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={weights.inDegreeHistogram}
+                onChange={(event) => patchWeights({ inDegreeHistogram: Number(event.target.value) })}
+              />
+            </label>
+            <label>
+              Out-degree histogram
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={weights.outDegreeHistogram}
+                onChange={(event) => patchWeights({ outDegreeHistogram: Number(event.target.value) })}
+              />
+            </label>
+          </>
+        )}
         <label>
           Size
           <input
@@ -406,6 +430,48 @@ function TechniqueConfig({
             value={thresholds.graphEmbeddingSeed}
             onChange={(event) => patch({ graphEmbeddingSeed: Number(event.target.value) })}
           />
+        </label>
+        <label>
+          Pooling
+          <select
+            value={thresholds.graphEmbeddingPooling}
+            onChange={(event) => patch({ graphEmbeddingPooling: event.target.value as Thresholds["graphEmbeddingPooling"] })}
+          >
+            <option value="mean">mean</option>
+            <option value="mean_max">mean_max</option>
+          </select>
+        </label>
+        <label className="inlineCheck">
+          <input
+            type="checkbox"
+            checked={thresholds.graphEmbeddingUseNodeNames}
+            onChange={(event) => patch({ graphEmbeddingUseNodeNames: event.target.checked })}
+          />
+          Node names
+        </label>
+        <label className="inlineCheck">
+          <input
+            type="checkbox"
+            checked={thresholds.graphEmbeddingUseNodeTypes}
+            onChange={(event) => patch({ graphEmbeddingUseNodeTypes: event.target.checked })}
+          />
+          Node types
+        </label>
+        <label className="inlineCheck">
+          <input
+            type="checkbox"
+            checked={thresholds.graphEmbeddingUseEdgeTypes}
+            onChange={(event) => patch({ graphEmbeddingUseEdgeTypes: event.target.checked })}
+          />
+          Edge types
+        </label>
+        <label className="inlineCheck">
+          <input
+            type="checkbox"
+            checked={thresholds.graphEmbeddingPoolFeatures}
+            onChange={(event) => patch({ graphEmbeddingPoolFeatures: event.target.checked })}
+          />
+          Pool features
         </label>
       </div>
     );

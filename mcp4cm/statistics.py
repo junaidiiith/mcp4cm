@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import warnings
 from collections import Counter
 from statistics import mean, median
 from typing import Any
@@ -74,7 +73,6 @@ def _model_visualization_row(record: ModelRecord) -> dict[str, Any]:
         "uniqueNames": len(set(names)),
         "tokens": len(tokens),
         "uniqueTokens": len(set(tokens)),
-        "text": " ".join(tokens),
     }
 
 
@@ -397,72 +395,6 @@ def model_quality_watchlists(rows: list[dict[str, Any]], *, limit: int = 12) -> 
     }
 
 
-def boxplot_summary(values: list[int]) -> dict[str, float]:
-    if not values:
-        return {"min": 0, "q1": 0, "median": 0, "q3": 0, "max": 0}
-    ordered = sorted(values)
-    return {
-        "min": ordered[0],
-        "q1": percentile(ordered, 0.25),
-        "median": percentile(ordered, 0.5),
-        "q3": percentile(ordered, 0.75),
-        "max": ordered[-1],
-    }
-
-
-def topic_model(models: list[dict[str, Any]]) -> dict[str, Any]:
-    texts = [model["text"] for model in models]
-    if len(texts) < 2 or not any(texts):
-        return {"available": False, "reason": "Topic modeling requires at least two models with named elements."}
-    try:
-        import numpy as np
-        from sklearn.decomposition import NMF, TruncatedSVD
-        from sklearn.feature_extraction.text import TfidfVectorizer
-
-        vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1, max_df=1.0, sublinear_tf=True)
-        matrix = vectorizer.fit_transform(texts)
-        topic_count = min(8, matrix.shape[0], matrix.shape[1])
-        if topic_count < 1:
-            return {"available": False, "reason": "Topic modeling found no usable vocabulary."}
-        model = NMF(n_components=topic_count, init="nndsvda", random_state=42, max_iter=600)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            weights = model.fit_transform(matrix)
-        feature_names = np.array(vectorizer.get_feature_names_out())
-        labels = [
-            f"Topic {index}: {', '.join(feature_names[np.argsort(row)[::-1][:4]])}"
-            for index, row in enumerate(model.components_)
-        ]
-        if matrix.shape[0] >= 2 and matrix.shape[1] >= 2:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                projection = TruncatedSVD(n_components=2, random_state=42).fit_transform(matrix)
-        else:
-            projection = np.column_stack((np.arange(matrix.shape[0]), np.zeros(matrix.shape[0])))
-        return {
-            "available": True,
-            "projectionMethod": "TruncatedSVD",
-            "points": [
-                {
-                    "id": models[index]["id"],
-                    "x": round(float(projection[index, 0]), 6),
-                    "y": round(float(projection[index, 1]), 6),
-                    "topic": labels[int(weights[index].argmax())],
-                    "topicStrength": round(float(weights[index].max()), 6),
-                    "namedElements": models[index]["namedElements"],
-                    "uniqueNames": models[index]["uniqueNames"],
-                }
-                for index in range(len(models))
-            ],
-            "prevalence": [
-                {"label": label, "count": round(float(value), 6)}
-                for label, value in zip(labels, weights.mean(axis=0), strict=True)
-            ],
-        }
-    except Exception as exc:
-        return {"available": False, "reason": f"Topic modeling unavailable: {exc}"}
-
-
 def _distribution(values: list[int]) -> dict[str, float | int]:
     if not values:
         return {"min": 0, "max": 0, "mean": 0, "median": 0}
@@ -474,7 +406,6 @@ def _distribution(values: list[int]) -> dict[str, float | int]:
     }
 
 
-TOPIC_MODEL_MODEL_LIMIT = 500
 SCATTER_POINT_LIMIT = 2000
 
 
@@ -503,7 +434,6 @@ class CorpusStatisticsAccumulator:
     def __init__(self) -> None:
         self.node_counts: list[int] = []
         self.edge_counts: list[int] = []
-        self.name_slot_counts: list[int] = []
         self.name_count_values: list[int] = []
         self.missing_ratios: list[float] = []
         self.languages: Counter[str] = Counter()
@@ -523,7 +453,6 @@ class CorpusStatisticsAccumulator:
         self.type_concept_counter: dict[str, Counter[str]] = {}
         self.type_concept_classification_counter: dict[str, dict[str, Counter[str]]] = {}
         self.scatter_rows: list[dict[str, Any]] = []
-        self.topic_model_rows: list[dict[str, Any]] = []
         self.sample_models: list[dict[str, Any]] = []
         self.unique_name_doc_freq: Counter[str] = Counter()
         self.label_pipeline_counter: Counter[tuple[str, str, str, str, tuple[str, ...], tuple[str, ...], str]] = (
@@ -548,7 +477,6 @@ class CorpusStatisticsAccumulator:
                 self.name_counter[stripped] += 1
 
         row = _model_visualization_row(record)
-        self.name_slot_counts.append(int(row["nameSlots"]))
         self.semantic_name_counts.append(int(row["semanticNameCount"]))
         self.name_count_values.append(len(record.names))
         if row["nameSlots"]:
@@ -574,7 +502,12 @@ class CorpusStatisticsAccumulator:
             self.scatter_rows.append(
                 {
                     "id": row["id"],
+                    "nodeCount": int(record.node_count),
+                    "edgeCount": int(record.edge_count),
+                    "graphSize": int(record.node_count) + int(record.edge_count),
                     "namedElements": row["namedElements"],
+                    "semanticNameCount": row["semanticNameCount"],
+                    "placeholderNameCount": row["placeholderNameCount"],
                     "uniqueNames": row["uniqueNames"],
                     "tokens": row["tokens"],
                     "uniqueTokens": row["uniqueTokens"],
@@ -583,9 +516,6 @@ class CorpusStatisticsAccumulator:
                     "missingNameRatio": row["missingNameRatio"],
                 }
             )
-
-        if len(self.topic_model_rows) < TOPIC_MODEL_MODEL_LIMIT:
-            self.topic_model_rows.append(row)
 
         if len(self.sample_models) < 8:
             self.sample_models.append(
@@ -641,7 +571,7 @@ class CorpusStatisticsAccumulator:
         self.unique_name_doc_freq.update(model_names)
         self.label_pipeline_doc_freq.update(model_label_rows)
 
-    def build_payload(self, *, skip_topic_model: bool = False, topic_model_skip_reason: str = "") -> dict[str, Any]:
+    def build_payload(self) -> dict[str, Any]:
         model_count = len(self.node_counts)
         return {
             "summary": {
@@ -654,43 +584,11 @@ class CorpusStatisticsAccumulator:
             },
             "topTypes": counter_items(self.type_counter),
             "topNames": counter_items(self.name_counter),
-            "visualizations": self._build_visualizations(
-                model_count,
-                skip_topic_model=skip_topic_model,
-                topic_model_skip_reason=topic_model_skip_reason,
-            ),
+            "visualizations": self._build_visualizations(model_count),
             "sampleModels": self.sample_models,
         }
 
-    def _build_visualizations(
-        self,
-        model_count: int,
-        *,
-        skip_topic_model: bool = False,
-        topic_model_skip_reason: str = "",
-    ) -> dict[str, Any]:
-        major_types = [label for label, _ in self.entry_type_counter.most_common(6)]
-        type_links: list[dict[str, Any]] = []
-        for element_type in major_types:
-            concepts = self.type_concept_counter.get(element_type, Counter())
-            type_links.extend(
-                {"type": element_type, "concept": concept, "count": count} for concept, count in concepts.most_common(8)
-            )
-
-        topic_result: dict[str, Any]
-        if skip_topic_model:
-            topic_result = {
-                "available": False,
-                "reason": topic_model_skip_reason or "Topic modeling skipped for this statistics snapshot.",
-            }
-        elif model_count > TOPIC_MODEL_MODEL_LIMIT:
-            topic_result = {
-                "available": False,
-                "reason": f"Topic modeling skipped for datasets with more than {TOPIC_MODEL_MODEL_LIMIT} models.",
-            }
-        else:
-            topic_result = topic_model(self.topic_model_rows)
-
+    def _build_visualizations(self, model_count: int) -> dict[str, Any]:
         scatter_points = self.scatter_rows
         if model_count > len(scatter_points):
             scatter_note = f"Showing {len(scatter_points)} of {model_count} models."
@@ -735,10 +633,7 @@ class CorpusStatisticsAccumulator:
             ),
             "nameReuseDistribution": name_reuse_distribution(self.concept_doc_freq, model_count),
             "elementTypeTreemap": counter_items(self.entry_type_counter, 40),
-            "typeConceptLinks": type_links,
             "modelVocabularyScatter": scatter_points,
             "scatterNote": scatter_note,
-            "topicModel": topic_result,
-            "nameCountBoxplot": boxplot_summary(self.name_slot_counts),
             "topNamesPerModel": counter_items(self.unique_name_doc_freq, 20),
         }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -312,6 +313,11 @@ def graph_embedding_pairs(
     num_walks: int = 20,
     workers: int = 1,
     seed: int = 42,
+    use_node_names: bool = True,
+    use_node_types: bool = True,
+    use_edge_types: bool = True,
+    pool_feature_nodes: bool = False,
+    pooling: Literal["mean", "mean_max"] = "mean",
     progress: ProgressCallback | None = None,
 ) -> list[SimilarPair]:
     records = list(dataset)
@@ -320,30 +326,58 @@ def graph_embedding_pairs(
 
     Node2Vec = require_node2vec()
     np = _require_numpy()
-    embeddings: list[Any] = []
-    _report_progress(
-        progress, phase="embedding", current=0, total=len(records), message="Computing Node2Vec graph embeddings."
+    _validate_graph_embedding_parameters(
+        threshold=threshold,
+        dimensions=dimensions,
+        walk_length=walk_length,
+        num_walks=num_walks,
+        workers=workers,
+        pooling=pooling,
     )
-    for index, record in enumerate(records, start=1):
-        embeddings.append(
-            _node2vec_graph_embedding(
-                record,
-                Node2Vec,
-                np,
-                dimensions=dimensions,
-                walk_length=walk_length,
-                num_walks=num_walks,
-                workers=workers,
-                seed=seed,
-            )
-        )
+    _report_progress(
+        progress,
+        phase="embedding",
+        current=0,
+        total=len(records) + 1,
+        message="Building shared Node2Vec graph.",
+    )
+    embedding_graph, model_nodes = _shared_node2vec_graph(
+        records,
+        use_node_names=use_node_names,
+        use_node_types=use_node_types,
+        use_edge_types=use_edge_types,
+        pool_feature_nodes=pool_feature_nodes,
+    )
+    if embedding_graph.number_of_nodes() == 0 or embedding_graph.number_of_edges() == 0:
+        embeddings = [np.zeros(_pooled_embedding_dimensions(dimensions, pooling), dtype=float) for _ in records]
+    else:
         _report_progress(
             progress,
             phase="embedding",
-            current=index,
-            total=len(records),
-            message=f"Computed {index} of {len(records)} Node2Vec graph embeddings.",
+            current=1,
+            total=len(records) + 1,
+            message="Training shared Node2Vec model.",
         )
+        node2vec = Node2Vec(
+            embedding_graph,
+            dimensions=dimensions,
+            walk_length=walk_length,
+            num_walks=num_walks,
+            workers=workers,
+            quiet=True,
+            seed=seed,
+        )
+        model = node2vec.fit(window=5, min_count=1, batch_words=4, seed=seed)
+        embeddings = []
+        for index, record in enumerate(records, start=1):
+            embeddings.append(_pooled_node_embeddings(model, model_nodes[record.model_id], np, dimensions, pooling))
+            _report_progress(
+                progress,
+                phase="embedding",
+                current=index + 1,
+                total=len(records) + 1,
+                message=f"Pooled {index} of {len(records)} shared graph embeddings.",
+            )
 
     pairs = _embedding_similarity_pairs(
         records,
@@ -361,6 +395,29 @@ def graph_embedding_pairs(
         message=f"Graph embeddings found {len(pairs)} pairs.",
     )
     return pairs
+
+
+def _validate_graph_embedding_parameters(
+    *,
+    threshold: float,
+    dimensions: int,
+    walk_length: int,
+    num_walks: int,
+    workers: int,
+    pooling: str,
+) -> None:
+    if not 0 <= threshold <= 1:
+        raise ValueError("graphEmbeddingThreshold must be between 0 and 1.")
+    if dimensions < 1:
+        raise ValueError("graphEmbeddingDimensions must be greater than 0.")
+    if walk_length < 1:
+        raise ValueError("graphEmbeddingWalkLength must be greater than 0.")
+    if num_walks < 1:
+        raise ValueError("graphEmbeddingNumWalks must be greater than 0.")
+    if workers < 1:
+        raise ValueError("graphEmbeddingWorkers must be greater than 0.")
+    if pooling not in {"mean", "mean_max"}:
+        raise ValueError("graphEmbeddingPooling must be one of: mean, mean_max.")
 
 
 def bert_semantic_similarity_pairs(
@@ -612,9 +669,18 @@ def record_tokens(record: ModelRecord, *, token_mode: TfidfTokenMode) -> list[st
 
     if token_mode == "typed_name_pairs":
         pairs = sorted(node_name_type_pairs(record))
-        return [f"{(node_type or '_')}.{name}" for name, node_type in pairs]
+        return [typed_name_pair_token(name, node_type) for name, node_type in pairs]
 
     raise ValueError(f"Unsupported TF-IDF token mode: {token_mode}")
+
+
+def typed_name_pair_token(name: str, node_type: str) -> str:
+    return f"type_{tfidf_atomic_token(node_type or 'untyped')}__name_{tfidf_atomic_token(name)}"
+
+
+def tfidf_atomic_token(value: str) -> str:
+    token = re.sub(r"\W+", "_", value.strip(), flags=re.UNICODE).strip("_")
+    return token or "empty"
 
 
 def node_name_type_pairs(record: ModelRecord) -> list[tuple[str, str]]:
@@ -628,6 +694,96 @@ def node_name_type_pairs(record: ModelRecord) -> list[tuple[str, str]]:
 
 def hash_name_tokens(record: ModelRecord, tokens: Iterable[str], *, include_types: bool) -> str:
     return hash_tokens(tokens)
+
+
+def _shared_node2vec_graph(
+    records: list[ModelRecord],
+    *,
+    use_node_names: bool,
+    use_node_types: bool,
+    use_edge_types: bool,
+    pool_feature_nodes: bool,
+):
+    nx = require_networkx()
+    graph = nx.DiGraph() if any(record.graph.is_directed() for record in records) else nx.Graph()
+    model_nodes: dict[str, list[str]] = {}
+
+    for record in records:
+        element_nodes: list[str] = []
+        pooled_nodes: set[str] = set()
+        node_lookup: dict[object, str] = {}
+
+        for node_id, attrs in record.graph.nodes(data=True):
+            embedded_node = _embedded_model_node_id(record.model_id, node_id)
+            node_lookup[node_id] = embedded_node
+            element_nodes.append(embedded_node)
+            graph.add_node(embedded_node, kind="element", model_id=record.model_id)
+
+            feature_nodes = []
+            if use_node_names:
+                name = node_name_attr(attrs)
+                if name:
+                    feature_nodes.append(_embedding_feature_node("name", name))
+            if use_node_types:
+                node_type = node_type_attr(attrs)
+                if node_type:
+                    feature_nodes.append(_embedding_feature_node("type", node_type))
+            for feature_node in feature_nodes:
+                _add_feature_edge(graph, embedded_node, feature_node)
+                pooled_nodes.add(feature_node)
+
+        for source, target, attrs in record.graph.edges(data=True):
+            embedded_source = node_lookup.get(source)
+            embedded_target = node_lookup.get(target)
+            if embedded_source is None or embedded_target is None:
+                continue
+            graph.add_edge(embedded_source, embedded_target)
+            if use_edge_types:
+                edge_type = edge_type_attr(attrs)
+                if edge_type:
+                    edge_feature = _embedding_feature_node("edge_type", edge_type)
+                    graph.add_node(edge_feature, kind="feature")
+                    graph.add_edge(embedded_source, edge_feature)
+                    graph.add_edge(edge_feature, embedded_target)
+                    if not graph.is_directed():
+                        graph.add_edge(edge_feature, embedded_source)
+                        graph.add_edge(embedded_target, edge_feature)
+                    pooled_nodes.add(edge_feature)
+
+        model_nodes[record.model_id] = sorted({*element_nodes, *pooled_nodes}) if pool_feature_nodes else element_nodes
+
+    return graph, model_nodes
+
+
+def _embedded_model_node_id(model_id: str, node_id: object) -> str:
+    return f"model::{model_id}::node::{node_id}"
+
+
+def _embedding_feature_node(kind: str, value: str) -> str:
+    return f"feature::{kind}::{value}"
+
+
+def _add_feature_edge(graph, element_node: str, feature_node: str) -> None:
+    graph.add_node(feature_node, kind="feature")
+    graph.add_edge(element_node, feature_node)
+    if graph.is_directed():
+        graph.add_edge(feature_node, element_node)
+
+
+def _pooled_node_embeddings(model, nodes: list[str], np, dimensions: int, pooling: str):
+    vectors = [model.wv[node] for node in nodes if node in model.wv]
+    if not vectors:
+        return np.zeros(_pooled_embedding_dimensions(dimensions, pooling), dtype=float)
+
+    matrix = np.asarray(vectors, dtype=float)
+    mean_vector = np.mean(matrix, axis=0)
+    if pooling == "mean_max":
+        return np.concatenate([mean_vector, np.max(matrix, axis=0)])
+    return mean_vector
+
+
+def _pooled_embedding_dimensions(dimensions: int, pooling: str) -> int:
+    return dimensions * 2 if pooling == "mean_max" else dimensions
 
 
 def _node2vec_graph_embedding(

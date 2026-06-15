@@ -241,8 +241,6 @@ def run_after_dummy_statistics_job(
     try:
         after_statistics = build_statistics_payload(
             (record for record in records if record.model_id in retained_model_ids),
-            skip_topic_model=True,
-            topic_model_skip_reason="Topic modeling skipped for after-cleansing visualizations.",
         )
         with AFTER_DUMMY_STATISTICS_LOCK:
             current = AFTER_DUMMY_STATISTICS_JOBS.get(dataset_id)

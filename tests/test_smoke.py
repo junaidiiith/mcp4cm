@@ -10,10 +10,13 @@ from mcp4cm.dummy import (
 from mcp4cm.duplicates import (
     detect_duplicates_by_node_name_hash,
     detect_duplicates_by_node_name_type_hash,
+    graph_embedding_pairs,
     graph_isomorphism_pairs,
     graph_similarity_pairs,
+    record_tokens,
     tfidf_duplicate_by_names,
     tfidf_duplicate_by_names_and_types,
+    tfidf_duplicate_pairs,
     vote_duplicate_pairs,
 )
 from mcp4cm.loading import load_eamodelset, load_modelset
@@ -255,6 +258,159 @@ def test_tfidf_names_types_bag_includes_edge_types():
         ("first", "second")
     ]
     assert tfidf_duplicate_by_names_and_types(dataset, threshold=0.99) == []
+
+
+def test_graph_embedding_uses_shared_semantic_feature_space(monkeypatch):
+    class FakeWordVectors(dict):
+        pass
+
+    class FakeNode2Vec:
+        def __init__(self, graph, dimensions, **_kwargs):
+            self.graph = graph
+            self.dimensions = dimensions
+
+        def fit(self, **_kwargs):
+            vectors = FakeWordVectors()
+            for node in self.graph.nodes():
+                vectors[node] = fake_vector(self.graph, node, self.dimensions)
+            return type("FakeModel", (), {"wv": vectors})()
+
+    def feature_vector(node: str, dimensions: int):
+        values = [0.0] * dimensions
+        if node.endswith("::order") or node.endswith("::customer"):
+            values[0] = 1.0
+        elif node.endswith("::invoice") or node.endswith("::payment"):
+            values[0] = -1.0
+        elif node.endswith("::business object") or node.endswith("::business actor"):
+            values[1] = 1.0
+        elif node.endswith("::association"):
+            values[2] = 1.0
+        return values
+
+    def fake_vector(graph, node: str, dimensions: int):
+        if node.startswith("feature::"):
+            return feature_vector(node, dimensions)
+        values = [0.0] * dimensions
+        feature_neighbors = [neighbor for neighbor in graph.neighbors(node) if str(neighbor).startswith("feature::")]
+        if not feature_neighbors:
+            values[3] = 1.0
+            return values
+        for neighbor in feature_neighbors:
+            for index, value in enumerate(feature_vector(str(neighbor), dimensions)):
+                values[index] += value
+        return values
+
+    monkeypatch.setattr("mcp4cm.duplicates.require_node2vec", lambda: FakeNode2Vec)
+    parser = ArchimateJsonParser()
+    first = parser.parse(
+        {
+            "elements": [
+                {"id": "a", "name": "Order", "type": "BusinessObject"},
+                {"id": "b", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [{"id": "r1", "sourceId": "a", "targetId": "b", "type": "Association"}],
+        },
+        model_id="first",
+    )
+    second = parser.parse(
+        {
+            "elements": [
+                {"id": "x", "name": "Order", "type": "BusinessObject"},
+                {"id": "y", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [{"id": "r2", "sourceId": "x", "targetId": "y", "type": "Association"}],
+        },
+        model_id="second",
+    )
+    third = parser.parse(
+        {
+            "elements": [
+                {"id": "m", "name": "Invoice", "type": "BusinessObject"},
+                {"id": "n", "name": "Payment", "type": "BusinessActor"},
+            ],
+            "relationships": [{"id": "r3", "sourceId": "m", "targetId": "n", "type": "Association"}],
+        },
+        model_id="third",
+    )
+    dataset = Dataset([first, second, third], "archimate")
+
+    semantic_pairs = graph_embedding_pairs(dataset, threshold=0.9, dimensions=4)
+    topology_pairs = graph_embedding_pairs(
+        dataset,
+        threshold=0.9,
+        dimensions=4,
+        use_node_names=False,
+        use_node_types=False,
+        use_edge_types=False,
+    )
+
+    assert [(pair.left_id, pair.right_id) for pair in semantic_pairs] == [("first", "second")]
+    assert {(pair.left_id, pair.right_id) for pair in topology_pairs} == {
+        ("first", "second"),
+        ("first", "third"),
+        ("second", "third"),
+    }
+
+
+def test_tfidf_typed_name_pairs_keep_type_name_bindings_atomic():
+    parser = ArchimateJsonParser()
+    first = parser.parse(
+        {
+            "elements": [
+                {"id": "a", "name": "Order Item", "type": "BusinessObject"},
+                {"id": "b", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [],
+        },
+        model_id="first",
+    )
+    second = parser.parse(
+        {
+            "elements": [
+                {"id": "x", "name": "Order Item", "type": "BusinessActor"},
+                {"id": "y", "name": "Customer", "type": "BusinessObject"},
+            ],
+            "relationships": [],
+        },
+        model_id="second",
+    )
+    dataset = Dataset([first, second], "archimate")
+
+    assert tfidf_duplicate_pairs(dataset, token_mode="names_types_bag", threshold=0.99)
+    assert tfidf_duplicate_pairs(dataset, token_mode="typed_name_pairs", threshold=0.99) == []
+    assert record_tokens(first, token_mode="typed_name_pairs") == [
+        "type_business_actor__name_customer",
+        "type_business_object__name_order_item",
+    ]
+
+
+def test_tfidf_typed_name_pair_ngrams_operate_on_atomic_pair_tokens():
+    parser = ArchimateJsonParser()
+    first = parser.parse(
+        {
+            "elements": [
+                {"id": "a", "name": "Order Item", "type": "BusinessObject"},
+                {"id": "b", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [],
+        },
+        model_id="first",
+    )
+    second = parser.parse(
+        {
+            "elements": [
+                {"id": "x", "name": "Order Item", "type": "BusinessObject"},
+                {"id": "y", "name": "Customer", "type": "BusinessActor"},
+            ],
+            "relationships": [],
+        },
+        model_id="second",
+    )
+    dataset = Dataset([first, second], "archimate")
+
+    pairs = tfidf_duplicate_pairs(dataset, token_mode="typed_name_pairs", threshold=0.99, ngram_range=(1, 2))
+
+    assert [(pair.left_id, pair.right_id) for pair in pairs] == [("first", "second")]
 
 
 def test_pairwise_duplicate_algorithms_report_progress():

@@ -24,12 +24,16 @@ def test_corpus_statistics_accumulator_builds_without_graph_reload():
         accumulator.node_counts.append(index)
         accumulator.edge_counts.append(index + 1)
         accumulator.name_count_values.append(3)
-        accumulator.name_slot_counts.append(4)
         accumulator.languages["uml"] += 1
         accumulator.scatter_rows.append(
             {
                 "id": f"m{index}",
+                "nodeCount": index,
+                "edgeCount": index + 1,
+                "graphSize": index * 2 + 1,
                 "namedElements": 2,
+                "semanticNameCount": 2,
+                "placeholderNameCount": 0,
                 "uniqueNames": 2,
                 "tokens": 3,
                 "uniqueTokens": 3,
@@ -42,8 +46,8 @@ def test_corpus_statistics_accumulator_builds_without_graph_reload():
     payload = accumulator.build_payload()
 
     assert payload["summary"]["models"] == 1200
-    assert payload["visualizations"]["topicModel"]["available"] is False
     assert len(payload["visualizations"]["modelVocabularyScatter"]) == 1200
+    assert payload["visualizations"]["modelVocabularyScatter"][10]["graphSize"] == 21
 
 
 def test_corpus_statistics_accumulator_builds_quality_visualizations():
@@ -100,6 +104,10 @@ def test_corpus_statistics_accumulator_builds_quality_visualizations():
     class_row = next(row for row in visualizations["vocabularyRanking"] if row["name"] == "class1")
     assert class_row["classification"] == "placeholder"
     assert visualizations["nameReuseDistribution"][0] == {"label": "1", "count": 5}
+    assert visualizations["modelVocabularyScatter"][0]["nodeCount"] == 8
+    assert visualizations["modelVocabularyScatter"][0]["edgeCount"] == 1
+    assert visualizations["modelVocabularyScatter"][0]["graphSize"] == 9
+    assert visualizations["modelVocabularyScatter"][0]["semanticNameCount"] == 4
     pipeline_row = next(row for row in visualizations["labelPipelineRows"] if row["rawName"] == "Approve invoice")
     assert pipeline_row["normalizedName"] == "approve invoice"
     assert pipeline_row["nameTokens"] == ["approve", "invoice"]

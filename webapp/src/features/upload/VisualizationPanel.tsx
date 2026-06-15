@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Expand, Grid2X2, Info, ListTree, Network, Plus, Search } from "lucide-react";
+import { hierarchy, treemap, treemapSquarify, type HierarchyRectangularNode } from "d3-hierarchy";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Cloud, Expand, Grid2X2, Info, ListTree, Network, Plus, Search, Table } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { errorMessage, getLabelPipelineRows } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -170,7 +171,7 @@ export function VisualizationPanel({
   );
 }
 
-type VisualizationCategoryId = "quality" | "labels" | "structure" | "topics";
+type VisualizationCategoryId = "quality" | "labels";
 interface VisualizationChartDefinition {
   id: string;
   title: string;
@@ -261,12 +262,6 @@ function visualizationCategories(
           description: "How many distinct normalized names appear in one model versus many models.",
           render: () => <NameReuseDistributionChart items={data.nameReuseDistribution || []} />,
         },
-      ],
-    },
-    {
-      id: "structure",
-      label: "Structure",
-      charts: [
         {
           id: "element-type-treemap",
           title: "Normalized Node Types in the Corpus",
@@ -274,53 +269,10 @@ function visualizationCategories(
           render: () => <Treemap items={data.elementTypeTreemap} />,
         },
         {
-          id: "type-name-links",
-          title: "Normalized Type to Frequent Names",
-          description: "Strongest links between normalized node types and normalized names.",
-          render: () => <TypeConceptLinks links={data.typeConceptLinks} />,
-        },
-        {
-          id: "names-within-types",
-          title: "Frequent Normalized Names within Types",
-          description: "Hierarchical treemap grouped by major normalized node type.",
-          render: () => <ConceptTreemap links={data.typeConceptLinks} />,
-        },
-        {
           id: "model-vocabulary-scatter",
           title: "Model Size vs Vocabulary Richness",
-          description: "Point size follows derived name-token count; color follows missing-name ratio.",
+          description: "Compare graph size against per-model name vocabulary metrics; color follows missing-name ratio.",
           render: () => <Scatter points={data.modelVocabularyScatter} />,
-        },
-        {
-          id: "name-count-boxplot",
-          title: "Boxplot of Name Counts in Models",
-          description: "Five-number summary of parser-observed model name counts.",
-          render: () => <Boxplot summary={data.nameCountBoxplot} />,
-        },
-      ],
-    },
-    {
-      id: "topics",
-      label: "Topics",
-      charts: data.topicModel.available ? [
-        {
-          id: "topic-map",
-          title: `Document Topic Map (${data.topicModel.projectionMethod} projection)`,
-          description: "NMF topic assignment from derived name tokens projected into two dimensions.",
-          render: () => <TopicScatter points={data.topicModel.points || []} />,
-        },
-        {
-          id: "topic-prevalence",
-          title: "Average Topic Prevalence in the Corpus",
-          description: "Mean NMF topic weight.",
-          render: () => <HorizontalBars items={data.topicModel.prevalence || []} />,
-        },
-      ] : [
-        {
-          id: "topics-unavailable",
-          title: "Topic Model",
-          description: "Topic modeling is unavailable for this dataset.",
-          render: () => <p className="visualizationNote">{data.topicModel.reason}</p>,
         },
       ],
     },
@@ -341,37 +293,6 @@ function ChartPreview({ chart, featured, onExpand }: { chart: VisualizationChart
       </div>
       <div className="chartBody">{chart.render()}</div>
     </article>
-  );
-}
-
-function HorizontalBars({ items }: { items: StatisticItem[] }) {
-  const max = Math.max(...items.map((item) => item.count), 1);
-  if (!items.length) return <EmptyChart />;
-  return <div className="horizontalBars">{items.map((item) => <div className="horizontalBarRow" key={item.label} title={`${item.label}: ${round(item.count)}`}><span>{item.label}</span><i><b style={{ width: `${item.count / max * 100}%` }} /></i><strong>{round(item.count)}</strong></div>)}</div>;
-}
-
-function LimitedHorizontalBars({ items, ariaLabel }: { items: StatisticItem[]; ariaLabel: string }) {
-  const [limit, setLimit] = useState(10);
-  const visibleItems = items.slice(0, limit);
-  return (
-    <>
-      <label className="chartLimit">
-        Top N
-        <input
-          aria-label={ariaLabel}
-          type="number"
-          min={1}
-          value={limit}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (Number.isInteger(value)) setLimit(Math.max(value, 1));
-          }}
-        />
-      </label>
-      <div className={limit > 10 ? "chartRowsScrollable" : ""}>
-        <HorizontalBars items={visibleItems} />
-      </div>
-    </>
   );
 }
 
@@ -721,8 +642,11 @@ function VocabularyRanking({ rows }: { rows: VisualizationPayload["vocabularyRan
   );
 }
 
+type TypeVocabularyView = "table" | "cloud";
+
 function TypeVocabularyTable({ rows }: { rows: VisualizationPayload["typeVocabularyTable"] }) {
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<TypeVocabularyView>("table");
   const normalizedQuery = query.trim().toLowerCase();
   const visibleRows = useMemo(
     () => (normalizedQuery
@@ -744,11 +668,33 @@ function TypeVocabularyTable({ rows }: { rows: VisualizationPayload["typeVocabul
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <span className="typeVocabularyStatus">
-          {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} types
-        </span>
+        <div className="typeVocabularyToolbarActions">
+          <div className="typeVocabularyViewControl" aria-label="Type vocabulary view">
+            <button
+              className={view === "table" ? "active" : ""}
+              type="button"
+              title="Table view"
+              onClick={() => setView("table")}
+            >
+              <Table size={14} aria-hidden="true" />
+              Table
+            </button>
+            <button
+              className={view === "cloud" ? "active" : ""}
+              type="button"
+              title="Tag cloud view"
+              onClick={() => setView("cloud")}
+            >
+              <Cloud size={14} aria-hidden="true" />
+              Cloud
+            </button>
+          </div>
+          <span className="typeVocabularyStatus">
+            {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} types
+          </span>
+        </div>
       </div>
-      {!visibleRows.length ? <EmptyChart /> : (
+      {!visibleRows.length ? <EmptyChart /> : view === "table" ? (
         <div className="typeVocabularyFrame">
           <table className="typeQualityTable typeVocabularyTable">
             <thead>
@@ -774,15 +720,7 @@ function TypeVocabularyTable({ rows }: { rows: VisualizationPayload["typeVocabul
                     {row.names.length ? (
                       <div className="typeVocabularyNames">
                         {row.names.map((name) => (
-                          <span
-                            className={`typeVocabularyName ${name.classification}`}
-                            key={`${row.type}:${name.name}`}
-                            title={`${name.name}: ${name.occurrences.toLocaleString()} occurrences, ${percentage(name.share)} within ${row.type}`}
-                          >
-                            <strong>{name.name}</strong>
-                            <small>{name.occurrences.toLocaleString()} · {percentage(name.share)}</small>
-                            <i>{vocabularyClassificationLabel(name.classification)}</i>
-                          </span>
+                          <TypeVocabularyNameTag key={`${row.type}:${name.name}`} row={row} name={name} />
                         ))}
                       </div>
                     ) : (
@@ -794,7 +732,78 @@ function TypeVocabularyTable({ rows }: { rows: VisualizationPayload["typeVocabul
             </tbody>
           </table>
         </div>
+      ) : (
+        <TypeVocabularyCloud rows={visibleRows} />
       )}
+    </div>
+  );
+}
+
+function TypeVocabularyNameTag({
+  row,
+  name,
+  size = "default",
+}: {
+  row: VisualizationPayload["typeVocabularyTable"][number];
+  name: VisualizationPayload["typeVocabularyTable"][number]["names"][number];
+  size?: "default" | "cloud";
+}) {
+  return (
+    <span
+      className={`typeVocabularyName ${name.classification}${size === "cloud" ? " cloud" : ""}`}
+      style={size === "cloud" ? typeVocabularyCloudTagStyle(name) : undefined}
+      title={typeVocabularyNameTitle(row.type, name)}
+    >
+      <strong>{name.name}</strong>
+      <small>{name.occurrences.toLocaleString()} · {percentage(name.share)}</small>
+      <i>{vocabularyClassificationLabel(name.classification)}</i>
+    </span>
+  );
+}
+
+function typeVocabularyNameTitle(
+  type: string,
+  name: VisualizationPayload["typeVocabularyTable"][number]["names"][number],
+) {
+  return `${name.name}: ${name.occurrences.toLocaleString()} occurrences, ${percentage(name.share)} within ${type}, ${vocabularyClassificationLabel(name.classification)}`;
+}
+
+function typeVocabularyCloudTagStyle(
+  name: VisualizationPayload["typeVocabularyTable"][number]["names"][number],
+) {
+  const scale = Math.max(0.72, Math.min(1.35, 0.72 + name.share * 1.8));
+  return {
+    flexGrow: Math.max(name.occurrences, 1),
+    fontSize: `${round(11 * scale)}px`,
+    minWidth: `${Math.round(108 * scale)}px`,
+  };
+}
+
+function TypeVocabularyCloud({ rows }: { rows: VisualizationPayload["typeVocabularyTable"] }) {
+  return (
+    <div className="typeVocabularyCloud">
+      {rows.map((row) => (
+        <section className="typeVocabularyCloudGroup" key={row.type}>
+          <header className="typeVocabularyCloudHeader">
+            <strong title={row.type}>{row.type}</strong>
+            <span>
+              {row.namedOccurrences.toLocaleString()} named
+              {row.totalOccurrences !== row.namedOccurrences && (
+                <> · {row.totalOccurrences.toLocaleString()} slots</>
+              )}
+            </span>
+          </header>
+          {row.names.length ? (
+            <div className="typeVocabularyCloudTags">
+              {row.names.map((name) => (
+                <TypeVocabularyNameTag key={`${row.type}:${name.name}`} row={row} name={name} size="cloud" />
+              ))}
+            </div>
+          ) : (
+            <p className="typeVocabularyEmpty">No named vocabulary</p>
+          )}
+        </section>
+      ))}
     </div>
   );
 }
@@ -1199,47 +1208,237 @@ function percentage(value: number) {
   return `${round(value * 100)}%`;
 }
 
+interface TreemapDatum {
+  name?: string;
+  value?: number;
+  children?: TreemapDatum[];
+}
+
 function Treemap({ items }: { items: StatisticItem[] }) {
-  const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
+  const width = 760;
+  const height = 320;
+  const leaves = useMemo(() => {
+    if (!items.length) return [];
+    const root = hierarchy<TreemapDatum>({
+      children: items.map((item) => ({ name: item.label, value: item.count })),
+    })
+      .sum((datum) => datum.value ?? 0)
+      .sort((left, right) => (right.value ?? 0) - (left.value ?? 0));
+    treemap<TreemapDatum>()
+      .tile(treemapSquarify)
+      .size([width, height])
+      .paddingInner(3)
+      .round(true)(root);
+    return (root.leaves() as HierarchyRectangularNode<TreemapDatum>[]).map((node) => ({
+      label: node.data.name ?? "",
+      count: node.value ?? 0,
+      x0: node.x0,
+      y0: node.y0,
+      x1: node.x1,
+      y1: node.y1,
+    }));
+  }, [items]);
   if (!items.length) return <EmptyChart />;
-  return <div className="treemap">{items.map((item) => <span key={item.label} style={{ flexGrow: item.count, flexBasis: `${item.count / total * 100}%` }} title={`${item.label}: ${item.count}`}><b>{item.label}</b><small>{item.count}</small></span>)}</div>;
+  return (
+    <svg
+      className="treemapPlot"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Normalized node types treemap"
+    >
+      {leaves.map((leaf) => {
+        const rectWidth = Math.max(leaf.x1 - leaf.x0, 0);
+        const rectHeight = Math.max(leaf.y1 - leaf.y0, 0);
+        const showLabel = rectWidth >= 54 && rectHeight >= 34;
+        return (
+          <g key={leaf.label} className="treemapCell">
+            <rect
+              className="treemapRect"
+              height={rectHeight}
+              width={rectWidth}
+              x={leaf.x0}
+              y={leaf.y0}
+            >
+              <title>{`${leaf.label}: ${leaf.count.toLocaleString()}`}</title>
+            </rect>
+            {showLabel && (
+              <>
+                <text className="treemapLabel" x={leaf.x0 + 8} y={leaf.y0 + 18}>
+                  {truncateTreemapLabel(leaf.label, rectWidth)}
+                </text>
+                <text className="treemapValue" x={leaf.x0 + 8} y={leaf.y0 + rectHeight - 8}>
+                  {leaf.count.toLocaleString()}
+                </text>
+              </>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
-function ConceptTreemap({ links }: { links: VisualizationPayload["typeConceptLinks"] }) {
-  const groups = Object.entries(links.reduce<Record<string, typeof links>>((result, link) => {
-    (result[link.type] ||= []).push(link);
-    return result;
-  }, {}));
-  if (!groups.length) return <EmptyChart />;
-  return <div className="conceptTreemap">{groups.map(([type, entries]) => <section key={type}><b>{type}</b><div>{(entries || []).map((entry) => <span style={{ flexGrow: entry.count }} title={`${entry.type} → ${entry.concept}: ${entry.count}`} key={`${entry.type}:${entry.concept}`}>{entry.concept}</span>)}</div></section>)}</div>;
+function truncateTreemapLabel(label: string, width: number) {
+  const maxChars = Math.max(4, Math.floor((width - 16) / 7));
+  return label.length > maxChars ? `${label.slice(0, Math.max(maxChars - 1, 1))}…` : label;
 }
 
-function TypeConceptLinks({ links }: { links: VisualizationPayload["typeConceptLinks"] }) {
-  const max = Math.max(...links.map((link) => link.count), 1);
-  if (!links.length) return <EmptyChart />;
-  return <div className="typeConceptLinks">{links.map((link) => <div key={`${link.type}:${link.concept}`} title={`${link.type} → ${link.concept}: ${link.count}`}><b>{link.type}</b><i><span style={{ width: `${link.count / max * 100}%` }} /></i><strong>{link.concept}</strong><small>{link.count}</small></div>)}</div>;
-}
+type ModelVocabularyPoint = VisualizationPayload["modelVocabularyScatter"][number];
+type ModelScatterMetric = {
+  key: keyof ModelVocabularyPoint | "graphSize";
+  label: string;
+  value: (point: ModelVocabularyPoint) => number;
+};
+
+const modelSizeMetrics: ModelScatterMetric[] = [
+  { key: "graphSize", label: "Nodes + edges", value: (point) => (point.graphSize ?? ((point.nodeCount ?? 0) + (point.edgeCount ?? 0))) || point.nameSlots },
+  { key: "nodeCount", label: "Nodes", value: (point) => point.nodeCount ?? point.nameSlots },
+  { key: "edgeCount", label: "Edges", value: (point) => point.edgeCount ?? 0 },
+  { key: "nameSlots", label: "Name slots", value: (point) => point.nameSlots },
+];
+
+const vocabularyMetrics: ModelScatterMetric[] = [
+  { key: "uniqueTokens", label: "Unique name tokens", value: (point) => point.uniqueTokens },
+  { key: "uniqueNames", label: "Unique normalized names", value: (point) => point.uniqueNames },
+  { key: "namedElements", label: "Named elements", value: (point) => point.namedElements },
+  { key: "semanticNameCount", label: "Semantic names", value: (point) => point.semanticNameCount ?? point.namedElements },
+  { key: "tokens", label: "Name token occurrences", value: (point) => point.tokens },
+];
 
 function Scatter({ points }: { points: VisualizationPayload["modelVocabularyScatter"] }) {
-  return <SvgScatter points={points.map((point) => ({ ...point, x: point.namedElements, y: point.uniqueNames, label: point.id, value: point.missingNameRatio, size: point.tokens }))} xLabel="Named elements" yLabel="Unique concepts" />;
+  const [xMetricKey, setXMetricKey] = useState(modelSizeMetrics[0].key);
+  const [yMetricKey, setYMetricKey] = useState(vocabularyMetrics[0].key);
+  const xMetric = modelSizeMetrics.find((metric) => metric.key === xMetricKey) || modelSizeMetrics[0];
+  const yMetric = vocabularyMetrics.find((metric) => metric.key === yMetricKey) || vocabularyMetrics[0];
+  const plottedPoints = points.map((point) => ({
+    x: xMetric.value(point),
+    y: yMetric.value(point),
+    label: point.id,
+    value: point.missingNameRatio,
+    size: point.nameSlots,
+    detail: [
+      `${xMetric.label}: ${formatNumber(xMetric.value(point))}`,
+      `${yMetric.label}: ${formatNumber(yMetric.value(point))}`,
+      `Missing names: ${percentage(point.missingNameRatio)}`,
+    ].join(", "),
+  }));
+  return (
+    <div className="modelScatterPanel">
+      <div className="chartControls">
+        <label>
+          Model size
+          <select value={xMetricKey} onChange={(event) => setXMetricKey(event.target.value as ModelScatterMetric["key"])}>
+            {modelSizeMetrics.map((metric) => <option key={metric.key} value={metric.key}>{metric.label}</option>)}
+          </select>
+        </label>
+        <label>
+          Name metric
+          <select value={yMetricKey} onChange={(event) => setYMetricKey(event.target.value as ModelScatterMetric["key"])}>
+            {vocabularyMetrics.map((metric) => <option key={metric.key} value={metric.key}>{metric.label}</option>)}
+          </select>
+        </label>
+        <span>Color: missing-name ratio</span>
+      </div>
+      <SvgScatter points={plottedPoints} xLabel={xMetric.label} yLabel={yMetric.label} zeroBased />
+    </div>
+  );
 }
 
-function TopicScatter({ points }: { points: NonNullable<VisualizationPayload["topicModel"]["points"]> }) {
-  return <SvgScatter points={points.map((point) => ({ ...point, label: `${point.id} | ${point.topic}`, value: point.topicStrength, size: point.namedElements }))} xLabel="Component 1" yLabel="Component 2" />;
-}
-
-function SvgScatter({ points, xLabel, yLabel }: { points: Array<{ x: number; y: number; label: string; value: number; size: number }>; xLabel: string; yLabel: string }) {
+function SvgScatter({
+  points,
+  xLabel,
+  yLabel,
+  zeroBased = false,
+}: {
+  points: Array<{ x: number; y: number; label: string; value: number; size: number; detail?: string }>;
+  xLabel: string;
+  yLabel: string;
+  zeroBased?: boolean;
+}) {
   if (!points.length) return <EmptyChart />;
-  const xValues = points.map((point) => point.x), yValues = points.map((point) => point.y);
-  const minX = Math.min(...xValues), maxX = Math.max(...xValues), minY = Math.min(...yValues), maxY = Math.max(...yValues);
-  const scale = (value: number, min: number, max: number, start: number, end: number) => start + (value - min) / (max - min || 1) * (end - start);
-  return <svg className="scatter" viewBox="0 0 640 300" role="img" aria-label={`${xLabel} versus ${yLabel}`}><text x="320" y="294">{xLabel}</text><text transform="translate(14 160) rotate(-90)">{yLabel}</text>{points.map((point, index) => <circle key={`${point.label}:${index}`} cx={scale(point.x, minX, maxX, 42, 625)} cy={scale(point.y, minY, maxY, 270, 15)} r={Math.min(4 + Math.sqrt(point.size || 1), 14)} fill={`rgba(15, 118, 110, ${Math.max(.25, Math.min(.95, point.value + .2))})`}><title>{`${point.label}: ${xLabel} ${round(point.x)}, ${yLabel} ${round(point.y)}`}</title></circle>)}</svg>;
+  const width = 760;
+  const height = 340;
+  const margin = { top: 22, right: 26, bottom: 54, left: 72 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const xValues = points.map((point) => point.x);
+  const yValues = points.map((point) => point.y);
+  const xDomain = numericDomain(xValues, zeroBased);
+  const yDomain = numericDomain(yValues, zeroBased);
+  const xTicks = chartTicks(xDomain[0], xDomain[1]);
+  const yTicks = chartTicks(yDomain[0], yDomain[1]);
+  const xScale = (value: number) => scaleLinear(value, xDomain[0], xDomain[1], margin.left, margin.left + plotWidth);
+  const yScale = (value: number) => scaleLinear(value, yDomain[0], yDomain[1], margin.top + plotHeight, margin.top);
+  return (
+    <svg className="scatter" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${xLabel} versus ${yLabel}`}>
+      {xTicks.map((tick) => {
+        const x = xScale(tick);
+        return <g key={`x:${tick}`}><line className="chartGridLine" x1={x} x2={x} y1={margin.top} y2={margin.top + plotHeight} /><text className="chartTick" x={x} y={height - 28}>{formatNumber(tick)}</text></g>;
+      })}
+      {yTicks.map((tick) => {
+        const y = yScale(tick);
+        return <g key={`y:${tick}`}><line className="chartGridLine" x1={margin.left} x2={margin.left + plotWidth} y1={y} y2={y} /><text className="chartTick" x={margin.left - 10} y={y + 4} textAnchor="end">{formatNumber(tick)}</text></g>;
+      })}
+      <line className="chartAxisLine" x1={margin.left} x2={margin.left + plotWidth} y1={margin.top + plotHeight} y2={margin.top + plotHeight} />
+      <line className="chartAxisLine" x1={margin.left} x2={margin.left} y1={margin.top} y2={margin.top + plotHeight} />
+      {points.map((point, index) => (
+        <circle
+          key={`${point.label}:${index}`}
+          cx={xScale(point.x)}
+          cy={yScale(point.y)}
+          r={Math.min(3.5 + Math.sqrt(point.size || 1), 11)}
+          fill={`rgba(15, 118, 110, ${Math.max(0.25, Math.min(0.95, point.value + 0.2))})`}
+        >
+          <title>{`${point.label}: ${point.detail || `${xLabel} ${formatNumber(point.x)}, ${yLabel} ${formatNumber(point.y)}`}`}</title>
+        </circle>
+      ))}
+      <text className="chartAxisLabel" x={margin.left + plotWidth / 2} y={height - 6}>{xLabel}</text>
+      <text className="chartAxisLabel" transform={`translate(18 ${margin.top + plotHeight / 2}) rotate(-90)`}>{yLabel}</text>
+    </svg>
+  );
 }
 
-function Boxplot({ summary }: { summary: VisualizationPayload["nameCountBoxplot"] }) {
-  const max = summary.max || 1;
-  const left = (summary.q1 / max) * 100, width = ((summary.q3 - summary.q1) / max) * 100;
-  return <div className="boxplot" title={`min ${summary.min}, Q1 ${round(summary.q1)}, median ${round(summary.median)}, Q3 ${round(summary.q3)}, max ${summary.max}`}><i /><span style={{ left: `${left}%`, width: `${width}%` }} /><b style={{ left: `${summary.median / max * 100}%` }} /><small>min {summary.min}</small><small>median {round(summary.median)}</small><small>max {summary.max}</small></div>;
+function numericDomain(values: number[], zeroBased: boolean): [number, number] {
+  const finiteValues = values.filter(Number.isFinite);
+  if (!finiteValues.length) return [0, 1];
+  let min = Math.min(...finiteValues);
+  let max = Math.max(...finiteValues);
+  if (zeroBased && min > 0) min = 0;
+  if (min === max) {
+    if (max === 0) return [0, 1];
+    return zeroBased ? [0, max] : [min - Math.abs(max) * 0.1, max + Math.abs(max) * 0.1];
+  }
+  const padding = (max - min) * 0.04;
+  return [zeroBased ? Math.min(0, min) : min - padding, max + padding];
+}
+
+function scaleLinear(value: number, min: number, max: number, start: number, end: number) {
+  return start + (value - min) / (max - min || 1) * (end - start);
+}
+
+function chartTicks(min: number, max: number, count = 5) {
+  if (max <= min) return [min];
+  const step = niceStep((max - min) / Math.max(count - 1, 1));
+  const start = Math.ceil(min / step) * step;
+  const ticks: number[] = [];
+  for (let value = start; value <= max + step * 0.5; value += step) {
+    ticks.push(Number(value.toFixed(10)));
+  }
+  return ticks.length ? ticks : [min, max];
+}
+
+function niceStep(value: number) {
+  const exponent = Math.floor(Math.log10(value || 1));
+  const magnitude = 10 ** exponent;
+  const normalized = value / magnitude;
+  if (normalized <= 1) return magnitude;
+  if (normalized <= 2) return 2 * magnitude;
+  if (normalized <= 5) return 5 * magnitude;
+  return 10 * magnitude;
+}
+
+function formatNumber(value: number) {
+  return round(value).toLocaleString();
 }
 
 function EmptyChart() { return <p className="visualizationNote">No matching values in this dataset.</p>; }
