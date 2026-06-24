@@ -884,6 +884,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pyecore" },
     { name = "scikit-learn" },
+    { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
@@ -913,6 +914,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.17" },
     { name = "scikit-learn", specifier = ">=1.2" },
     { name = "torch", marker = "extra == 'ml'", specifier = ">=2.0" },
+    { name = "tqdm", specifier = ">=4.67.1" },
     { name = "transformers", marker = "extra == 'ml'", specifier = ">=4.40" },
 ]
 provides-extras = ["plot", "dev", "ml"]

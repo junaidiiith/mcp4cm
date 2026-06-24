@@ -36,7 +36,7 @@ import type {
 } from "../../types";
 import { formatDuration, round, techniqueLabel } from "../../utils";
 
-const disabledDuplicateTechniques = new Set(["graph_embedding", "graph_isomorphism"]);
+const disabledDuplicateTechniques = new Set(["graph_embedding"]);
 
 export function DuplicatePanel({
   canRun,
