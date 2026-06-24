@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
+
+from lingua import Language, LanguageDetectorBuilder
 
 from mcp4cm.core import Dataset, ModelRecord
 from mcp4cm.name_classification import iter_name_slots
@@ -16,6 +19,7 @@ DEFAULT_PLACEHOLDER_THRESHOLD = 0.30
 DEFAULT_MIN_UNIQUE_WORDS = 3
 DEFAULT_NAME_REPETITION_THRESHOLD = 0.50
 DEFAULT_REGEX_MIN_MATCHES = 1
+DEFAULT_LANGUAGE_CODES: tuple[str, ...] = ("en",)
 
 FILTER_ORDER: tuple[str, ...] = (
     "min_size",
@@ -25,6 +29,7 @@ FILTER_ORDER: tuple[str, ...] = (
     "low_vocabulary",
     "name_repetition_ratio",
     "regex_rule",
+    "language",
 )
 
 
@@ -111,6 +116,11 @@ def default_filter_configs() -> list[dict[str, Any]]:
             "targetField": "name",
             "scope": "eligible_only",
             "minMatches": DEFAULT_REGEX_MIN_MATCHES,
+        },
+        {
+            "id": "language",
+            "enabled": True,
+            "languages": list(DEFAULT_LANGUAGE_CODES),
         },
     ]
 
@@ -277,6 +287,8 @@ def evaluate_filter(record: ModelRecord, derived_nodes: list[DerivedNode], confi
         return _eval_name_repetition(record, derived_nodes, filter_id, config)
     if filter_id == "regex_rule":
         return _eval_regex_rule(record, derived_nodes, filter_id, config)
+    if filter_id == "language":
+        return _eval_language(record, derived_nodes, filter_id, config)
     return _kept_finding(record.model_id, filter_id, "unknown_filter", 0.0, 1.0)
 
 
@@ -560,6 +572,80 @@ def _eval_regex_rule(
             "pattern": pattern,
         },
     )
+
+
+def _eval_language(
+    record: ModelRecord,
+    derived_nodes: list[DerivedNode],
+    filter_id: str,
+    config: dict[str, Any],
+) -> DummyFinding:
+    selected_languages = _normalize_language_codes(config.get("languages") or config.get("language"))
+    if not selected_languages:
+        return _kept_finding(
+            record.model_id,
+            filter_id,
+            "language_not_configured",
+            score=1.0,
+            threshold=1.0,
+            metrics={"selectedLanguages": []},
+        )
+
+    text_parts = [node.raw_name.strip() for node in derived_nodes if node.raw_name.strip()]
+    text = " ".join(text_parts)
+    detected_language = detect_record_language(text)
+    retained = detected_language in selected_languages
+    metrics = {
+        "detectedLanguage": detected_language,
+        "selectedLanguages": list(selected_languages),
+        "nameCount": len(text_parts),
+        "textLength": len(text),
+    }
+    if retained:
+        return _kept_finding(
+            record.model_id,
+            filter_id,
+            "language_allowed",
+            score=1.0,
+            threshold=1.0,
+            evidence=(detected_language,),
+            metrics=metrics,
+        )
+    return _removed_finding(
+        record.model_id,
+        filter_id,
+        "language_not_allowed" if detected_language else "language_undetected",
+        score=0.0,
+        threshold=1.0,
+        evidence=(detected_language,) if detected_language else (),
+        metrics=metrics,
+    )
+
+
+def _normalize_language_codes(value: Any) -> tuple[str, ...]:
+    values = value if isinstance(value, (list, tuple, set)) else [value]
+    normalized: list[str] = []
+    for item in values:
+        code = str(item or "").strip().lower()
+        if not code:
+            continue
+        if code not in normalized:
+            normalized.append(code)
+    return tuple(normalized)
+
+
+def detect_record_language(text: str) -> str:
+    if not text.strip():
+        return ""
+    detected = _language_detector().detect_language_of(text)
+    if detected is None:
+        return ""
+    return str(detected.iso_code_639_1).rsplit(".", 1)[-1].lower()
+
+
+@lru_cache(maxsize=1)
+def _language_detector():
+    return LanguageDetectorBuilder.from_all_languages_without(Language.LATIN, Language.ESPERANTO).build()
 
 
 def derive_nodes(record: ModelRecord) -> list[DerivedNode]:

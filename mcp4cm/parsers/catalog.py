@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -267,14 +268,23 @@ class EcoreFileAdapter(IRParserAdapter):
         self.parser.set_enable_scoped_uri_mappings(bool(options.get("resolve_external_refs", True)))
         return self.parser
 
+    def parse_file(
+        self, path: Path, *, model_id: str, options: ParserOptions, relpath: str | None = None
+    ) -> ParsedModelResult:
+        ecore_model_id = model_id
+        if relpath and model_id == Path(relpath).stem:
+            ecore_model_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"mcp4cm:ecore:{Path(relpath).as_posix()}"))
+        return super().parse_file(path, model_id=ecore_model_id, options=options, relpath=relpath)
+
 
 class BPMNSignavioAdapter(IRParserAdapter):
     metadata_language = "bpmn"
     format_name = "signavio"
 
     def create_parser(self, options: ParserOptions):
-        _ = options
-        return BPMNSignavioJSONParser()
+        return BPMNSignavioJSONParser(
+            materialize_connector_nodes=bool(options.get("materialize_connector_nodes", True))
+        )
 
 
 def diagnostics_from_stats(
@@ -421,5 +431,6 @@ register_descriptor(
         parser_id="bpmn-signavio",
         extensions=(".json",),
         adapter_factory=BPMNSignavioAdapter,
+        option_specs=(OptionSpec("materializeConnectorNodes", "materialize_connector_nodes", True, bool_option),),
     )
 )

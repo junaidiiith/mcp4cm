@@ -19,6 +19,7 @@ export const filterLabels: Record<string, [string, string]> = {
   low_vocabulary: ["Low vocabulary", "Minimum unique token count across semantic names."],
   name_repetition_ratio: ["Name repetition", "Most frequent normalized name ratio among named nodes."],
   regex_rule: ["Regex rule", "Custom regex rule over names/types."],
+  language: ["Language", "Retain only models detected in selected natural languages."],
 };
 
 export const filterGroups: Record<string, string> = {
@@ -29,6 +30,7 @@ export const filterGroups: Record<string, string> = {
   name_repetition_ratio: "Placeholder Detection",
   low_vocabulary: "Vocabulary",
   regex_rule: "Custom",
+  language: "Language",
 };
 
 export const filterFormulaPreviews: Record<string, string> = {
@@ -39,6 +41,7 @@ export const filterFormulaPreviews: Record<string, string> = {
   low_vocabulary: "uniqueSemanticTokens < minUniqueWords",
   name_repetition_ratio: "mostFrequentNameCount / namedCount >= threshold",
   regex_rule: "regexMatchCount(targetField, scope) >= minMatches",
+  language: "detectedLanguage(modelNames) NOT IN selectedLanguages",
 };
 
 const canonicalPreset: FilterConfig[] = [
@@ -49,6 +52,24 @@ const canonicalPreset: FilterConfig[] = [
   { id: "low_vocabulary", enabled: true, minUniqueWords: 3 },
   { id: "name_repetition_ratio", enabled: true, threshold: 0.5 },
   { id: "regex_rule", enabled: false, pattern: "", targetField: "name", scope: "eligible_only", minMatches: 1 },
+  { id: "language", enabled: true, languages: ["en"] },
+];
+
+export const naturalLanguageOptions = [
+  { value: "en", label: "English" },
+  { value: "de", label: "German" },
+  { value: "fr", label: "French" },
+  { value: "es", label: "Spanish" },
+  { value: "it", label: "Italian" },
+  { value: "pt", label: "Portuguese" },
+  { value: "nl", label: "Dutch" },
+  { value: "sv", label: "Swedish" },
+  { value: "no", label: "Norwegian" },
+  { value: "da", label: "Danish" },
+  { value: "fi", label: "Finnish" },
+  { value: "pl", label: "Polish" },
+  { value: "cs", label: "Czech" },
+  { value: "tr", label: "Turkish" },
 ];
 
 export const dummyFilterPresets: Record<Language, FilterConfig[]> = {

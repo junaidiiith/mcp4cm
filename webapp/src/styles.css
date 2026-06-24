@@ -255,6 +255,20 @@ h3 { margin: 0 0 10px; font-size: 15px; }
 .wideField {
   grid-column: 1 / -1;
 }
+.languageMultiSelect {
+  display: grid;
+  gap: 8px;
+}
+.languageMultiSelect > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #354857;
+}
+.languageMultiSelect > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 8px 10px;
+}
 .uploadGrid, .controlsRow { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
 .representationPanel {
   min-width: 320px;

@@ -542,6 +542,11 @@ export interface RegexRuleFilterConfig extends BaseFilterConfig {
   minMatches: number;
 }
 
+export interface LanguageFilterConfig extends BaseFilterConfig {
+  id: "language";
+  languages: string[];
+}
+
 export type FilterConfig =
   | MinSizeFilterConfig
   | TooFewNamedElementsFilterConfig
@@ -549,7 +554,8 @@ export type FilterConfig =
   | PlaceholderNameRatioFilterConfig
   | LowVocabularyFilterConfig
   | NameRepetitionRatioFilterConfig
-  | RegexRuleFilterConfig;
+  | RegexRuleFilterConfig
+  | LanguageFilterConfig;
 
 export interface FormatOption {
   value: UploadFormat;

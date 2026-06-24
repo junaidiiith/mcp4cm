@@ -1,3 +1,6 @@
+import importlib.util
+from pathlib import Path
+
 import pytest
 
 from mcp4cm.core import Dataset
@@ -29,6 +32,13 @@ from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
 from mcp4cm.parsers.parse import parse_file
 from mcp4cm.parsers.uml_xmi.parser import ParseOptions, UMLXMIParser
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
+
+_DUMMY_CLEANSING_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "dummy_cleansing.py"
+_DUMMY_CLEANSING_SPEC = importlib.util.spec_from_file_location("dummy_cleansing_script", _DUMMY_CLEANSING_SCRIPT)
+assert _DUMMY_CLEANSING_SPEC and _DUMMY_CLEANSING_SPEC.loader
+_DUMMY_CLEANSING_MODULE = importlib.util.module_from_spec(_DUMMY_CLEANSING_SPEC)
+_DUMMY_CLEANSING_SPEC.loader.exec_module(_DUMMY_CLEANSING_MODULE)
+build_filter_configs = _DUMMY_CLEANSING_MODULE.build_filter_configs
 
 
 def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warning():
@@ -595,6 +605,58 @@ def test_dummy_cleansing_v2_regex_rule():
     regex_findings = [finding for finding in result.findings if finding.filter_id == "regex_rule"]
     assert regex_findings
     assert regex_findings[0].decision == "removed"
+
+
+def test_dummy_cleansing_language_filter_retains_selected_language():
+    english = uml_record(
+        [
+            "Customer account",
+            "Purchase order",
+            "Shipping address",
+            "Payment invoice",
+            "Product catalog",
+            "Delivery status",
+        ],
+        model_id="english-model",
+    )
+    german = uml_record(
+        [
+            "Kundenkonto",
+            "Bestellung",
+            "Lieferadresse",
+            "Rechnung",
+            "Produktkatalog",
+            "Zahlungsstatus",
+        ],
+        model_id="german-model",
+    )
+    configs = [{"id": config["id"], "enabled": False} for config in default_filter_configs()]
+    configs.append({"id": "language", "enabled": True, "languages": ["en"]})
+
+    result = evaluate_dummy_filters(Dataset([english, german], "uml"), filter_configs=configs)
+    outcomes = {outcome.model_id: outcome for outcome in result.model_outcomes}
+    language_findings = {finding.model_id: finding for finding in result.findings if finding.filter_id == "language"}
+
+    assert outcomes["english-model"].removed is False
+    assert outcomes["german-model"].removed is True
+    assert language_findings["english-model"].metrics["detectedLanguage"] == "en"
+    assert language_findings["german-model"].metrics["detectedLanguage"] == "de"
+
+
+def test_dummy_cleansing_script_enables_language_filter_config():
+    configs = build_filter_configs(["en", "de", "en"])
+    language_config = next(config for config in configs if config["id"] == "language")
+
+    assert language_config["enabled"] is True
+    assert language_config["languages"] == ["en", "de"]
+
+
+def test_dummy_cleansing_script_defaults_to_english_language_filter():
+    configs = build_filter_configs(None)
+    language_config = next(config for config in configs if config["id"] == "language")
+
+    assert language_config["enabled"] is True
+    assert language_config["languages"] == ["en"]
 
 
 def test_dummy_cleansing_v2_filter_summary_groups_mixed_modelset_by_language():

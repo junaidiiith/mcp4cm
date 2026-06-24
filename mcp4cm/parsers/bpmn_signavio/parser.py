@@ -91,6 +91,9 @@ class BPMNSignavioJSONParser(BaseParser):
 
     language = "BPMN-Signavio-JSON"
 
+    def __init__(self, *, materialize_connector_nodes: bool = True) -> None:
+        self.materialize_connector_nodes = materialize_connector_nodes
+
     def parse(self, filepath: str) -> tuple[IR, ParserRunStats]:
         self._start_run()
 
@@ -145,7 +148,7 @@ class BPMNSignavioJSONParser(BaseParser):
         self._collect_shapes(data, None, records, order, parent_of)
         self._build_incoming_index(records, incoming_refs)
         edge_ids = self._identify_edge_shapes(records)
-        node_ids = {shape_id for shape_id in records if shape_id not in edge_ids}
+        node_ids = set(records) if self.materialize_connector_nodes else set(records) - edge_ids
 
         for shape_id in order:
             if shape_id not in node_ids:
@@ -161,6 +164,24 @@ class BPMNSignavioJSONParser(BaseParser):
                 )
             )
 
+        if self.materialize_connector_nodes:
+            self._add_lossless_connector_edges(ir, records, order, incoming_refs, edge_ids)
+        else:
+            self._add_legacy_connector_edges(ir, records, order, incoming_refs, node_ids, edge_ids)
+
+        self._add_contains_edges(ir, parent_of, node_ids)
+
+        return ir, self._stats()
+
+    def _add_legacy_connector_edges(
+        self,
+        ir: IR,
+        records: dict[str, ShapeRecord],
+        order: list[str],
+        incoming_refs: dict[str, list[str]],
+        node_ids: set[str],
+        edge_ids: set[str],
+    ) -> None:
         for shape_id in order:
             if shape_id not in edge_ids:
                 continue
@@ -199,6 +220,89 @@ class BPMNSignavioJSONParser(BaseParser):
                 )
             )
 
+    def _add_lossless_connector_edges(
+        self,
+        ir: IR,
+        records: dict[str, ShapeRecord],
+        order: list[str],
+        incoming_refs: dict[str, list[str]],
+        edge_ids: set[str],
+    ) -> None:
+        non_connector_node_ids = set(records) - edge_ids
+
+        for shape_id in order:
+            rec = records[shape_id]
+            for target_ref in rec.outgoing_ids:
+                if target_ref not in records:
+                    continue
+                edge_type = "bpmnConnectorSource" if target_ref in edge_ids else "bpmnOutgoing"
+                ir.edges.append(
+                    Edge(
+                        id=f"outgoing:{rec.id}->{target_ref}",
+                        sourceId=rec.id,
+                        targetId=target_ref,
+                        type=edge_type,
+                        data={
+                            "feature": "outgoing",
+                            "sourceType": rec.stencil_id,
+                            "targetType": records[target_ref].stencil_id,
+                        },
+                    )
+                )
+
+        for shape_id in order:
+            if shape_id not in edge_ids:
+                continue
+
+            rec = records[shape_id]
+            if rec.target_id and rec.target_id in records:
+                ir.edges.append(
+                    Edge(
+                        id=f"target:{rec.id}->{rec.target_id}",
+                        sourceId=rec.id,
+                        targetId=rec.target_id,
+                        type="bpmnConnectorTarget",
+                        data={
+                            "feature": "target",
+                            "connectorType": rec.stencil_id,
+                            "targetType": records[rec.target_id].stencil_id,
+                        },
+                    )
+                )
+            elif rec.target_id:
+                self.warn(
+                    WarningType.UNRESOLVED_REFERENCE,
+                    f"Connector '{rec.id}' target '{rec.target_id}' does not resolve to a parsed shape.",
+                )
+
+            source_candidates = [source for source in incoming_refs.get(rec.id, []) if source in non_connector_node_ids]
+            target_id = self._resolve_edge_target(rec, non_connector_node_ids)
+            if not source_candidates or not target_id:
+                continue
+            if len(source_candidates) > 1:
+                self.warn(
+                    WarningType.OTHER,
+                    (
+                        f"Connector '{rec.id}' has multiple source candidates {source_candidates}; "
+                        "deriving first direct edge."
+                    ),
+                )
+
+            source_id = source_candidates[0]
+            edge_data = self._build_edge_data(rec)
+            edge_data["derived"] = True
+            edge_data["connectorId"] = rec.id
+            ir.edges.append(
+                Edge(
+                    id=rec.id,
+                    sourceId=source_id,
+                    targetId=target_id,
+                    type=rec.stencil_id,
+                    data=edge_data,
+                )
+            )
+
+    def _add_contains_edges(self, ir: IR, parent_of: dict[str, str | None], node_ids: set[str]) -> None:
         contains_ids: set[str] = set()
         for child_id, parent_id in parent_of.items():
             if not parent_id:
@@ -220,8 +324,6 @@ class BPMNSignavioJSONParser(BaseParser):
                     data={"feature": "childShapes"},
                 )
             )
-
-        return ir, self._stats()
 
     def _collect_shapes(
         self,

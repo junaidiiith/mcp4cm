@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { filterFormulaPreviews, filterGroups, filterLabels } from "../../config";
+import { filterFormulaPreviews, filterGroups, filterLabels, naturalLanguageOptions } from "../../config";
 import type { BusyState, DummyProgressState, DummyResponse, FilterConfig } from "../../types";
 import { formatDuration, round } from "../../utils";
 
@@ -233,7 +233,7 @@ function BuiltInFilterEditor({
   filters: FilterConfig[];
   onChange: (index: number, patch: Partial<FilterConfig>) => void;
 }) {
-  const groups = ["Size", "Naming Density", "Placeholder Detection", "Vocabulary", "Custom", "General"];
+  const groups = ["Size", "Naming Density", "Placeholder Detection", "Vocabulary", "Language", "Custom", "General"];
   const groupedFilters = groups
     .map((group) => ({
       group,
@@ -414,6 +414,13 @@ function BuiltInFilterEditor({
                             />
                           </Label>
                         )}
+                        {"languages" in filter && (
+                          <LanguageMultiSelect
+                            value={filter.languages}
+                            disabled={!filter.enabled}
+                            onChange={(languages) => onChange(index, { languages })}
+                          />
+                        )}
                       </div>
                       {formula && (
                         <details className="formulaDetail">
@@ -430,6 +437,41 @@ function BuiltInFilterEditor({
         );
       })}
     </Accordion>
+  );
+}
+
+function LanguageMultiSelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string[];
+  disabled: boolean;
+  onChange: (languages: string[]) => void;
+}) {
+  const selected = new Set(value);
+  return (
+    <div className="wideField languageMultiSelect">
+      <span>Languages</span>
+      <div>
+        {naturalLanguageOptions.map((option) => (
+          <label className="checkLine" key={option.value}>
+            <input
+              type="checkbox"
+              checked={selected.has(option.value)}
+              disabled={disabled}
+              onChange={(event) => {
+                const next = event.target.checked
+                  ? [...value, option.value]
+                  : value.filter((language) => language !== option.value);
+                onChange([...new Set(next)]);
+              }}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
