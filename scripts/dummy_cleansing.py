@@ -30,6 +30,7 @@ TARGET_GROUPS: dict[str, tuple[str, ...]] = {
 
 TARGET_CHOICES = tuple(TARGET_GROUPS) + DEFAULT_TARGETS
 DEFAULT_RETAINED_LANGUAGES = ("en",)
+LANGUAGE_FILTER_ID = "language"
 
 
 class Style:
@@ -182,14 +183,47 @@ def summarize_dataset(result_payload: dict[str, Any]) -> dict[str, Any]:
         }
         for summary in result_payload["filterSummaries"]
     ]
+    union_rows = summarize_dummy_filter_unions(result_payload)
     return {
         "version": 1,
         "dataset": result_payload["dataset"],
         "datasetType": result_payload["datasetType"],
         "totalModels": total_models,
         "rows": rows,
+        "unionRows": union_rows,
         "generatedAt": result_payload["finishedAt"],
     }
+
+
+def summarize_dummy_filter_unions(result_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    total_models = int(result_payload.get("runSummary", {}).get("total_models") or 0)
+    outcomes = [outcome for outcome in result_payload.get("modelOutcomes") or [] if isinstance(outcome, dict)]
+    variants = (
+        ("all_enabled", "All enabled filters", None),
+        ("without_language", "Without language filter", LANGUAGE_FILTER_ID),
+    )
+    rows: list[dict[str, Any]] = []
+    for variant_id, label, excluded_filter_id in variants:
+        removed = 0
+        for outcome in outcomes:
+            triggered_filters = set(outcome.get("allTriggeredFilters") or [])
+            if excluded_filter_id:
+                triggered_filters.discard(excluded_filter_id)
+            if triggered_filters:
+                removed += 1
+        rows.append(
+            {
+                "dataset": result_payload["dataset"],
+                "variant": variant_id,
+                "filterSet": label,
+                "excludedFilterId": excluded_filter_id,
+                "totalModels": total_models,
+                "removed": removed,
+                "remaining": total_models - removed,
+                "removalRate": (removed / total_models * 100.0) if total_models else 0.0,
+            }
+        )
+    return rows
 
 
 def build_filter_configs(languages: list[str] | None) -> list[dict[str, Any]]:
@@ -200,7 +234,9 @@ def build_filter_configs(languages: list[str] | None) -> list[dict[str, Any]]:
         )
     )
     return [
-        {**config, "enabled": True, "languages": selected_languages} if config.get("id") == "language" else config
+        {**config, "enabled": True, "languages": selected_languages}
+        if config.get("id") == LANGUAGE_FILTER_ID
+        else config
         for config in configs
     ]
 
@@ -329,6 +365,7 @@ def main() -> int:
         "cumulative": False,
         "datasets": summaries,
         "rows": [row for summary in summaries for row in summary["rows"]],
+        "unionRows": [row for summary in summaries for row in summary["unionRows"]],
         "generatedAt": time.time(),
     }
     write_json(args.evaluation_dir / "dummy_cleansing_summary.json", aggregate)

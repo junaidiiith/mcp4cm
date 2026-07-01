@@ -404,6 +404,7 @@ flowchart LR
 | TF-IDF | Near-duplicate text similarity using model name/type text. | Token mode, threshold, max features, min document frequency, n-grams, stopwords. |
 | Graph metrics | Weighted structural similarity. | Threshold and weights for node names, node types, edge types, degree histogram, size, and density. |
 | Graph embeddings | Shared Node2Vec graph embedding similarity with optional semantic feature nodes. | Threshold, dimensions, walk length, number of walks, workers, seed, node-name/type/edge-type features, pooling. |
+| Contrastive GNN | Unsupervised GraphCL-style GNN using sentence-encoded node and edge text. | Threshold, dimensions, layers, epochs, learning rate, temperature, augmentations, sentence model, device. |
 | BERT semantic | Semantic similarity over model text. | Threshold, text mode, model name, batch size, max length. |
 | Isomorphism | Exact graph-structure match. | Structure/name/name+type mode, edge-type matching, direction, parallel-edge multiplicity. |
 

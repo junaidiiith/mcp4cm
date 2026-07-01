@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
+import multiprocessing
+import os
 import re
+import signal
+import tempfile
+import threading
+import time
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import combinations
+from pathlib import Path
+from queue import Empty
 from typing import Any, Literal
+from urllib.parse import quote
 
-from mcp4cm._deps import require_networkx, require_node2vec, require_sklearn, require_transformers_torch
+from mcp4cm._deps import require_networkx, require_node2vec, require_sentence_transformers, require_sklearn
 from mcp4cm.core import Dataset, ModelRecord
 from mcp4cm.name_classification import (
     extract_node_labels,
@@ -21,10 +31,16 @@ from mcp4cm.name_classification import (
 )
 from mcp4cm.utils import pair_count, pair_key, progress_percent
 
-IsomorphismMode = Literal["structure", "names", "names_types"]
+IsomorphismMode = Literal["structure"]
 TfidfTokenMode = Literal["names", "names_types_bag", "typed_name_pairs"]
 StopwordsMode = Literal["none", "english"]
 ProgressCallback = Callable[[dict[str, Any]], None]
+ISOMORPHISM_TIMEOUT_SECONDS = 120.0
+DEFAULT_SENTENCE_SIMILARITY_THRESHOLD = 0.80
+
+
+class IsomorphismCheckTimeout(TimeoutError):
+    """Raised internally when one graph-pair isomorphism check exceeds its budget."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,39 +322,58 @@ def graph_similarity_pairs(
 def graph_isomorphism_pairs(
     dataset: Dataset,
     *,
-    mode: IsomorphismMode = "names",
-    match_edge_types: bool = True,
+    mode: IsomorphismMode = "structure",
     ignore_direction: bool = False,
     match_parallel_edge_multiplicity: bool = True,
+    timeout_seconds: float = ISOMORPHISM_TIMEOUT_SECONDS,
     progress: ProgressCallback | None = None,
 ) -> list[SimilarPair]:
+    """Find topologically identical graphs, skipping individual timed-out checks."""
+    if timeout_seconds <= 0:
+        raise ValueError("isomorphism timeout_seconds must be greater than 0.")
     records = list(dataset)
     if len(records) < 2:
         return []
 
+    prepared_records = [
+        (
+            record,
+            _graph_for_isomorphism(
+                record.graph,
+                ignore_direction=ignore_direction,
+                match_parallel_edge_multiplicity=match_parallel_edge_multiplicity,
+            ),
+        )
+        for record in records
+    ]
+    buckets: dict[tuple[int, int], list[tuple[ModelRecord, Any]]] = defaultdict(list)
+    for record, graph in prepared_records:
+        # Equal node and edge counts are necessary (but not sufficient) for
+        # isomorphism, so never compare models across these size buckets.
+        buckets[(graph.number_of_nodes(), graph.number_of_edges())].append((record, graph))
+
+    candidates = [pair for bucket in buckets.values() for pair in combinations(bucket, 2)]
     pairs: list[SimilarPair] = []
-    total_pairs = pair_count(len(records))
+    total_pairs = len(candidates)
     _report_progress(
         progress, phase="pair_scan", current=0, total=total_pairs, message="Scanning graph isomorphism candidates."
     )
-    for checked, (left, right) in enumerate(combinations(records, 2), start=1):
-        if are_graphs_isomorphic(
-            left,
-            right,
-            mode=mode,
-            match_edge_types=match_edge_types,
-            ignore_direction=ignore_direction,
-            match_parallel_edge_multiplicity=match_parallel_edge_multiplicity,
-        ):
-            pairs.append(SimilarPair(left.model_id, right.model_id, 1.0, f"graph_isomorphism_{mode}"))
-        _report_pair_progress(progress, checked, total_pairs, "isomorphism candidate pair(s) checked")
+    timed_out = 0
+    for checked, ((left, left_graph), (right, right_graph)) in enumerate(candidates, start=1):
+        isomorphic = _prepared_graphs_are_isomorphic_with_timeout(left_graph, right_graph, timeout_seconds)
+        if isomorphic is None:
+            timed_out += 1
+        elif isomorphic:
+            pairs.append(SimilarPair(left.model_id, right.model_id, 1.0, "graph_isomorphism_structure"))
+        suffix = f"; {timed_out} timed out" if timed_out else ""
+        _report_pair_progress(progress, checked, total_pairs, f"isomorphism candidate pair(s) checked{suffix}")
 
     _report_progress(
         progress,
         phase="done",
         current=total_pairs,
         total=total_pairs,
-        message=f"Graph isomorphism found {len(pairs)} pairs.",
+        message=f"Graph isomorphism found {len(pairs)} pairs; skipped {timed_out} timed-out check(s).",
     )
     return pairs
 
@@ -352,18 +387,19 @@ def graph_embedding_pairs(
     num_walks: int = 5,
     workers: int = 1,
     seed: int = 42,
-    use_node_names: bool = True,
-    use_node_types: bool = True,
-    use_edge_types: bool = True,
-    pool_feature_nodes: bool = False,
-    pooling: Literal["mean", "mean_max"] = "mean",
+    embedding_cache_dir: Path | str | None = None,
     progress: ProgressCallback | None = None,
 ) -> list[SimilarPair]:
+    """Train or reload vectors from one shared Node2Vec feature graph.
+
+    Vectors are stored under ``.mcp4cm_embeddings/<dataset>/<graph_id>/node2vec.npz``
+    by default.  Pass ``embedding_cache_dir`` to select the directory that contains
+    the dataset folders.
+    """
     records = list(dataset)
     if len(records) < 2:
         return []
 
-    Node2Vec = require_node2vec()
     np = _require_numpy()
     _validate_graph_embedding_parameters(
         threshold=threshold,
@@ -371,60 +407,46 @@ def graph_embedding_pairs(
         walk_length=walk_length,
         num_walks=num_walks,
         workers=workers,
-        pooling=pooling,
     )
     _report_progress(
         progress,
         phase="embedding",
         current=0,
-        total=len(records) + 1,
-        message="Building shared Node2Vec graph.",
+        total=len(records),
+        message="Loading or training one shared Node2Vec model.",
     )
-    embedding_graph, model_nodes = _shared_node2vec_graph(
-        records,
-        use_node_names=use_node_names,
-        use_node_types=use_node_types,
-        use_edge_types=use_edge_types,
-        pool_feature_nodes=pool_feature_nodes,
-    )
-    if embedding_graph.number_of_nodes() == 0 or embedding_graph.number_of_edges() == 0:
-        embeddings = [np.zeros(_pooled_embedding_dimensions(dimensions, pooling), dtype=float) for _ in records]
+    corpus_fingerprint = _cache_fingerprint("|".join(_graph_cache_fingerprint(record) for record in records))
+    metadata = _node2vec_cache_metadata(corpus_fingerprint, dimensions, walk_length, num_walks, workers, seed)
+    embeddings = []
+    for record in records:
+        cache_path = _embedding_cache_path(embedding_cache_dir, dataset, record, "node2vec")
+        embedding = _load_embedding(cache_path, metadata, np)
+        embeddings.append(embedding)
+    if any(embedding is None for embedding in embeddings):
+        graph, model_nodes = _shared_node2vec_graph(records)
+        Node2Vec = require_node2vec()
+        if graph.number_of_nodes() == 0 or graph.number_of_edges() == 0:
+            embeddings = [np.zeros(dimensions, dtype=float) for _ in records]
+        else:
+            print("Training one shared Node2Vec model for all graphs with total nodes:", graph.number_of_nodes(), "total edges:", graph.number_of_edges())
+            model = Node2Vec(graph, dimensions=dimensions, walk_length=walk_length, num_walks=num_walks, workers=workers, quiet=True, seed=seed).fit(window=5, min_count=1, batch_words=4, seed=seed)
+            embeddings = [_pooled_node_embeddings(model, model_nodes[record.model_id], np, dimensions) for record in records]
+        for record, embedding in zip(records, embeddings, strict=True):
+            _save_embedding(_embedding_cache_path(embedding_cache_dir, dataset, record, "node2vec"), embedding, metadata, np)
+        action = "Trained shared"
     else:
-        node_count = embedding_graph.number_of_nodes()
-        edge_count = embedding_graph.number_of_edges()
-        walk_count = node_count * num_walks
-        walk_tokens = walk_count * walk_length
+        action = "Reloaded shared"
+    for index, record in enumerate(records, start=1):
         _report_progress(
             progress,
             phase="embedding",
-            current=1,
-            total=len(records) + 1,
+            current=index,
+            total=len(records),
             message=(
-                "Training shared Node2Vec model "
-                f"on {_compact_count(node_count)} node(s), {_compact_count(edge_count)} edge(s), "
-                f"~{_compact_count(walk_count)} walk(s), ~{_compact_count(walk_tokens)} walk token(s)."
+                f"{action} Node2Vec for {index} of {len(records)} graph(s) "
+                f"({_compact_count(record.node_count)} node(s), {_compact_count(record.edge_count)} edge(s))."
             ),
         )
-        node2vec = Node2Vec(
-            embedding_graph,
-            dimensions=dimensions,
-            walk_length=walk_length,
-            num_walks=num_walks,
-            workers=workers,
-            quiet=True,
-            seed=seed,
-        )
-        model = node2vec.fit(window=5, min_count=1, batch_words=4, seed=seed)
-        embeddings = []
-        for index, record in enumerate(records, start=1):
-            embeddings.append(_pooled_node_embeddings(model, model_nodes[record.model_id], np, dimensions, pooling))
-            _report_progress(
-                progress,
-                phase="embedding",
-                current=index + 1,
-                total=len(records) + 1,
-                message=f"Pooled {index} of {len(records)} shared graph embeddings.",
-            )
 
     pairs = _embedding_similarity_pairs(
         records,
@@ -451,7 +473,6 @@ def _validate_graph_embedding_parameters(
     walk_length: int,
     num_walks: int,
     workers: int,
-    pooling: str,
 ) -> None:
     if not 0 <= threshold <= 1:
         raise ValueError("graphEmbeddingThreshold must be between 0 and 1.")
@@ -463,32 +484,28 @@ def _validate_graph_embedding_parameters(
         raise ValueError("graphEmbeddingNumWalks must be greater than 0.")
     if workers < 1:
         raise ValueError("graphEmbeddingWorkers must be greater than 0.")
-    if pooling not in {"mean", "mean_max"}:
-        raise ValueError("graphEmbeddingPooling must be one of: mean, mean_max.")
 
 
 def bert_semantic_similarity_pairs(
     dataset: Dataset,
     *,
-    threshold: float = 0.9,
-    model_name: str = "bert-base-uncased",
+    threshold: float = DEFAULT_SENTENCE_SIMILARITY_THRESHOLD,
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 8,
     max_length: int = 256,
     semantic_text_mode: TfidfTokenMode = "names_types_bag",
+    embedding_cache_dir: Path | str | None = None,
     progress: ProgressCallback | None = None,
 ) -> list[SimilarPair]:
     records = list(dataset)
     if len(records) < 2:
         return []
+    if batch_size < 1:
+        raise ValueError("bertBatchSize must be greater than 0.")
+    if max_length < 1:
+        raise ValueError("bertMaxLength must be greater than 0.")
 
-    AutoTokenizer, AutoModel, torch = require_transformers_torch()
     np = _require_numpy()
-
-    _report_progress(progress, phase="load_model", current=0, total=1, message=f"Loading {model_name}.")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name)
-    model.eval()
-    _report_progress(progress, phase="load_model", current=1, total=1, message=f"Loaded {model_name}.")
 
     texts = [
         " ".join(record_tokens(record, token_mode=semantic_text_mode))
@@ -496,18 +513,44 @@ def bert_semantic_similarity_pairs(
         or record_text(record, include_types=True)
         for record in records
     ]
-    embeddings = []
-    total_batches = math.ceil(len(records) / batch_size)
+    embeddings: list[Any | None] = []
+    missing: list[tuple[int, ModelRecord, str, Path, dict[str, Any]]] = []
+    for index, (record, text) in enumerate(zip(records, texts, strict=True)):
+        metadata = _bert_cache_metadata(record, text, model_name, max_length, semantic_text_mode)
+        cache_path = _embedding_cache_path(embedding_cache_dir, dataset, record, "bert")
+        embedding = _load_embedding(cache_path, metadata, np)
+        embeddings.append(embedding)
+        if embedding is None:
+            missing.append((index, record, text, cache_path, metadata))
+
+    total_batches = math.ceil(len(missing) / batch_size)
     _report_progress(
-        progress, phase="embedding", current=0, total=total_batches, message="Computing BERT semantic embeddings."
+        progress,
+        phase="embedding",
+        current=0,
+        total=total_batches,
+        message=(
+            "Reloaded all BERT semantic embeddings."
+            if not missing
+            else "Loading or computing BERT semantic embeddings."
+        ),
     )
-    with torch.no_grad():
-        for batch_index, start in enumerate(range(0, len(texts), batch_size), start=1):
-            batch = texts[start : start + batch_size]
-            encoded = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
-            output = model(**encoded)
-            batch_embeddings = _mean_pool_bert(output.last_hidden_state, encoded["attention_mask"], torch)
-            embeddings.extend(batch_embeddings.cpu().numpy())
+    if missing:
+        SentenceTransformer = require_sentence_transformers()
+        _report_progress(progress, phase="load_model", current=0, total=1, message=f"Loading {model_name}.")
+        model = SentenceTransformer(model_name)
+        model.max_seq_length = max_length
+        _report_progress(progress, phase="load_model", current=1, total=1, message=f"Loaded {model_name}.")
+        for batch_index, start in enumerate(range(0, len(missing), batch_size), start=1):
+            batch_items = missing[start : start + batch_size]
+            batch_embeddings = model.encode(
+                [item[2] for item in batch_items], batch_size=batch_size, normalize_embeddings=True, show_progress_bar=False
+            )
+            for item, embedding in zip(batch_items, batch_embeddings, strict=True):
+                index, _record, _text, cache_path, metadata = item
+                vector = np.asarray(embedding, dtype=float)
+                embeddings[index] = vector
+                _save_embedding(cache_path, vector, metadata, np)
             _report_progress(
                 progress,
                 phase="embedding",
@@ -538,12 +581,13 @@ def are_graphs_isomorphic(
     left: ModelRecord,
     right: ModelRecord,
     *,
-    mode: IsomorphismMode = "names",
-    match_edge_types: bool = True,
+    mode: IsomorphismMode = "structure",
     ignore_direction: bool = False,
     match_parallel_edge_multiplicity: bool = True,
+    timeout_seconds: float = ISOMORPHISM_TIMEOUT_SECONDS,
 ) -> bool:
-    nx = require_networkx()
+    if timeout_seconds <= 0:
+        raise ValueError("isomorphism timeout_seconds must be greater than 0.")
     left_graph = _graph_for_isomorphism(
         left.graph,
         ignore_direction=ignore_direction,
@@ -555,15 +599,75 @@ def are_graphs_isomorphic(
         match_parallel_edge_multiplicity=match_parallel_edge_multiplicity,
     )
 
+    return _prepared_graphs_are_isomorphic_with_timeout(left_graph, right_graph, timeout_seconds) is True
+
+
+def _prepared_graphs_are_isomorphic(left_graph: Any, right_graph: Any) -> bool:
     if (
         left_graph.number_of_nodes() != right_graph.number_of_nodes()
         or left_graph.number_of_edges() != right_graph.number_of_edges()
     ):
         return False
+    return require_networkx().is_isomorphic(left_graph, right_graph)
 
-    node_match = _isomorphism_node_match(mode)
-    edge_match = _isomorphism_edge_match() if match_edge_types else None
-    return nx.is_isomorphic(left_graph, right_graph, node_match=node_match, edge_match=edge_match)
+
+def _prepared_graphs_are_isomorphic_with_timeout(
+    left_graph: Any, right_graph: Any, timeout_seconds: float
+) -> bool | None:
+    """Return ``None`` when a single pair exceeds the isomorphism time budget."""
+    if threading.current_thread() is threading.main_thread() and hasattr(signal, "setitimer"):
+        return _isomorphism_with_signal_timeout(left_graph, right_graph, timeout_seconds)
+    return _isomorphism_with_process_timeout(left_graph, right_graph, timeout_seconds)
+
+
+def _isomorphism_with_signal_timeout(left_graph: Any, right_graph: Any, timeout_seconds: float) -> bool | None:
+    def raise_timeout(_signum, _frame) -> None:
+        raise IsomorphismCheckTimeout
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, raise_timeout)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    started = time.monotonic()
+    try:
+        return _prepared_graphs_are_isomorphic(left_graph, right_graph)
+    except IsomorphismCheckTimeout:
+        return None
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        previous_delay, previous_interval = previous_timer
+        if previous_delay:
+            remaining_delay = max(previous_delay - (time.monotonic() - started), 0.0)
+            signal.setitimer(signal.ITIMER_REAL, remaining_delay, previous_interval)
+
+
+def _isomorphism_in_child(left_graph: Any, right_graph: Any, result_queue) -> None:
+    try:
+        result_queue.put(("result", _prepared_graphs_are_isomorphic(left_graph, right_graph)))
+    except Exception as exc:  # pragma: no cover - exercised only from worker-thread callers
+        result_queue.put(("error", f"{type(exc).__name__}: {exc}"))
+
+
+def _isomorphism_with_process_timeout(left_graph: Any, right_graph: Any, timeout_seconds: float) -> bool | None:
+    """Use a child process where signal-based interruption is unavailable (for example a web worker thread)."""
+    context = multiprocessing.get_context()
+    result_queue = context.Queue(maxsize=1)
+    process = context.Process(target=_isomorphism_in_child, args=(left_graph, right_graph, result_queue))
+    process.start()
+    process.join(timeout_seconds)
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        return None
+    try:
+        status, value = result_queue.get(timeout=1)
+    except Empty as exc:
+        raise RuntimeError("Isomorphism worker exited without a result.")
+    finally:
+        result_queue.close()
+    if status == "error":
+        raise RuntimeError(f"Isomorphism worker failed: {value}")
+    return bool(value)
 
 
 def graph_similarity_features(
@@ -661,7 +765,7 @@ def vote_duplicate_pairs(
     tfidf_name_threshold: float = 0.9,
     tfidf_name_type_threshold: float = 0.9,
     graph_threshold: float = 0.85,
-    isomorphism_mode: IsomorphismMode = "names",
+    isomorphism_mode: IsomorphismMode = "structure",
 ) -> list[DuplicateDecision]:
     votes: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
 
@@ -785,62 +889,113 @@ def hash_name_tokens(record: ModelRecord, tokens: Iterable[str], *, include_type
     return hash_tokens(tokens)
 
 
-def _shared_node2vec_graph(
-    records: list[ModelRecord],
-    *,
-    use_node_names: bool,
-    use_node_types: bool,
-    use_edge_types: bool,
-    pool_feature_nodes: bool,
-):
+def _embedding_cache_path(
+    embedding_cache_dir: Path | str | None, dataset: Dataset, record: ModelRecord, technique: str
+) -> Path:
+    """Return a path scoped to dataset and graph, without permitting path traversal."""
+    root = Path(embedding_cache_dir) if embedding_cache_dir is not None else Path(".mcp4cm_embeddings")
+    return root / quote(str(dataset.dataset_type), safe="._-") / quote(record.model_id, safe="._-") / f"{technique}.npz"
+
+
+def _node2vec_cache_metadata(
+    corpus_fingerprint: str, dimensions: int, walk_length: int, num_walks: int, workers: int, seed: int
+) -> dict[str, Any]:
+    return {
+        "version": 2,
+        "technique": "node2vec_shared",
+        "corpus": corpus_fingerprint,
+        "dimensions": dimensions,
+        "walk_length": walk_length,
+        "num_walks": num_walks,
+        "workers": workers,
+        "seed": seed,
+    }
+
+
+def _bert_cache_metadata(
+    record: ModelRecord, text: str, model_name: str, max_length: int, semantic_text_mode: str
+) -> dict[str, Any]:
+    return {
+        "version": 2,
+        "technique": "sentence_transformer",
+        "model_name": model_name,
+        "max_length": max_length,
+        "semantic_text_mode": semantic_text_mode,
+        "text": _cache_fingerprint(text),
+        "model_id": record.model_id,
+    }
+
+
+def _graph_cache_fingerprint(record: ModelRecord) -> str:
+    graph = record.graph
+    payload = {
+        "directed": graph.is_directed(),
+        # Node2Vec consumes the graph's iteration order, so retain it in the
+        # fingerprint instead of treating equivalent reordered graphs as cache hits.
+        "nodes": [str(node) for node in graph.nodes()],
+        "edges": [(str(left), str(right)) for left, right in graph.edges()],
+    }
+    return _cache_fingerprint(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+
+def _cache_fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _load_embedding(path: Path, expected_metadata: dict[str, Any], np):
+    try:
+        with np.load(path, allow_pickle=False) as payload:
+            metadata = json.loads(str(payload["metadata"].item()))
+            if metadata != expected_metadata:
+                return None
+            return np.asarray(payload["embedding"], dtype=float)
+    except (FileNotFoundError, KeyError, OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def _save_embedding(path: Path, embedding, metadata: dict[str, Any], np) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", suffix=".npz", dir=path.parent)
+    os.close(descriptor)
+    temporary_path = Path(temporary_name)
+    try:
+        np.savez_compressed(
+            temporary_path,
+            embedding=np.asarray(embedding, dtype=float),
+            metadata=json.dumps(metadata, sort_keys=True),
+        )
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _shared_node2vec_graph(records: list[ModelRecord]):
     nx = require_networkx()
     graph = nx.DiGraph() if any(record.graph.is_directed() for record in records) else nx.Graph()
     model_nodes: dict[str, list[str]] = {}
-
     for record in records:
-        element_nodes: list[str] = []
-        pooled_nodes: set[str] = set()
-        node_lookup: dict[object, str] = {}
-
+        lookup: dict[object, str] = {}
+        nodes: list[str] = []
         for node_id, attrs in record.graph.nodes(data=True):
-            embedded_node = _embedded_model_node_id(record.model_id, node_id)
-            node_lookup[node_id] = embedded_node
-            element_nodes.append(embedded_node)
-            graph.add_node(embedded_node, kind="element", model_id=record.model_id)
-
-            feature_nodes = []
-            if use_node_names:
-                name = node_name_attr(attrs)
-                if name:
-                    feature_nodes.append(_embedding_feature_node("name", name))
-            if use_node_types:
-                node_type = node_type_attr(attrs)
-                if node_type:
-                    feature_nodes.append(_embedding_feature_node("type", node_type))
-            for feature_node in feature_nodes:
-                _add_feature_edge(graph, embedded_node, feature_node)
-                pooled_nodes.add(feature_node)
-
+            node = _embedded_model_node_id(record.model_id, node_id)
+            lookup[node_id] = node
+            nodes.append(node)
+            graph.add_node(node)
+            for kind, value in (("name", node_name_attr(attrs)), ("type", node_type_attr(attrs))):
+                if value:
+                    feature = _embedding_feature_node(kind, value)
+                    graph.add_edge(node, feature)
+                    if graph.is_directed():
+                        graph.add_edge(feature, node)
         for source, target, attrs in record.graph.edges(data=True):
-            embedded_source = node_lookup.get(source)
-            embedded_target = node_lookup.get(target)
-            if embedded_source is None or embedded_target is None:
-                continue
-            graph.add_edge(embedded_source, embedded_target)
-            if use_edge_types:
+            if source in lookup and target in lookup:
+                graph.add_edge(lookup[source], lookup[target])
                 edge_type = edge_type_attr(attrs)
                 if edge_type:
-                    edge_feature = _embedding_feature_node("edge_type", edge_type)
-                    graph.add_node(edge_feature, kind="feature")
-                    graph.add_edge(embedded_source, edge_feature)
-                    graph.add_edge(edge_feature, embedded_target)
-                    if not graph.is_directed():
-                        graph.add_edge(edge_feature, embedded_source)
-                        graph.add_edge(embedded_target, edge_feature)
-                    pooled_nodes.add(edge_feature)
-
-        model_nodes[record.model_id] = sorted({*element_nodes, *pooled_nodes}) if pool_feature_nodes else element_nodes
-
+                    feature = _embedding_feature_node("edge_type", edge_type)
+                    graph.add_edge(lookup[source], feature)
+                    graph.add_edge(feature, lookup[target])
+        model_nodes[record.model_id] = nodes
     return graph, model_nodes
 
 
@@ -852,27 +1007,9 @@ def _embedding_feature_node(kind: str, value: str) -> str:
     return f"feature::{kind}::{value}"
 
 
-def _add_feature_edge(graph, element_node: str, feature_node: str) -> None:
-    graph.add_node(feature_node, kind="feature")
-    graph.add_edge(element_node, feature_node)
-    if graph.is_directed():
-        graph.add_edge(feature_node, element_node)
-
-
-def _pooled_node_embeddings(model, nodes: list[str], np, dimensions: int, pooling: str):
+def _pooled_node_embeddings(model, nodes: list[str], np, dimensions: int):
     vectors = [model.wv[node] for node in nodes if node in model.wv]
-    if not vectors:
-        return np.zeros(_pooled_embedding_dimensions(dimensions, pooling), dtype=float)
-
-    matrix = np.asarray(vectors, dtype=float)
-    mean_vector = np.mean(matrix, axis=0)
-    if pooling == "mean_max":
-        return np.concatenate([mean_vector, np.max(matrix, axis=0)])
-    return mean_vector
-
-
-def _pooled_embedding_dimensions(dimensions: int, pooling: str) -> int:
-    return dimensions * 2 if pooling == "mean_max" else dimensions
+    return np.mean(vectors, axis=0) if vectors else np.zeros(dimensions, dtype=float)
 
 
 def _node2vec_graph_embedding(
@@ -992,22 +1129,6 @@ def node_name_attr(attrs: dict[str, object]) -> str:
 
 def edge_type_attr(attrs: dict[str, object]) -> str:
     return normalize(attrs.get("type") or attrs.get("relationship") or attrs.get("label"))
-
-
-def _isomorphism_node_match(mode: IsomorphismMode):
-    if mode == "structure":
-        return None
-    if mode == "names":
-        return lambda left, right: node_name_attr(left) == node_name_attr(right)
-    if mode == "names_types":
-        return lambda left, right: (
-            node_name_attr(left) == node_name_attr(right) and node_type_attr(left) == node_type_attr(right)
-        )
-    raise ValueError(f"Unsupported isomorphism mode: {mode}")
-
-
-def _isomorphism_edge_match():
-    return lambda left, right: edge_type_attr(left) == edge_type_attr(right)
 
 
 def _graph_for_isomorphism(

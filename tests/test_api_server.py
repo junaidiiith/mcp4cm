@@ -670,6 +670,10 @@ def test_selected_duplicate_techniques_accepts_ml_aliases():
     assert selected == ["graph_embedding", "bert_semantic"]
 
 
+def test_selected_duplicate_techniques_accepts_contrastive_gnn_aliases():
+    assert selected_duplicate_techniques({"techniques": ["graphcl", "contrastive-gnn"]}) == ["gnn"]
+
+
 def test_selected_duplicate_techniques_accepts_cached_payload_shapes():
     assert selected_duplicate_techniques({"techniques": "graph_embeddings, BERT semantic"}) == [
         "graph_embedding",

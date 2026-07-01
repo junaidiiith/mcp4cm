@@ -1,522 +1,782 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402, I001
+"""Run duplicate detection across prepared datasets and write analysis artifacts.
+
+The script produces per-technique threshold CSV/JSON/PNG files below one
+directory per dataset, writes a combined technique plot for each dataset, and
+emits a LaTeX/CSV/JSON table summary at the selected reporting threshold.
+"""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
-from tqdm import tqdm
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_DIR = Path(__file__).resolve().parent
+for import_path in (REPOSITORY_ROOT, SCRIPT_DIR):
+    if str(import_path) not in sys.path:
+        sys.path.insert(0, str(import_path))
 
-from mcp4cm.core import Dataset, ModelRecord
-from mcp4cm.duplicates import (
-    DuplicateGroup,
-    GraphSimilarPair,
-    SimilarPair,
+from mcp4cm.duplicates import (  # noqa: E402
+    bert_semantic_similarity_pairs,
     detect_duplicates_by_name_hash,
     graph_similarity_pairs,
     tfidf_duplicate_pairs,
 )
-from mcp4cm.runtime_store import deserialize_model_from_runtime, json_safe
-from mcp4cm.utils import pair_count, pair_key
-
-DEFAULT_TARGETS = (
-    "modelset-uml-xmi",
-    "modelset-ecore-xmi",
-    "eamodelset-archimate",
-    "sap-sam-bpmn",
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs  # noqa: E402
+from mcp4cm.utils import pair_count  # noqa: E402
+from run_duplicate_detection import (  # noqa: E402
+    DEFAULT_DATA_DIR,
+    TechniqueProgressBar,
+    duplicate_models_removed_from_groups,
+    duplicate_models_removed_from_pairs,
+    load_prepared_dataset,
+    tqdm,
 )
 
-TARGET_GROUPS: dict[str, tuple[str, ...]] = {
-    "all": DEFAULT_TARGETS,
-    "modelset": ("modelset-uml-xmi", "modelset-ecore-xmi"),
+DEFAULT_DATASETS = ("modelset-uml-xmi", "modelset-ecore-xmi", "eamodelset-archimate", "sap-sam-bpmn")
+DATASET_ALIASES = {"sap-sam": "sap-sam-bpmn"}
+DATASET_LABELS = {
+    "modelset-uml-xmi": "ModelSet UML",
+    "modelset-ecore-xmi": "ModelSet Ecore",
+    "eamodelset-archimate": "EAModelSet",
+    "sap-sam-bpmn": "SAP-SAM BPMN",
 }
 
-TARGET_CHOICES = tuple(TARGET_GROUPS) + DEFAULT_TARGETS
+THRESHOLDS = tuple(round(index * 0.05, 2) for index in range(1, 21))
+PAIR_TECHNIQUES = ("tfidf", "graph-similarity", "bert", "gnn")
+TECHNIQUES = ("hash", *PAIR_TECHNIQUES)
+TECHNIQUE_ALIASES = {
+    "bert-similarity": "bert",
+}
+TECHNIQUE_LABELS = {
+    "hash": "Hash",
+    "tfidf": "TF-IDF",
+    "graph-similarity": "Graph metrics",
+    "bert": "BERT",
+    "gnn": "GNN",
+}
+TECHNIQUE_COLORS = {
+    "tfidf": "#1f77b4",
+    "graph-similarity": "#ff7f0e",
+    "bert": "#d62728",
+    "gnn": "#9467bd",
+    "hash": "#2ca02c",
+}
 
 
-class Style:
-    def __init__(self, enabled: bool) -> None:
-        self.enabled = enabled
-
-    def _wrap(self, code: str, text: str) -> str:
-        if not self.enabled:
-            return text
-        return f"\033[{code}m{text}\033[0m"
-
-    def bold(self, text: str) -> str:
-        return self._wrap("1", text)
-
-    def dim(self, text: str) -> str:
-        return self._wrap("2", text)
-
-    def green(self, text: str) -> str:
-        return self._wrap("32", text)
-
-    def blue(self, text: str) -> str:
-        return self._wrap("34", text)
-
-    def red(self, text: str) -> str:
-        return self._wrap("31", text)
+@dataclass(frozen=True)
+class TableRow:
+    dataset: str
+    technique: str
+    models: int
+    model_percent: float
+    pairs: int
+    groups: int
+    largest_group: int
+    runtime_seconds: float
+    total_models: int
 
 
-@dataclass(frozen=True, slots=True)
-class TechniqueSpec:
-    id: str
-    label: str
-    config: dict[str, Any]
-    runner: Callable[
-        [Dataset, Callable[[dict[str, Any]], None] | None], tuple[list[dict[str, Any]], list[dict[str, Any]]]
-    ]
+@dataclass(frozen=True)
+class TechniqueArtifacts:
+    technique: str
+    rows: list[dict[str, int | float]]
+    table_row: TableRow
+    json_path: Path
+    csv_path: Path
+    png_path: Path
 
 
-def run_hash(
-    dataset: Dataset,
-    progress: Callable[[dict[str, Any]], None] | None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    groups = detect_duplicates_by_name_hash(dataset, include_types=False, progress=progress)
-    return serialize_hash_groups(groups)
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run duplicate detection and generate per-technique artifacts plus summary tables."
+    )
+    parser.add_argument(
+        "dataset",
+        nargs="?",
+        help=(
+            "Prepared dataset directory below --data-dir. If omitted and --dataset is not used, "
+            f"all default datasets are processed: {', '.join(DEFAULT_DATASETS)}."
+        ),
+    )
+    parser.add_argument(
+        "--dataset",
+        action="append",
+        dest="datasets",
+        help="Dataset directory or alias to process. Repeat to select multiple datasets.",
+    )
+    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    parser.add_argument(
+        "--technique",
+        action="append",
+        nargs="+",
+        choices=(*TECHNIQUES, "bert-similarity"),
+        default=None,
+        help=(
+            "Technique(s) to run. Repeat the option or provide several names "
+            f"(default: all: {', '.join(TECHNIQUES)})."
+        ),
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.9,
+        help="Reporting threshold for table rows. Threshold plots always use 0.05..1.0.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("threshold-results_v1"),
+        help="Root directory for generated artifacts.",
+    )
+    parser.add_argument(
+        "--embedding-cache-dir",
+        type=Path,
+        help="Embedding cache root (default: <data-dir>/.mcp4cm_embeddings).",
+    )
+    parser.add_argument(
+        "--tfidf-token-mode",
+        choices=("names", "names_types_bag", "typed_name_pairs"),
+        default="names_types_bag",
+    )
+    parser.add_argument("--bert-model", default="sentence-transformers/all-MiniLM-L6-v2")
+    parser.add_argument("--bert-batch-size", type=int, default=8)
+    parser.add_argument("--bert-max-length", type=int, default=256)
+    parser.add_argument("--gnn-model-name", default="sentence-transformers/all-MiniLM-L6-v2")
+    parser.add_argument("--gnn-dimensions", type=int, default=128)
+    parser.add_argument("--gnn-layers", type=int, default=2)
+    parser.add_argument("--gnn-epochs", type=int, default=20)
+    parser.add_argument("--gnn-learning-rate", type=float, default=1e-3)
+    parser.add_argument("--gnn-temperature", type=float, default=0.2)
+    parser.add_argument("--gnn-edge-dropout", type=float, default=0.15)
+    parser.add_argument("--gnn-feature-mask-rate", type=float, default=0.10)
+    parser.add_argument("--gnn-batch-size", type=int, default=32)
+    parser.add_argument("--gnn-seed", type=int, default=42)
+    parser.add_argument("--gnn-device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--no-progress", action="store_true", help="Disable terminal progress bars.")
+    return parser.parse_args(argv)
 
 
-def run_tfidf(
-    dataset: Dataset,
-    progress: Callable[[dict[str, Any]], None] | None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    pairs = tfidf_duplicate_pairs(dataset, progress=progress, technique="tfidf")
-    return serialize_pair_groups(pairs)
+def canonical_dataset(name: str) -> str:
+    return DATASET_ALIASES.get(name, name)
 
 
-def run_graph_similarity(
-    dataset: Dataset,
-    progress: Callable[[dict[str, Any]], None] | None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    pairs = graph_similarity_pairs(dataset, progress=progress)
-    return serialize_pair_groups(pairs)
+def canonical_technique(name: str) -> str:
+    return TECHNIQUE_ALIASES.get(name, name)
 
 
-# Comment out entries here to disable techniques for a run.
-# Node2Vec graph embeddings, BERT semantic similarity, and graph isomorphism are intentionally excluded.
-DUPLICATE_TECHNIQUES = (
-    TechniqueSpec(
-        id="hash",
-        label="Hash",
-        config={"includeTypes": False, "minNamedNodes": 0, "deduplicateNameTokens": False},
-        runner=run_hash,
-    ),
-    TechniqueSpec(
-        id="tfidf",
-        label="TF-IDF",
-        config={
-            "tokenMode": "names",
-            "similarityThreshold": 0.9,
-            "maxFeatures": 50_000,
-            "minDf": 1,
-            "ngramRange": [1, 1],
-            "stopwordsMode": "none",
-        },
-        runner=run_tfidf,
-    ),
-    TechniqueSpec(
-        id="graph_similarity",
-        label="Graph Metrics",
-        config={
-            "similarityThreshold": 0.85,
-            "weights": None,
-            "useDirectedMetrics": False,
-            "normalizeParallelEdges": False,
-        },
-        runner=run_graph_similarity,
-    ),
-)
+def selected_datasets(args: argparse.Namespace) -> list[str]:
+    if args.datasets:
+        datasets = [canonical_dataset(dataset) for dataset in args.datasets]
+    elif args.dataset:
+        datasets = [canonical_dataset(args.dataset)]
+    else:
+        datasets = list(DEFAULT_DATASETS)
+    return list(dict.fromkeys(datasets))
 
 
-def resolve_targets(selected: list[str] | None) -> list[str]:
-    if not selected:
-        return list(DEFAULT_TARGETS)
-
-    resolved: list[str] = []
-    for item in selected:
-        if item in TARGET_GROUPS:
-            resolved.extend(TARGET_GROUPS[item])
-            continue
-        if item not in DEFAULT_TARGETS:
-            raise ValueError(f"Unknown target: {item}")
-        resolved.append(item)
-
-    return list(dict.fromkeys(resolved))
+def selected_techniques(args: argparse.Namespace) -> list[str]:
+    if not args.technique:
+        return list(TECHNIQUES)
+    techniques = [canonical_technique(technique) for group in args.technique for technique in group]
+    return list(dict.fromkeys(techniques))
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> None:
-    temp_path = path.with_suffix(".tmp")
-    temp_path.write_text(json.dumps(json_safe(payload), ensure_ascii=False, indent=2), encoding="utf-8")
-    temp_path.replace(path)
+def gnn_training_config(args: argparse.Namespace) -> GNNTrainingConfig:
+    return GNNTrainingConfig(
+        model_name=args.gnn_model_name,
+        embedding_dim=args.gnn_dimensions,
+        layers=args.gnn_layers,
+        epochs=args.gnn_epochs,
+        learning_rate=args.gnn_learning_rate,
+        temperature=args.gnn_temperature,
+        edge_dropout=args.gnn_edge_dropout,
+        feature_mask_rate=args.gnn_feature_mask_rate,
+        batch_size=args.gnn_batch_size,
+        seed=args.gnn_seed,
+        device=args.gnn_device,
+    )
 
 
-def load_runtime_index(runtime_dir: Path) -> dict[str, Any]:
-    index_path = runtime_dir / "index.json"
-    if not index_path.exists():
-        raise FileNotFoundError(f"Missing runtime index: {index_path}")
-    payload = json.loads(index_path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"Runtime index is not a JSON object: {index_path}")
-    models = payload.get("models")
-    if not isinstance(models, list):
-        raise ValueError(f"Runtime index does not contain a models list: {index_path}")
-    return payload
+def pair_endpoints(pair: Any) -> tuple[str, str]:
+    return str(pair.left_id), str(pair.right_id)
 
 
-def load_records(runtime_dir: Path, index_payload: dict[str, Any]) -> list[ModelRecord]:
-    ir_dir = runtime_dir / "ir"
-    records: list[ModelRecord] = []
-    model_entries = [entry for entry in index_payload.get("models") or [] if isinstance(entry, dict)]
-    for entry in tqdm(model_entries, desc=runtime_dir.name, unit="model"):
-        filename = str(entry.get("file") or "")
-        if not filename:
-            raise ValueError(f"Runtime index entry is missing a file value in {runtime_dir / 'index.json'}")
-        model_path = ir_dir / filename
-        if not model_path.exists():
-            raise FileNotFoundError(f"Runtime model file is missing: {model_path}")
-        payload = json.loads(model_path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError(f"Runtime model file is not a JSON object: {model_path}")
-        records.append(deserialize_model_from_runtime(payload))
-    return records
-
-
-def serialize_hash_groups(groups: list[DuplicateGroup]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    serialized_groups = [
-        {
-            "groupId": f"group-{index}",
-            "fingerprint": group.fingerprint,
-            "modelIds": list(group.model_ids),
-            "size": len(group.model_ids),
-            "pairCount": pair_count(len(group.model_ids)),
-        }
-        for index, group in enumerate(sorted(groups, key=lambda item: (-len(item.model_ids), item.model_ids)), start=1)
-    ]
-    pairs = []
-    for group in serialized_groups:
-        model_ids = list(group["modelIds"])
-        for left_index, left_id in enumerate(model_ids):
-            for right_id in model_ids[left_index + 1 :]:
-                pairs.append(
-                    {
-                        "leftId": left_id,
-                        "rightId": right_id,
-                        "score": 1.0,
-                        "groupId": group["groupId"],
-                    }
-                )
-    return pairs, serialized_groups
-
-
-def serialize_pair_groups(
-    pairs: list[SimilarPair] | list[GraphSimilarPair],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    serialized_pairs = [
-        {
-            "leftId": pair.left_id,
-            "rightId": pair.right_id,
-            "score": pair.score,
-            "metrics": dict(pair.metrics) if isinstance(pair, GraphSimilarPair) else {},
-        }
-        for pair in pairs
-    ]
-    groups = connected_pair_groups(serialized_pairs)
-    group_lookup = {
-        pair_key(left_id, right_id): group["groupId"]
-        for group in groups
-        for left_index, left_id in enumerate(group["modelIds"])
-        for right_id in group["modelIds"][left_index + 1 :]
-    }
-    for pair in serialized_pairs:
-        group_id = group_lookup.get(pair_key(str(pair["leftId"]), str(pair["rightId"])))
-        if group_id:
-            pair["groupId"] = group_id
-    return serialized_pairs, groups
-
-
-def connected_pair_groups(pairs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def connected_components_from_pairs(pairs: list[Any]) -> list[set[str]]:
     adjacency: dict[str, set[str]] = {}
     for pair in pairs:
-        left_id = str(pair["leftId"])
-        right_id = str(pair["rightId"])
+        left_id, right_id = pair_endpoints(pair)
         adjacency.setdefault(left_id, set()).add(right_id)
         adjacency.setdefault(right_id, set()).add(left_id)
 
+    components: list[set[str]] = []
     visited: set[str] = set()
-    components: list[list[str]] = []
     for model_id in sorted(adjacency):
         if model_id in visited:
             continue
+        component: set[str] = set()
         stack = [model_id]
         visited.add(model_id)
-        component: list[str] = []
         while stack:
             current = stack.pop()
-            component.append(current)
-            for neighbor in sorted(adjacency.get(current, set())):
+            component.add(current)
+            for neighbor in adjacency[current]:
                 if neighbor not in visited:
                     visited.add(neighbor)
                     stack.append(neighbor)
         if len(component) > 1:
-            components.append(sorted(component))
-
-    groups = []
-    for index, model_ids in enumerate(sorted(components, key=lambda item: (-len(item), item)), start=1):
-        internal_pairs = {
-            pair_key(str(pair["leftId"]), str(pair["rightId"]))
-            for pair in pairs
-            if str(pair["leftId"]) in model_ids and str(pair["rightId"]) in model_ids
-        }
-        groups.append(
-            {
-                "groupId": f"group-{index}",
-                "modelIds": model_ids,
-                "size": len(model_ids),
-                "pairCount": len(internal_pairs),
-                "possiblePairCount": pair_count(len(model_ids)),
-                "density": len(internal_pairs) / pair_count(len(model_ids)) if len(model_ids) > 1 else 0,
-            }
-        )
-    return groups
+            components.append(component)
+    return components
 
 
-def summarize_scores(pairs: list[dict[str, Any]]) -> dict[str, float]:
-    scores = [float(pair["score"]) for pair in pairs]
-    if not scores:
-        return {"min": 0, "max": 0, "avg": 0}
-    return {"min": min(scores), "max": max(scores), "avg": sum(scores) / len(scores)}
-
-
-def run_technique(dataset: Dataset, technique: TechniqueSpec) -> dict[str, Any]:
-    started_at = time.time()
-    current_phase = ""
-    last_rendered = 0
-
-    with tqdm(total=1, desc=technique.id, unit="item") as progress_bar:
-
-        def progress(event: dict[str, Any]) -> None:
-            nonlocal current_phase, last_rendered
-            phase = str(event.get("phase") or "run")
-            current = int(event.get("current") or 0)
-            total = max(int(event.get("total") or 0), 1)
-            if phase == "done":
-                progress_bar.n = progress_bar.total or total
-                progress_bar.refresh()
-                return
-            if phase != current_phase or total != progress_bar.total:
-                current_phase = phase
-                last_rendered = 0
-                progress_bar.reset(total=total)
-                progress_bar.set_description(f"{technique.id}:{phase}")
-            redraw_step = max(1, total // 100)
-            if current < total and current - last_rendered < redraw_step:
-                return
-            progress_bar.n = min(current, total)
-            last_rendered = progress_bar.n
-            progress_bar.refresh()
-
-        try:
-            pairs, groups = technique.runner(dataset, progress)
-            status = "ok"
-            reason = ""
-        except ImportError as err:
-            pairs = []
-            groups = []
-            status = "skipped"
-            reason = str(err)
-        except Exception as err:
-            pairs = []
-            groups = []
-            status = "error"
-            reason = str(err)
-
-        if progress_bar.n < (progress_bar.total or 1):
-            progress_bar.n = progress_bar.total or 1
-            progress_bar.refresh()
-
-    finished_at = time.time()
-    detected_model_ids = sorted(
-        {
-            model_id
-            for pair in pairs
-            for model_id in (str(pair.get("leftId") or ""), str(pair.get("rightId") or ""))
-            if model_id
-        }
+def table_row_from_pairs(
+    *,
+    dataset_name: str,
+    technique: str,
+    total_models: int,
+    pairs: list[Any],
+    runtime_seconds: float,
+) -> TableRow:
+    components = connected_components_from_pairs(pairs)
+    participating_models = len({model_id for component in components for model_id in component})
+    return TableRow(
+        dataset=dataset_name,
+        technique=technique,
+        models=participating_models,
+        model_percent=(participating_models / total_models * 100.0) if total_models else 0.0,
+        pairs=len(pairs),
+        groups=len(components),
+        largest_group=max((len(component) for component in components), default=0),
+        runtime_seconds=runtime_seconds,
+        total_models=total_models,
     )
-    return {
-        "techniqueId": technique.id,
-        "label": technique.label,
-        "status": status,
-        "reason": reason,
-        "config": technique.config,
-        "pairCount": len(pairs),
-        "detectedModelCount": len(detected_model_ids),
-        "detectedModelIds": detected_model_ids,
-        "groupCount": len(groups),
-        "largestGroupSize": max((int(group.get("size") or 0) for group in groups), default=0),
-        "scoreStats": summarize_scores(pairs),
-        "pairs": pairs,
-        "groups": groups,
-        "startedAt": started_at,
-        "finishedAt": finished_at,
-        "elapsedMs": int((finished_at - started_at) * 1000),
-    }
 
 
-def summarize_dataset(result_payload: dict[str, Any]) -> dict[str, Any]:
-    total_models = int(result_payload.get("totalModels") or 0)
-    rows = [
+def table_row_from_hash_groups(
+    *,
+    dataset_name: str,
+    total_models: int,
+    groups: list[Any],
+    runtime_seconds: float,
+) -> TableRow:
+    participating_models = len({model_id for group in groups for model_id in group.model_ids})
+    hash_pair_count = sum(pair_count(len(group.model_ids)) for group in groups)
+    return TableRow(
+        dataset=dataset_name,
+        technique="hash",
+        models=participating_models,
+        model_percent=(participating_models / total_models * 100.0) if total_models else 0.0,
+        pairs=hash_pair_count,
+        groups=len(groups),
+        largest_group=max((len(group.model_ids) for group in groups), default=0),
+        runtime_seconds=runtime_seconds,
+        total_models=total_models,
+    )
+
+
+def rows_for_thresholds(
+    pairs: list[Any],
+    model_count: int,
+    technique: str,
+    *,
+    progress_enabled: bool,
+) -> list[dict[str, int | float]]:
+    rows: list[dict[str, int | float]] = []
+    progress = (
+        tqdm(total=len(THRESHOLDS), desc=f"{technique}: thresholds", unit="threshold", dynamic_ncols=True)
+        if progress_enabled and tqdm is not None
+        else None
+    )
+    try:
+        for threshold in THRESHOLDS:
+            matched_pairs = [pair for pair in pairs if pair.score >= threshold]
+            duplicates = duplicate_models_removed_from_pairs(matched_pairs)
+            rows.append(
+                {
+                    "threshold": threshold,
+                    "duplicates": duplicates,
+                    "unique": model_count - duplicates,
+                    "matchingPairs": len(matched_pairs),
+                }
+            )
+            if progress is not None:
+                progress.update(1)
+    finally:
+        if progress is not None:
+            progress.close()
+    return rows
+
+
+def hash_threshold_rows(groups: list[Any], model_count: int) -> list[dict[str, int | float]]:
+    duplicates = duplicate_models_removed_from_groups(groups)
+    return [
         {
-            "dataset": result_payload["dataset"],
-            "type": "Duplicate Filtering",
-            "technique": result["techniqueId"],
-            "techniqueLabel": result["label"],
-            "status": result["status"],
-            "detected": result["detectedModelCount"],
-            "detectedPercent": (result["detectedModelCount"] / total_models * 100.0) if total_models else 0.0,
-            "pairCount": result["pairCount"],
-            "groupCount": result["groupCount"],
-            "largestGroupSize": result["largestGroupSize"],
-            "totalModels": total_models,
-            "elapsedMs": result["elapsedMs"],
+            "threshold": 1.0,
+            "duplicates": duplicates,
+            "unique": model_count - duplicates,
+            "matchingPairs": sum(pair_count(len(group.model_ids)) for group in groups),
         }
-        for result in result_payload["techniqueResults"]
     ]
-    return {
-        "version": 1,
-        "dataset": result_payload["dataset"],
-        "datasetType": result_payload["datasetType"],
-        "totalModels": total_models,
-        "totalPairs": result_payload["totalPairs"],
-        "rows": rows,
-        "generatedAt": result_payload["finishedAt"],
-    }
 
 
-def evaluate_dataset(*, dataset_name: str, evaluation_dir: Path) -> dict[str, Any]:
-    runtime_dir = evaluation_dir / f"{dataset_name}-runtime"
-    if not runtime_dir.is_dir():
-        raise FileNotFoundError(f"Missing runtime directory: {runtime_dir}")
+def matched_pairs_at_threshold(pairs: list[Any], threshold: float) -> list[Any]:
+    return [pair for pair in pairs if pair.score >= threshold]
 
-    index_payload = load_runtime_index(runtime_dir)
-    dataset_type = str(index_payload.get("datasetType") or "runtime")
-    records = load_records(runtime_dir, index_payload)
-    dataset = Dataset(records=records, dataset_type=dataset_type, root=runtime_dir / "ir")
 
-    started_at = time.time()
-    technique_results = [run_technique(dataset, technique) for technique in DUPLICATE_TECHNIQUES]
-    finished_at = time.time()
-    result_payload = {
-        "version": 1,
+def write_technique_csv(path: Path, technique: str, rows: list[dict[str, int | float]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=("technique", "threshold", "duplicates", "unique", "matchingPairs"))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({"technique": technique, **row})
+
+
+def write_technique_json(
+    path: Path,
+    *,
+    dataset_name: str,
+    technique: str,
+    model_count: int,
+    rows: list[dict[str, int | float]],
+    runtime_seconds: float,
+    config: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
         "dataset": dataset_name,
-        "datasetType": dataset_type,
-        "runtimeDir": str(runtime_dir),
-        "techniqueMode": "independent",
-        "ignoredTechniques": ["graph_embedding", "bert_semantic", "graph_isomorphism"],
-        "totalModels": len(records),
-        "totalPairs": pair_count(len(records)),
-        "techniqueResults": technique_results,
-        "startedAt": started_at,
-        "finishedAt": finished_at,
-        "elapsedMs": int((finished_at - started_at) * 1000),
+        "technique": technique,
+        "modelCount": model_count,
+        "thresholds": [row["threshold"] for row in rows],
+        "runtimeSeconds": runtime_seconds,
+        "config": config,
+        "results": rows,
     }
-    summary_payload = summarize_dataset(result_payload)
-    write_json(runtime_dir / "duplicate_detection.json", result_payload)
-    write_json(runtime_dir / "duplicate_detection_summary.json", summary_payload)
-    return summary_payload
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Run duplicate detection techniques over parsed evaluation runtime datasets.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            "  python scripts/duplicate_detection.py\n"
-            "  python scripts/duplicate_detection.py --only modelset-uml-xmi\n"
-            "  python scripts/duplicate_detection.py --evaluation-dir evaluation-runs\n"
-        ),
-    )
-    parser.add_argument(
-        "--only",
-        action="append",
-        choices=TARGET_CHOICES,
-        metavar="TARGET",
-        help=(
-            "Run only the selected dataset or group. "
-            f"Groups: {', '.join(TARGET_GROUPS)}. Targets: {', '.join(DEFAULT_TARGETS)}. "
-            "Repeatable. Default: evaluation targets from docs/EVALUATION_CLEANSING.md."
-        ),
-    )
-    parser.add_argument(
-        "--evaluation-dir",
-        type=Path,
-        default=Path("evaluation"),
-        help="Directory containing <dataset>-runtime folders (default: evaluation).",
-    )
-    parser.add_argument(
-        "--no-color",
-        action="store_true",
-        help="Disable colored terminal output.",
-    )
-    return parser.parse_args()
+def plot_technique(path: Path, technique: str, rows: list[dict[str, int | float]], model_count: int) -> None:
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib.ticker import PercentFormatter
+    except ImportError as exc:
+        raise ImportError("Plotting requires matplotlib. Install it with `pip install -e '.[plot]'`.") from exc
+
+    thresholds = [float(row["threshold"]) for row in rows]
+    duplicates = [int(row["duplicates"]) / model_count * 100.0 for row in rows]
+    unique = [int(row["unique"]) / model_count * 100.0 for row in rows]
+    figure, axis = plt.subplots(figsize=(9, 5))
+    axis.plot(thresholds, duplicates, marker="o", color=TECHNIQUE_COLORS[technique], label="Duplicate models")
+    axis.plot(thresholds, unique, marker="s", color="#333333", linestyle="--", label="Unique models")
+    axis.set_xlabel("Similarity threshold")
+    axis.set_ylabel("Models (%)")
+    axis.set_title(f"{TECHNIQUE_LABELS[technique]} duplicate detection")
+    axis.set_ylim(0, 100)
+    axis.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+    if len(thresholds) > 1:
+        axis.set_xlim(0.05, 1.0)
+        axis.set_xticks(THRESHOLDS)
+    else:
+        axis.set_xlim(0.95, 1.05)
+        axis.set_xticks([thresholds[0]])
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
 
 
-def print_summary(style: Style, aggregate: dict[str, Any]) -> None:
-    rows = aggregate["rows"]
-    if not rows:
-        return
+def load_pair_rows_from_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
 
-    dataset_width = max(len(str(row["dataset"])) for row in rows)
-    technique_width = max(len(str(row["technique"])) for row in rows)
-    print()
-    print(style.bold(style.green("Done")))
-    for row in rows:
-        status = f" {row['status']}" if row["status"] != "ok" else ""
-        print(
-            f"  {str(row['dataset']):<{dataset_width}}  "
-            f"{str(row['technique']):<{technique_width}}  "
-            f"{style.bold(str(row['detected']))}/{row['totalModels']}  "
-            f"{row['detectedPercent']:.2f}%  "
-            f"{row['pairCount']} pairs{status}"
+
+def technique_artifact_path(dataset_dir: Path, technique: str, suffix: str) -> Path:
+    return dataset_dir / technique / f"{technique}.{suffix}"
+
+
+def plot_combined_dataset(dataset_dir: Path, output_name: str = "combined_duplicate_techniques.png") -> Path | None:
+    technique_rows: dict[str, list[dict[str, str]]] = {}
+    model_counts: dict[str, int] = {}
+    for technique in PAIR_TECHNIQUES:
+        csv_path = technique_artifact_path(dataset_dir, technique, "csv")
+        json_path = technique_artifact_path(dataset_dir, technique, "json")
+        if not csv_path.exists() or not json_path.exists():
+            continue
+        technique_rows[technique] = load_pair_rows_from_csv(csv_path)
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        model_count = payload.get("modelCount")
+        if isinstance(model_count, int):
+            model_counts[technique] = model_count
+
+    if not technique_rows:
+        return None
+
+    try:
+        import matplotlib.lines as mlines
+        import matplotlib.pyplot as plt
+        from matplotlib.ticker import PercentFormatter
+    except ImportError as exc:
+        raise ImportError("Plotting requires matplotlib. Install it with `pip install -e '.[plot]'`.") from exc
+
+    figure, axis = plt.subplots(figsize=(12, 7))
+    for technique in PAIR_TECHNIQUES:
+        rows = sorted(technique_rows.get(technique, []), key=lambda row: float(row["threshold"]))
+        model_count = model_counts.get(technique)
+        if not rows or not model_count:
+            continue
+        thresholds = [float(row["threshold"]) for row in rows]
+        duplicates = [int(row["duplicates"]) / model_count * 100.0 for row in rows]
+        unique = [int(row["unique"]) / model_count * 100.0 for row in rows]
+        axis.plot(
+            thresholds,
+            duplicates,
+            marker="o",
+            linewidth=1.9,
+            markersize=4.0,
+            color=TECHNIQUE_COLORS[technique],
+            linestyle="-",
+        )
+        axis.plot(
+            thresholds,
+            unique,
+            marker="s",
+            linewidth=1.9,
+            markersize=3.7,
+            color=TECHNIQUE_COLORS[technique],
+            linestyle="--",
         )
 
+    axis.set_title(f"{DATASET_LABELS.get(dataset_dir.name, dataset_dir.name)}: duplicate and unique models")
+    axis.set_xlabel("Similarity threshold")
+    axis.set_ylabel("Models (%)")
+    axis.set_xlim(0.05, 1.0)
+    axis.set_ylim(0, 100)
+    axis.set_xticks(THRESHOLDS)
+    axis.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+    axis.grid(True, alpha=0.3)
 
-def main() -> int:
-    args = parse_args()
-    style = Style(enabled=sys.stdout.isatty() and not args.no_color)
-    targets = resolve_targets(args.only)
+    technique_handles = [
+        mlines.Line2D(
+            [],
+            [],
+            color=TECHNIQUE_COLORS[technique],
+            marker="o",
+            linestyle="-",
+            label=TECHNIQUE_LABELS[technique],
+        )
+        for technique in PAIR_TECHNIQUES
+        if technique in technique_rows
+    ]
+    metric_handles = [
+        mlines.Line2D([], [], color="black", marker="o", linestyle="-", label="Duplicate models"),
+        mlines.Line2D([], [], color="black", marker="s", linestyle="--", label="Unique models"),
+    ]
+    figure.legend(handles=technique_handles, title="Technique", loc="lower center", ncol=4, bbox_to_anchor=(0.40, 0.0))
+    figure.legend(handles=metric_handles, title="Metric", loc="lower center", ncol=2, bbox_to_anchor=(0.80, 0.0))
+    figure.tight_layout(rect=(0, 0.12, 1, 1))
+    output_path = dataset_dir / output_name
+    figure.savefig(output_path, dpi=180)
+    plt.close(figure)
+    return output_path
 
-    print(style.bold(style.blue("Duplicate detection evaluation")))
-    print(style.dim(f"  Targets: {', '.join(targets)}"))
-    print(style.dim(f"  Evaluation directory: {args.evaluation_dir.resolve()}"))
-    print(style.dim(f"  Techniques: {', '.join(technique.id for technique in DUPLICATE_TECHNIQUES)}"))
-    print()
 
-    summaries: list[dict[str, Any]] = []
-    for target in targets:
-        print(style.bold(style.blue(target)))
-        summaries.append(evaluate_dataset(dataset_name=target, evaluation_dir=args.evaluation_dir))
-        print()
+def compute_pair_technique(
+    args: argparse.Namespace,
+    dataset: Any,
+    technique: str,
+    cache_dir: Path,
+) -> tuple[list[Any], dict[str, Any]]:
+    progress = TechniqueProgressBar(technique, enabled=not args.no_progress)
+    try:
+        if technique == "tfidf":
+            pairs = tfidf_duplicate_pairs(
+                dataset,
+                threshold=0.0,
+                token_mode=args.tfidf_token_mode,
+                technique="tfidf",
+                progress=progress,
+            )
+            config = {"thresholdScanStart": 0.0, "tokenMode": args.tfidf_token_mode}
+        elif technique == "graph-similarity":
+            pairs = graph_similarity_pairs(dataset, threshold=0.0, progress=progress)
+            config = {"thresholdScanStart": 0.0}
+        elif technique == "bert":
+            pairs = bert_semantic_similarity_pairs(
+                dataset,
+                threshold=0.0,
+                model_name=args.bert_model,
+                batch_size=args.bert_batch_size,
+                max_length=args.bert_max_length,
+                embedding_cache_dir=cache_dir,
+                progress=progress,
+            )
+            config = {
+                "thresholdScanStart": 0.0,
+                "model": args.bert_model,
+                "batchSize": args.bert_batch_size,
+                "maxLength": args.bert_max_length,
+            }
+        elif technique == "gnn":
+            config_object = gnn_training_config(args)
+            triples = gnn_duplicate_pairs(
+                dataset,
+                threshold=0.0,
+                config=config_object,
+                embedding_cache_dir=cache_dir,
+                progress=progress,
+            )
+            pairs = [
+                SimpleNamespace(left_id=left_id, right_id=right_id, score=score)
+                for left_id, right_id, score in triples
+            ]
+            config = {"thresholdScanStart": 0.0, "trainingConfig": asdict(config_object)}
+        else:
+            raise ValueError(f"Unsupported pair technique: {technique}")
+        return list(pairs), config
+    finally:
+        progress.close()
 
-    aggregate = {
-        "version": 1,
-        "type": "Duplicate Filtering",
-        "techniqueMode": "independent",
-        "ignoredTechniques": ["graph_embedding", "bert_semantic", "graph_isomorphism"],
-        "datasets": summaries,
-        "rows": [row for summary in summaries for row in summary["rows"]],
-        "generatedAt": time.time(),
+
+def run_hash_artifacts(
+    args: argparse.Namespace,
+    dataset: Any,
+    dataset_name: str,
+    output_dir: Path,
+) -> TechniqueArtifacts:
+    started = time.perf_counter()
+    progress = TechniqueProgressBar("hash", enabled=not args.no_progress)
+    try:
+        groups = detect_duplicates_by_name_hash(dataset, include_types=False, progress=progress)
+    finally:
+        progress.close()
+    runtime_seconds = time.perf_counter() - started
+    rows = hash_threshold_rows(groups, len(dataset))
+    table_row = table_row_from_hash_groups(
+        dataset_name=dataset_name,
+        total_models=len(dataset),
+        groups=groups,
+        runtime_seconds=runtime_seconds,
+    )
+    json_path = technique_artifact_path(output_dir, "hash", "json")
+    csv_path = technique_artifact_path(output_dir, "hash", "csv")
+    png_path = technique_artifact_path(output_dir, "hash", "png")
+    write_technique_json(
+        json_path,
+        dataset_name=dataset_name,
+        technique="hash",
+        model_count=len(dataset),
+        rows=rows,
+        runtime_seconds=runtime_seconds,
+        config={"includeTypes": False},
+    )
+    write_technique_csv(csv_path, "hash", rows)
+    plot_technique(png_path, "hash", rows, len(dataset))
+    return TechniqueArtifacts("hash", rows, table_row, json_path, csv_path, png_path)
+
+
+def run_pair_artifacts(
+    args: argparse.Namespace,
+    dataset: Any,
+    dataset_name: str,
+    technique: str,
+    output_dir: Path,
+    cache_dir: Path,
+) -> TechniqueArtifacts:
+    started = time.perf_counter()
+    pairs, config = compute_pair_technique(args, dataset, technique, cache_dir)
+    runtime_seconds = time.perf_counter() - started
+    rows = rows_for_thresholds(pairs, len(dataset), technique, progress_enabled=not args.no_progress)
+    table_pairs = matched_pairs_at_threshold(pairs, args.threshold)
+    table_row = table_row_from_pairs(
+        dataset_name=dataset_name,
+        technique=technique,
+        total_models=len(dataset),
+        pairs=table_pairs,
+        runtime_seconds=runtime_seconds,
+    )
+    json_path = technique_artifact_path(output_dir, technique, "json")
+    csv_path = technique_artifact_path(output_dir, technique, "csv")
+    png_path = technique_artifact_path(output_dir, technique, "png")
+    write_technique_json(
+        json_path,
+        dataset_name=dataset_name,
+        technique=technique,
+        model_count=len(dataset),
+        rows=rows,
+        runtime_seconds=runtime_seconds,
+        config=config,
+    )
+    write_technique_csv(csv_path, technique, rows)
+    plot_technique(png_path, technique, rows, len(dataset))
+    return TechniqueArtifacts(technique, rows, table_row, json_path, csv_path, png_path)
+
+
+def run_dataset(args: argparse.Namespace, dataset_name: str, techniques: list[str]) -> list[TechniqueArtifacts]:
+    dataset = load_prepared_dataset(args.data_dir, dataset_name)
+    dataset_output_dir = args.output_dir / dataset_name
+    dataset_output_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = args.embedding_cache_dir or (args.data_dir / ".mcp4cm_embeddings")
+
+    artifacts: list[TechniqueArtifacts] = []
+    for technique in techniques:
+        print(f"Running {technique} on {dataset_name}")
+        if technique == "hash":
+            artifacts.append(run_hash_artifacts(args, dataset, dataset_name, dataset_output_dir))
+        else:
+            artifacts.append(run_pair_artifacts(args, dataset, dataset_name, technique, dataset_output_dir, cache_dir))
+
+    combined_path = plot_combined_dataset(dataset_output_dir)
+    if combined_path is not None:
+        print(combined_path)
+    return artifacts
+
+
+def format_int(value: int) -> str:
+    return f"{value:,}"
+
+
+def latex_escape(value: str) -> str:
+    return value.replace("_", r"\_").replace("%", r"\%")
+
+
+def latex_table(rows: list[TableRow], *, threshold: float) -> str:
+    lines = [
+        r"\begin{table*}[t]",
+        r"    \centering",
+        (
+            r"    \caption{Duplicate candidates produced independently by each duplicate detector at "
+            f"threshold {threshold:g}. ``Models'' counts distinct models that participate in at least one "
+            r"candidate duplicate relation. Hash is exact and does not use the threshold.}"
+        ),
+        r"    \label{tab:duplicate-results}",
+        r"    \begin{tabular}{llrrrrrr}",
+        r"        \toprule",
+        r"        Dataset & Technique & Models & Models (\%) & Pairs & Groups & Largest group & Runtime \\",
+        r"        \midrule",
+    ]
+    rows_by_dataset: dict[str, list[TableRow]] = {}
+    for row in rows:
+        rows_by_dataset.setdefault(row.dataset, []).append(row)
+
+    for dataset_index, (dataset, dataset_rows) in enumerate(rows_by_dataset.items()):
+        if dataset_index:
+            lines.append(r"        \midrule")
+        first = True
+        for row in dataset_rows:
+            dataset_cell = (
+                rf"\multirow{{{len(dataset_rows)}}}{{*}}{{{latex_escape(DATASET_LABELS.get(dataset, dataset))}}}"
+                if first
+                else ""
+            )
+            first = False
+            lines.append(
+                "        "
+                f"{dataset_cell} & {TECHNIQUE_LABELS[row.technique]} "
+                f"& {format_int(row.models)} "
+                f"& {row.model_percent:.2f} "
+                f"& {format_int(row.pairs)} "
+                f"& {format_int(row.groups)} "
+                f"& {format_int(row.largest_group)} "
+                f"& {row.runtime_seconds:.2f} s \\\\"
+            )
+
+    lines.extend([r"        \bottomrule", r"    \end{tabular}", r"\end{table*}", ""])
+    return "\n".join(lines)
+
+
+def write_table_csv(path: Path, rows: list[TableRow]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=(
+                "dataset",
+                "technique",
+                "models",
+                "modelsPercent",
+                "pairs",
+                "groups",
+                "largestGroup",
+                "runtimeSeconds",
+                "totalModels",
+            ),
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    "dataset": row.dataset,
+                    "technique": row.technique,
+                    "models": row.models,
+                    "modelsPercent": f"{row.model_percent:.4f}",
+                    "pairs": row.pairs,
+                    "groups": row.groups,
+                    "largestGroup": row.largest_group,
+                    "runtimeSeconds": f"{row.runtime_seconds:.6f}",
+                    "totalModels": row.total_models,
+                }
+            )
+
+
+def write_table_json(path: Path, rows: list[TableRow], *, threshold: float) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "threshold": threshold,
+        "rows": [
+            {
+                "dataset": row.dataset,
+                "technique": row.technique,
+                "models": row.models,
+                "modelsPercent": row.model_percent,
+                "pairs": row.pairs,
+                "groups": row.groups,
+                "largestGroup": row.largest_group,
+                "runtimeSeconds": row.runtime_seconds,
+                "totalModels": row.total_models,
+            }
+            for row in rows
+        ],
     }
-    write_json(args.evaluation_dir / "duplicate_detection_summary.json", aggregate)
-    print_summary(style, aggregate)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def write_table_outputs(output_dir: Path, rows: list[TableRow], *, threshold: float) -> list[Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tex_path = output_dir / "duplicate_technique_table.tex"
+    csv_path = output_dir / "duplicate_technique_table.csv"
+    json_path = output_dir / "duplicate_technique_table.json"
+    tex_path.write_text(latex_table(rows, threshold=threshold), encoding="utf-8")
+    write_table_csv(csv_path, rows)
+    write_table_json(json_path, rows, threshold=threshold)
+    return [tex_path, csv_path, json_path]
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    datasets = selected_datasets(args)
+    techniques = selected_techniques(args)
+    invalid = [technique for technique in techniques if technique not in TECHNIQUES]
+    if invalid:
+        raise ValueError(f"Unsupported technique(s): {', '.join(invalid)}")
+
+    all_artifacts: list[TechniqueArtifacts] = []
+    for dataset_name in datasets:
+        all_artifacts.extend(run_dataset(args, dataset_name, techniques))
+
+    table_rows = [artifact.table_row for artifact in all_artifacts]
+    table_paths = write_table_outputs(args.output_dir, table_rows, threshold=args.threshold)
+    for path in table_paths:
+        print(path)
     return 0
 
 
@@ -524,6 +784,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:
-        style = Style(enabled=sys.stderr.isatty())
-        print(style.red(f"error: {error}"), file=sys.stderr)
+        print(f"error: {error}", file=sys.stderr)
         raise SystemExit(1) from None

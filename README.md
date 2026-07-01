@@ -10,7 +10,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Node2Vec graph embeddings and BERT semantic duplicate detection are optional because they install heavier ML packages:
+Node2Vec, contrastive GNN, and BERT semantic duplicate detection are optional because they install heavier ML packages:
 
 ```bash
 pip install -e '.[ml]'
@@ -156,6 +156,22 @@ for language, rows in summarize_filters_by_language(combined).items():
 
 ## Duplicate Detection
 
+Run exact hash-based duplicate detection on a prepared dataset directly from the command line:
+
+```bash
+python3 scripts/run_duplicate_detection.py eamodelset-json
+```
+
+The dataset argument is the directory name under `data/`. The script writes a JSON report to standard output. Run several
+methods in one invocation, for example `--technique hash tfidf graph-similarity`; the available methods are `hash`,
+`tfidf`, `graph-similarity`, `node2vec`, `gnn`, `bert-similarity`, and `isomorphism`. Use `--output report.json` to save
+the report. Node2Vec, GNN, and BERT require the optional ML dependencies: `pip install -e '.[ml]'`.
+
+Each method result contains only `initialTotalModels`, `duplicateModelsRemoved`, and `uniqueModelsRemaining`. Runtime
+statistics are in the separate `timingsMs` object; progress and timing are logged to stderr. Use `--log-level DEBUG` for
+more verbose output. Terminal progress bars are shown for every selected method; use `--no-progress` for non-interactive
+runs.
+
 ```python
 from mcp4cm.duplicates import (
     bert_semantic_similarity_pairs,
@@ -188,13 +204,17 @@ near_by_graph = graph_similarity_pairs(uml, threshold=0.85)
 # 6. Node2Vec graph embedding similarity. Requires `pip install -e '.[ml]'`.
 near_by_graph_embeddings = graph_embedding_pairs(uml, threshold=0.90)
 
-# 7. BERT semantic similarity over model names and types. Requires `pip install -e '.[ml]'`.
+# 7. GraphCL-style contrastive GNN similarity over sentence-encoded node/edge text.
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
+near_by_gnn = gnn_duplicate_pairs(uml, threshold=0.85, config=GNNTrainingConfig(epochs=20))
+
+# 8. BERT semantic similarity over model names and types. Requires `pip install -e '.[ml]'`.
 near_by_bert = bert_semantic_similarity_pairs(uml, threshold=0.90)
 
-# 8. Exact graph isomorphism. Modes: "structure", "names", or "names_types".
+# 9. Exact graph isomorphism. Modes: "structure", "names", or "names_types".
 same_structure = graph_isomorphism_pairs(uml, mode="names", match_edge_types=True)
 
-# 9. Voting across hash, TF-IDF, graph metrics, and graph isomorphism.
+# 10. Voting across hash, TF-IDF, graph metrics, and graph isomorphism.
 decisions = vote_duplicate_pairs(
     uml,
     min_votes=3,
@@ -204,6 +224,38 @@ decisions = vote_duplicate_pairs(
     isomorphism_mode="names",
 )
 duplicate_model_ids = duplicate_model_ids_from_votes(decisions)
+```
+
+Node2Vec, contrastive GNN, and BERT vectors are cached as
+`.mcp4cm_embeddings/<dataset_name>/<graph_id>/node2vec.npz`, `contrastive_gnn.npz`, and `bert.npz`.
+Pass `embedding_cache_dir` to either detector to select a cache root. The batch
+runner defaults to `<data-dir>/.mcp4cm_embeddings` and accepts
+`--embedding-cache-dir`. To verify first-run persistence and the subsequent
+reload against a prepared dataset, run:
+
+```bash
+python3 scripts/test_embedding_cache.py eamodelset-json --data-dir data
+```
+
+Plot duplicate-model removal and unique-model counts for TF-IDF, contrastive GNN,
+and BERT over the 20 thresholds from `0.05` through `1.00`. TF-IDF is vectorized
+once and GNN/BERT vectors are trained or loaded once:
+
+```bash
+python3 scripts/plot_embedding_thresholds.py eamodelset-json --data-dir data
+```
+
+The script writes one JSON, CSV, and two-line PNG chart per technique to
+`embedding-threshold-results/<dataset>/`; filenames include both names, such as
+`gnn_eamodelset-json.json`. It requires the ML dependencies and the optional
+plotting dependency: `pip install -e '.[ml,plot]'`.
+
+To inspect vector collisions, cosine-score percentiles, and the connected
+components that turn matched pairs into duplicate removals without recomputing
+embeddings, run:
+
+```bash
+python3 scripts/diagnose_embedding_similarity.py eamodelset-json --data-dir data
 ```
 
 ## Extending Parsers

@@ -45,3 +45,27 @@ def require_transformers_torch():
             "`pip install -e '.[ml]'`."
         ) from exc
     return AutoTokenizer, AutoModel, torch
+
+
+def require_sentence_transformers():
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise ImportError(
+            "Semantic duplicate detection requires sentence-transformers. Install ML dependencies with "
+            "`pip install -e '.[ml]'`."
+        ) from exc
+    return SentenceTransformer
+
+
+def require_gnn_dependencies():
+    """Load the optional dependencies used by the contrastive GNN pipeline."""
+    try:
+        import torch
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise ImportError(
+            "GNN duplicate detection requires torch and sentence-transformers. Install ML dependencies with "
+            "`pip install -e '.[ml]'`."
+        ) from exc
+    return torch, SentenceTransformer

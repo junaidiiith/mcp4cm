@@ -36,8 +36,6 @@ import type {
 } from "../../types";
 import { formatDuration, round, techniqueLabel } from "../../utils";
 
-const disabledDuplicateTechniques = new Set(["graph_embedding"]);
-
 export function DuplicatePanel({
   canRun,
   busy,
@@ -87,7 +85,6 @@ export function DuplicatePanel({
                 <input
                   type="checkbox"
                   checked={selected.includes(technique.id)}
-                  disabled={disabledDuplicateTechniques.has(technique.id)}
                   onChange={() => onToggleSelection(technique.id)}
                 />
                 <span>{technique.label}</span>
@@ -97,7 +94,7 @@ export function DuplicatePanel({
                 <input
                   type="checkbox"
                   checked={mandatory.includes(technique.id)}
-                  disabled={!selected.includes(technique.id) || disabledDuplicateTechniques.has(technique.id)}
+                  disabled={!selected.includes(technique.id)}
                   onChange={() => onToggleMandatory(technique.id)}
                 />
                 Mandatory
@@ -449,48 +446,25 @@ function TechniqueConfig({
             onChange={(event) => patch({ graphEmbeddingSeed: Number(event.target.value) })}
           />
         </label>
-        <label>
-          Pooling
-          <select
-            value={thresholds.graphEmbeddingPooling}
-            onChange={(event) => patch({ graphEmbeddingPooling: event.target.value as Thresholds["graphEmbeddingPooling"] })}
-          >
-            <option value="mean">mean</option>
-            <option value="mean_max">mean_max</option>
-          </select>
-        </label>
-        <label className="inlineCheck">
-          <input
-            type="checkbox"
-            checked={thresholds.graphEmbeddingUseNodeNames}
-            onChange={(event) => patch({ graphEmbeddingUseNodeNames: event.target.checked })}
-          />
-          Node names
-        </label>
-        <label className="inlineCheck">
-          <input
-            type="checkbox"
-            checked={thresholds.graphEmbeddingUseNodeTypes}
-            onChange={(event) => patch({ graphEmbeddingUseNodeTypes: event.target.checked })}
-          />
-          Node types
-        </label>
-        <label className="inlineCheck">
-          <input
-            type="checkbox"
-            checked={thresholds.graphEmbeddingUseEdgeTypes}
-            onChange={(event) => patch({ graphEmbeddingUseEdgeTypes: event.target.checked })}
-          />
-          Edge types
-        </label>
-        <label className="inlineCheck">
-          <input
-            type="checkbox"
-            checked={thresholds.graphEmbeddingPoolFeatures}
-            onChange={(event) => patch({ graphEmbeddingPoolFeatures: event.target.checked })}
-          />
-          Pool features
-        </label>
+      </div>
+    );
+  }
+
+  if (technique === "gnn") {
+    return (
+      <div className="configGrid">
+        <label>Threshold<input type="number" min="0" max="1" step="0.01" value={thresholds.gnnThreshold} onChange={(event) => patch({ gnnThreshold: Number(event.target.value) })} /></label>
+        <label>Dimensions<input type="number" min="1" step="1" value={thresholds.gnnDimensions} onChange={(event) => patch({ gnnDimensions: Number(event.target.value) })} /></label>
+        <label>Layers<input type="number" min="1" step="1" value={thresholds.gnnLayers} onChange={(event) => patch({ gnnLayers: Number(event.target.value) })} /></label>
+        <label>Epochs<input type="number" min="1" step="1" value={thresholds.gnnEpochs} onChange={(event) => patch({ gnnEpochs: Number(event.target.value) })} /></label>
+        <label>Learning rate<input type="number" min="0.000001" step="0.0001" value={thresholds.gnnLearningRate} onChange={(event) => patch({ gnnLearningRate: Number(event.target.value) })} /></label>
+        <label>Temperature<input type="number" min="0.01" step="0.01" value={thresholds.gnnTemperature} onChange={(event) => patch({ gnnTemperature: Number(event.target.value) })} /></label>
+        <label>Edge dropout<input type="number" min="0" max="0.99" step="0.01" value={thresholds.gnnEdgeDropout} onChange={(event) => patch({ gnnEdgeDropout: Number(event.target.value) })} /></label>
+        <label>Feature masking<input type="number" min="0" max="0.99" step="0.01" value={thresholds.gnnFeatureMaskRate} onChange={(event) => patch({ gnnFeatureMaskRate: Number(event.target.value) })} /></label>
+        <label>Batch size<input type="number" min="1" step="1" value={thresholds.gnnBatchSize} onChange={(event) => patch({ gnnBatchSize: Number(event.target.value) })} /></label>
+        <label>Sentence model<input value={thresholds.gnnModelName} onChange={(event) => patch({ gnnModelName: event.target.value })} /></label>
+        <label>Seed<input type="number" step="1" value={thresholds.gnnSeed} onChange={(event) => patch({ gnnSeed: Number(event.target.value) })} /></label>
+        <label>Device<select value={thresholds.gnnDevice} onChange={(event) => patch({ gnnDevice: event.target.value as "auto" | "cpu" | "cuda" })}><option value="auto">Auto</option><option value="cpu">CPU</option><option value="cuda">CUDA</option></select></label>
       </div>
     );
   }
@@ -552,22 +526,6 @@ function TechniqueConfig({
   if (technique === "graph_isomorphism") {
     return (
       <div className="configGrid">
-        <label>
-          Mode
-          <select value={thresholds.isomorphismMode} onChange={(event) => patch({ isomorphismMode: event.target.value })}>
-            <option value="structure">Structure</option>
-            <option value="names">Names</option>
-            <option value="names_types">Names + types</option>
-          </select>
-        </label>
-        <label className="inlineCheck">
-          <input
-            type="checkbox"
-            checked={thresholds.matchEdgeTypes}
-            onChange={(event) => patch({ matchEdgeTypes: event.target.checked })}
-          />
-          Match edge types
-        </label>
         <label className="inlineCheck">
           <input
             type="checkbox"

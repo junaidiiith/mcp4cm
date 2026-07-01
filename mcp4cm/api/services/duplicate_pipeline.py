@@ -15,6 +15,7 @@ from mcp4cm.duplicates import (
     graph_similarity_pairs,
     tfidf_duplicate_pairs,
 )
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
 from mcp4cm.utils import pair_count, pair_key, pair_lookup_key, parse_bool
 
 DUPLICATE_TECHNIQUE_ORDER = (
@@ -22,6 +23,7 @@ DUPLICATE_TECHNIQUE_ORDER = (
     "tfidf",
     "graph_similarity",
     "graph_embedding",
+    "gnn",
     "bert_semantic",
     "graph_isomorphism",
 )
@@ -31,6 +33,7 @@ DUPLICATE_TECHNIQUE_LABELS = {
     "tfidf": "TF-IDF",
     "graph_similarity": "Graph Metrics",
     "graph_embedding": "Graph Embeddings",
+    "gnn": "Contrastive GNN",
     "bert_semantic": "BERT Semantic",
     "graph_isomorphism": "Isomorphism",
 }
@@ -54,6 +57,9 @@ DUPLICATE_TECHNIQUE_ALIASES = {
     "graph_embeddings": "graph_embedding",
     "node2vec": "graph_embedding",
     "node2vec_graph_embedding": "graph_embedding",
+    "gnn": "gnn",
+    "contrastive_gnn": "gnn",
+    "graphcl": "gnn",
     "bert": "bert_semantic",
     "bert_semantic": "bert_semantic",
     "bert_similarity": "bert_semantic",
@@ -174,13 +180,6 @@ def parse_min_df(value: Any) -> int | float:
     if isinstance(parsed, (int, float)) and parsed > 0:
         return parsed
     raise ValueError("minDf must be greater than 0.")
-
-
-def parse_isomorphism_mode(value: Any) -> str:
-    normalized = str(value or "names").strip().lower()
-    if normalized not in {"structure", "names", "names_types"}:
-        raise ValueError("isomorphismMode must be one of: structure, names, names_types.")
-    return normalized
 
 
 def unsupported_duplicate_techniques(body: dict[str, Any]) -> list[str]:
@@ -625,20 +624,36 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                     num_walks=int(thresholds.get("graphEmbeddingNumWalks", 5)),
                     workers=int(thresholds.get("graphEmbeddingWorkers", 1)),
                     seed=int(thresholds.get("graphEmbeddingSeed", 42)),
-                    use_node_names=parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),
-                    use_node_types=parse_bool(thresholds.get("graphEmbeddingUseNodeTypes"), default=True),
-                    use_edge_types=parse_bool(thresholds.get("graphEmbeddingUseEdgeTypes"), default=True),
-                    pool_feature_nodes=parse_bool(thresholds.get("graphEmbeddingPoolFeatures"), default=False),
-                    pooling=str(thresholds.get("graphEmbeddingPooling", "mean")),
                     progress=report_algorithm_progress(technique),
                 )
                 technique_pairs = [(pair.left_id, pair.right_id, pair.score) for pair in pairs]
                 add_pair_evidence(technique, technique_pairs)
+            elif technique == "gnn":
+                config = GNNTrainingConfig(
+                    model_name=str(thresholds.get("gnnModelName", "sentence-transformers/all-MiniLM-L6-v2")),
+                    embedding_dim=int(thresholds.get("gnnDimensions", 128)),
+                    layers=int(thresholds.get("gnnLayers", 2)),
+                    epochs=int(thresholds.get("gnnEpochs", 20)),
+                    learning_rate=float(thresholds.get("gnnLearningRate", 1e-3)),
+                    temperature=float(thresholds.get("gnnTemperature", 0.2)),
+                    edge_dropout=float(thresholds.get("gnnEdgeDropout", 0.15)),
+                    feature_mask_rate=float(thresholds.get("gnnFeatureMaskRate", 0.1)),
+                    batch_size=int(thresholds.get("gnnBatchSize", 32)),
+                    seed=int(thresholds.get("gnnSeed", 42)),
+                    device=str(thresholds.get("gnnDevice", "auto")),
+                )
+                pairs = gnn_duplicate_pairs(
+                    projected_dataset,
+                    threshold=float(thresholds.get("gnnThreshold", 0.85)),
+                    config=config,
+                    progress=report_algorithm_progress(technique),
+                )
+                add_pair_evidence(technique, pairs)
             elif technique == "bert_semantic":
                 pairs = bert_semantic_similarity_pairs(
                     projected_dataset,
-                    threshold=float(thresholds.get("bertSemantic", 0.9)),
-                    model_name=str(thresholds.get("bertModelName", "bert-base-uncased")),
+                    threshold=float(thresholds.get("bertSemantic", 0.8)),
+                    model_name=str(thresholds.get("bertModelName", "sentence-transformers/all-MiniLM-L6-v2")),
                     batch_size=int(thresholds.get("bertBatchSize", 8)),
                     max_length=int(thresholds.get("bertMaxLength", 256)),
                     semantic_text_mode=parse_semantic_text_mode(thresholds.get("semanticTextMode", "names_types_bag")),
@@ -649,8 +664,6 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
             elif technique == "graph_isomorphism":
                 pairs = graph_isomorphism_pairs(
                     projected_dataset,
-                    mode=parse_isomorphism_mode(thresholds.get("isomorphismMode", "names")),
-                    match_edge_types=parse_bool(thresholds.get("matchEdgeTypes"), default=True),
                     ignore_direction=parse_bool(thresholds.get("ignoreDirection"), default=False),
                     match_parallel_edge_multiplicity=parse_bool(
                         thresholds.get("matchParallelEdgeMultiplicity"), default=True
@@ -746,11 +759,18 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "graphEmbeddingNumWalks": int(thresholds.get("graphEmbeddingNumWalks", 5)),
         "graphEmbeddingWorkers": int(thresholds.get("graphEmbeddingWorkers", 1)),
         "graphEmbeddingSeed": int(thresholds.get("graphEmbeddingSeed", 42)),
-        "graphEmbeddingUseNodeNames": parse_bool(thresholds.get("graphEmbeddingUseNodeNames"), default=True),
-        "graphEmbeddingUseNodeTypes": parse_bool(thresholds.get("graphEmbeddingUseNodeTypes"), default=True),
-        "graphEmbeddingUseEdgeTypes": parse_bool(thresholds.get("graphEmbeddingUseEdgeTypes"), default=True),
-        "graphEmbeddingPoolFeatures": parse_bool(thresholds.get("graphEmbeddingPoolFeatures"), default=False),
-        "graphEmbeddingPooling": str(thresholds.get("graphEmbeddingPooling", "mean")),
+        "gnnThreshold": float(thresholds.get("gnnThreshold", 0.85)),
+        "gnnDimensions": int(thresholds.get("gnnDimensions", 128)),
+        "gnnLayers": int(thresholds.get("gnnLayers", 2)),
+        "gnnEpochs": int(thresholds.get("gnnEpochs", 20)),
+        "gnnLearningRate": float(thresholds.get("gnnLearningRate", 1e-3)),
+        "gnnTemperature": float(thresholds.get("gnnTemperature", 0.2)),
+        "gnnEdgeDropout": float(thresholds.get("gnnEdgeDropout", 0.15)),
+        "gnnFeatureMaskRate": float(thresholds.get("gnnFeatureMaskRate", 0.1)),
+        "gnnBatchSize": int(thresholds.get("gnnBatchSize", 32)),
+        "gnnModelName": str(thresholds.get("gnnModelName", "sentence-transformers/all-MiniLM-L6-v2")),
+        "gnnSeed": int(thresholds.get("gnnSeed", 42)),
+        "gnnDevice": str(thresholds.get("gnnDevice", "auto")),
     }
 
     return {

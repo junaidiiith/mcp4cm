@@ -4,6 +4,27 @@ Duplicate Detection helps find models that are likely copies, exports of the sam
 MCP4CM can run several detection methods in one job. Each method contributes evidence for candidate duplicate pairs; the
 final result is based on voting and optional mandatory methods.
 
+## Contrastive GNN
+
+**Contrastive GNN** is independent of the Node2Vec graph-embedding method. It sentence-encodes each node's normalized
+type/name text and each edge's relationship type, then trains an edge-aware message-passing graph encoder without labels.
+Training uses two randomly augmented views of every graph (edge dropout and node-feature masking) with an NT-Xent
+contrastive loss. The resulting L2-normalized graph vectors are compared with cosine similarity.
+
+The trained vectors are cached at `.mcp4cm_embeddings/<dataset>/<model>/contrastive_gnn.npz`. The cache key includes
+every graph, sentence model, and training setting, so it is invalidated whenever the corpus or configuration changes.
+This makes the method suitable for a whole dataset, not for mixing separately trained datasets.
+
+The command-line workflow is:
+
+```bash
+pip install -e '.[ml]'
+python scripts/run_duplicate_detection.py modelset-uml-json --technique gnn --threshold 0.85
+```
+
+For larger corpora, start with the default 20 epochs and use `--gnn-batch-size` to bound memory. CUDA is selected when
+available; use `--gnn-device cpu` for reproducible CPU-only execution. The web UI exposes the same training controls.
+
 ## General Workflow
 
 1. Upload and parse a dataset.
@@ -834,14 +855,7 @@ For best results, start with the default threshold and weights, inspect the high
 based on the type of false positives you see. Use Graph Metrics as a review and voting method, not as proof that two
 models are exactly the same.
 
-## 4) Graph Embeddings (currently disabled)
 
-TODO: currently experimental
-
-## 5) BERT
+## 4) BERT
 
 TODO: Verify implementation and add documentation
-
-## 6) Isomorphism (currently disabled)
-
-TODO: currently experimental

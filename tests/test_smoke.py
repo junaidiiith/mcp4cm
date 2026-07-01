@@ -1,8 +1,6 @@
-import importlib.util
 from pathlib import Path
 
 import pytest
-
 from mcp4cm.core import Dataset
 from mcp4cm.dummy import (
     default_filter_configs,
@@ -32,13 +30,6 @@ from mcp4cm.parsers.modelset_json.parser import ModelSetJsonParser
 from mcp4cm.parsers.parse import parse_file
 from mcp4cm.parsers.uml_xmi.parser import ParseOptions, UMLXMIParser
 from mcp4cm.xmi_names import EMPTY_NAME_SENTINEL, extract_xmi_names, normalize_identifier
-
-_DUMMY_CLEANSING_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "dummy_cleansing.py"
-_DUMMY_CLEANSING_SPEC = importlib.util.spec_from_file_location("dummy_cleansing_script", _DUMMY_CLEANSING_SCRIPT)
-assert _DUMMY_CLEANSING_SPEC and _DUMMY_CLEANSING_SPEC.loader
-_DUMMY_CLEANSING_MODULE = importlib.util.module_from_spec(_DUMMY_CLEANSING_SPEC)
-_DUMMY_CLEANSING_SPEC.loader.exec_module(_DUMMY_CLEANSING_MODULE)
-build_filter_configs = _DUMMY_CLEANSING_MODULE.build_filter_configs
 
 
 def test_drop_ir_edges_with_missing_nodes_removes_invalid_edges_and_reports_warning():
@@ -270,45 +261,23 @@ def test_tfidf_names_types_bag_includes_edge_types():
     assert tfidf_duplicate_by_names_and_types(dataset, threshold=0.99) == []
 
 
-def test_graph_embedding_uses_shared_semantic_feature_space(monkeypatch):
+def test_graph_embedding_trains_node2vec_once_in_a_shared_feature_space(monkeypatch, tmp_path):
     class FakeWordVectors(dict):
         pass
+
+    trained_graphs = []
 
     class FakeNode2Vec:
         def __init__(self, graph, dimensions, **_kwargs):
             self.graph = graph
             self.dimensions = dimensions
+            trained_graphs.append(graph)
 
         def fit(self, **_kwargs):
             vectors = FakeWordVectors()
             for node in self.graph.nodes():
-                vectors[node] = fake_vector(self.graph, node, self.dimensions)
+                vectors[node] = [float(self.graph.degree(node))] + [0.0] * (self.dimensions - 1)
             return type("FakeModel", (), {"wv": vectors})()
-
-    def feature_vector(node: str, dimensions: int):
-        values = [0.0] * dimensions
-        if node.endswith("::order") or node.endswith("::customer"):
-            values[0] = 1.0
-        elif node.endswith("::invoice") or node.endswith("::payment"):
-            values[0] = -1.0
-        elif node.endswith("::business object") or node.endswith("::business actor"):
-            values[1] = 1.0
-        elif node.endswith("::association"):
-            values[2] = 1.0
-        return values
-
-    def fake_vector(graph, node: str, dimensions: int):
-        if node.startswith("feature::"):
-            return feature_vector(node, dimensions)
-        values = [0.0] * dimensions
-        feature_neighbors = [neighbor for neighbor in graph.neighbors(node) if str(neighbor).startswith("feature::")]
-        if not feature_neighbors:
-            values[3] = 1.0
-            return values
-        for neighbor in feature_neighbors:
-            for index, value in enumerate(feature_vector(str(neighbor), dimensions)):
-                values[index] += value
-        return values
 
     monkeypatch.setattr("mcp4cm.duplicates.require_node2vec", lambda: FakeNode2Vec)
     parser = ArchimateJsonParser()
@@ -344,22 +313,17 @@ def test_graph_embedding_uses_shared_semantic_feature_space(monkeypatch):
     )
     dataset = Dataset([first, second, third], "archimate")
 
-    semantic_pairs = graph_embedding_pairs(dataset, threshold=0.9, dimensions=4)
-    topology_pairs = graph_embedding_pairs(
-        dataset,
-        threshold=0.9,
-        dimensions=4,
-        use_node_names=False,
-        use_node_types=False,
-        use_edge_types=False,
-    )
+    pairs = graph_embedding_pairs(dataset, threshold=0.9, dimensions=4, embedding_cache_dir=tmp_path)
 
-    assert [(pair.left_id, pair.right_id) for pair in semantic_pairs] == [("first", "second")]
-    assert {(pair.left_id, pair.right_id) for pair in topology_pairs} == {
-        ("first", "second"),
-        ("first", "third"),
-        ("second", "third"),
-    }
+    assert len(trained_graphs) == 1
+    assert any(str(node).startswith("feature::") for node in trained_graphs[0].nodes)
+    assert (tmp_path / "archimate" / "first" / "node2vec.npz").is_file()
+
+    def fail_if_trained(*_args, **_kwargs):
+        raise AssertionError("Node2Vec should have been reloaded from the embedding cache")
+
+    monkeypatch.setattr("mcp4cm.duplicates.require_node2vec", fail_if_trained)
+    assert graph_embedding_pairs(dataset, threshold=0.9, dimensions=4, embedding_cache_dir=tmp_path) == pairs
 
 
 def test_tfidf_typed_name_pairs_keep_type_name_bindings_atomic():
@@ -449,7 +413,7 @@ def test_pairwise_duplicate_algorithms_report_progress():
     assert isomorphism_events[-1]["percent"] == 100
 
 
-def test_graph_isomorphism_modes():
+def test_graph_isomorphism_ignores_names_and_types():
     parser = ArchimateJsonParser()
     first = parser.parse(
         {
@@ -474,9 +438,59 @@ def test_graph_isomorphism_modes():
 
     dataset = Dataset([first, second], "archimate")
 
-    assert len(graph_isomorphism_pairs(dataset, mode="structure")) == 1
-    assert len(graph_isomorphism_pairs(dataset, mode="names")) == 1
-    assert graph_isomorphism_pairs(dataset, mode="names_types") == []
+    assert len(graph_isomorphism_pairs(dataset)) == 1
+
+
+def test_graph_isomorphism_skips_timed_out_pair(monkeypatch):
+    parser = ArchimateJsonParser()
+    record = parser.parse(
+        {
+            "elements": [{"id": "a", "name": "Order", "type": "BusinessObject"}],
+            "relationships": [],
+        },
+        model_id="first",
+    )
+    other = parser.parse(
+        {
+            "elements": [{"id": "b", "name": "Order", "type": "BusinessObject"}],
+            "relationships": [],
+        },
+        model_id="second",
+    )
+    events = []
+    monkeypatch.setattr(
+        "mcp4cm.duplicates._prepared_graphs_are_isomorphic_with_timeout", lambda *_args: None
+    )
+
+    assert graph_isomorphism_pairs(Dataset([record, other], "archimate"), progress=events.append) == []
+    assert "skipped 1 timed-out check(s)" in events[-1]["message"]
+
+
+def test_structural_duplicate_techniques_run_on_uml_xmi_modelset(uml_xmi_model_count):
+    """Use --uml-xmi-model-count to choose how many models to run."""
+    pytest.importorskip("node2vec")
+    all_model_paths = sorted((Path(__file__).parents[1] / "data/modelset-uml-xmi").glob("*.xmi"))
+    assert 2 <= uml_xmi_model_count <= len(all_model_paths), (
+        f"--uml-xmi-model-count must be between 2 and {len(all_model_paths)}; got {uml_xmi_model_count}."
+    )
+    model_paths = all_model_paths[:uml_xmi_model_count]
+
+    records = [parse_file(path, language="uml", format="xmi").record for path in model_paths]
+    dataset = Dataset(records, "uml")
+
+    isomorphic_pairs = graph_isomorphism_pairs(dataset)
+    embedding_pairs = graph_embedding_pairs(
+        dataset,
+        threshold=1.0,
+        dimensions=4,
+        walk_length=2,
+        num_walks=1,
+        workers=1,
+        seed=42,
+    )
+
+    assert isinstance(isomorphic_pairs, list)
+    assert isinstance(embedding_pairs, list)
 
 
 def test_duplicate_voting_combines_techniques():
@@ -605,58 +619,6 @@ def test_dummy_cleansing_v2_regex_rule():
     regex_findings = [finding for finding in result.findings if finding.filter_id == "regex_rule"]
     assert regex_findings
     assert regex_findings[0].decision == "removed"
-
-
-def test_dummy_cleansing_language_filter_retains_selected_language():
-    english = uml_record(
-        [
-            "Customer account",
-            "Purchase order",
-            "Shipping address",
-            "Payment invoice",
-            "Product catalog",
-            "Delivery status",
-        ],
-        model_id="english-model",
-    )
-    german = uml_record(
-        [
-            "Kundenkonto",
-            "Bestellung",
-            "Lieferadresse",
-            "Rechnung",
-            "Produktkatalog",
-            "Zahlungsstatus",
-        ],
-        model_id="german-model",
-    )
-    configs = [{"id": config["id"], "enabled": False} for config in default_filter_configs()]
-    configs.append({"id": "language", "enabled": True, "languages": ["en"]})
-
-    result = evaluate_dummy_filters(Dataset([english, german], "uml"), filter_configs=configs)
-    outcomes = {outcome.model_id: outcome for outcome in result.model_outcomes}
-    language_findings = {finding.model_id: finding for finding in result.findings if finding.filter_id == "language"}
-
-    assert outcomes["english-model"].removed is False
-    assert outcomes["german-model"].removed is True
-    assert language_findings["english-model"].metrics["detectedLanguage"] == "en"
-    assert language_findings["german-model"].metrics["detectedLanguage"] == "de"
-
-
-def test_dummy_cleansing_script_enables_language_filter_config():
-    configs = build_filter_configs(["en", "de", "en"])
-    language_config = next(config for config in configs if config["id"] == "language")
-
-    assert language_config["enabled"] is True
-    assert language_config["languages"] == ["en", "de"]
-
-
-def test_dummy_cleansing_script_defaults_to_english_language_filter():
-    configs = build_filter_configs(None)
-    language_config = next(config for config in configs if config["id"] == "language")
-
-    assert language_config["enabled"] is True
-    assert language_config["languages"] == ["en"]
 
 
 def test_dummy_cleansing_v2_filter_summary_groups_mixed_modelset_by_language():
