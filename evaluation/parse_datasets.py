@@ -298,10 +298,10 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python scripts/parse_datasets.py\n"
-            "  python scripts/parse_datasets.py --only modelset-uml-xmi --force\n"
-            "  python scripts/parse_datasets.py --data-dir data --output-dir evaluation-runs\n"
-            "  python scripts/parse_datasets.py --only modelset-uml-json --only eamodelset-json\n"
+            "  python evaluation/parse_datasets.py\n"
+            "  python evaluation/parse_datasets.py --only modelset-uml-xmi --force\n"
+            "  python evaluation/parse_datasets.py --data-dir data --output-dir evaluation-runs\n"
+            "  python evaluation/parse_datasets.py --only modelset-uml-json --only eamodelset-json\n"
         ),
     )
     parser.add_argument(

@@ -154,10 +154,11 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python scripts/sample_sap_sam_bpmn.py\n"
-            "  python scripts/sample_sap_sam_bpmn.py --seed 7 --force\n"
-            "  python scripts/sample_sap_sam_bpmn.py --random-sample --force\n"
-            "  python scripts/sample_sap_sam_bpmn.py --extension json\n"
+            "  python evaluation/sample_sap_sam_bpmn.py\n"
+            "  python evaluation/sample_sap_sam_bpmn.py --source-dir /path/to/sap-sam --force\n"
+            "  python evaluation/sample_sap_sam_bpmn.py --seed 7 --force\n"
+            "  python evaluation/sample_sap_sam_bpmn.py --random-sample --force\n"
+            "  python evaluation/sample_sap_sam_bpmn.py --extension json\n"
         ),
     )
     parser.add_argument(
