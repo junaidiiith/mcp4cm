@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "dataset": "sap-sam-bpmn",
+  "datasetType": "bpmn",
+  "totalModels": 5000,
+  "rows": [
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "min_size",
+      "detected": 72,
+      "detectedPercent": 1.44,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "too_few_named_elements",
+      "detected": 275,
+      "detectedPercent": 5.5,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "short_median_name_length",
+      "detected": 243,
+      "detectedPercent": 4.859999999999999,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "placeholder_name_ratio",
+      "detected": 51,
+      "detectedPercent": 1.02,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "low_vocabulary",
+      "detected": 134,
+      "detectedPercent": 2.68,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "name_repetition_ratio",
+      "detected": 67,
+      "detectedPercent": 1.34,
+      "totalModels": 5000
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Dummy Filtering",
+      "technique": "language",
+      "detected": 2221,
+      "detectedPercent": 44.42,
+      "totalModels": 5000
+    }
+  ],
+  "unionRows": [
+    {
+      "dataset": "sap-sam-bpmn",
+      "variant": "all_enabled",
+      "filterSet": "All enabled filters",
+      "excludedFilterId": null,
+      "totalModels": 5000,
+      "removed": 2324,
+      "remaining": 2676,
+      "removalRate": 46.48
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "variant": "without_language",
+      "filterSet": "Without language filter",
+      "excludedFilterId": "language",
+      "totalModels": 5000,
+      "removed": 421,
+      "remaining": 4579,
+      "removalRate": 8.42
+    }
+  ],
+  "generatedAt": 1782998499.35611
+}

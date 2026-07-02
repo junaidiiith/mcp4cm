@@ -1,8 +1,7 @@
 # Evaluation
 
-This directory contains the evaluation drivers and their generated JSON artifacts.
-Run all commands from the repository root, not from inside `evaluation/`. The scripts use relative default paths such as
-`data/` and `evaluation/`.
+This directory contains the evaluation scripts and their generated artifacts.  
+Run all commands from the repository root, not from inside `evaluation/`. 
 
 ## Prerequisites
 
@@ -10,6 +9,12 @@ Install development and ML dependencies:
 
 ```bash
 uv sync --extra dev --extra ml
+```
+
+The threshold plotting script also requires the optional plotting dependency:
+
+```bash
+uv sync --extra dev --extra ml --extra plot
 ```
 
 The evaluation expects prepared input datasets below `data/`:
@@ -26,7 +31,7 @@ See [docs/DOWNLOAD_DATASETS.md](../docs/DOWNLOAD_DATASETS.md) for the full datas
 uv run python scripts/prepare_datasets.py --only modelset-uml-xmi --only modelset-ecore-xmi --only eamodelset-archimate
 ```
 
-SAP-SAM BPMN is not downloaded by `prepare_datasets.py`. Download SAP-SAM from the [`signavio/sap-sam`](https://github.com/signavio/sap-sam) repository and follow that repository's README to fully download and extract the dataset.
+SAP-SAM BPMN is not downloaded by `prepare_datasets.py`. Download SAP-SAM from the `[signavio/sap-sam](https://github.com/signavio/sap-sam)` repository and follow that repository's README to fully download and extract the dataset.
 After the SAP-SAM dataset is available locally, use `evaluation/sample_sap_sam_bpmn.py` to sample 5,000 valid BPMN models into `data/sap-sam-bpmn`:
 
 ```bash
@@ -65,6 +70,12 @@ Prepare the generated JSON summaries as Markdown tables:
 
 ```bash
 uv run python evaluation/prepare_results.py
+```
+
+Plot duplicate and unique model counts over thresholds from the parsed runtime datasets:
+
+```bash
+uv run python evaluation/plot_combined_duplicate_techniques.py
 ```
 
 To run only one dataset or dataset group, pass `--only` to any script:
@@ -110,7 +121,13 @@ Result preparation writes:
 evaluation/results.md
 ```
 
-Files ending in `_old.json` are retained comparison artifacts and are not used by the current evaluation scripts.
+Duplicate threshold plotting writes:
+
+```text
+evaluation/threshold-plots/<dataset>/<technique>/<technique>.csv
+evaluation/threshold-plots/<dataset>/<technique>/<technique>.json
+evaluation/threshold-plots/<dataset>/combined_duplicate_techniques.png
+```
 
 ## Current Duplicate Thresholds
 
@@ -130,3 +147,4 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+

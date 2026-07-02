@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "dataset": "modelset-ecore-xmi",
+  "datasetType": "ecore",
+  "totalModels": 5400,
+  "rows": [
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "min_size",
+      "detected": 122,
+      "detectedPercent": 2.259259259259259,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "too_few_named_elements",
+      "detected": 143,
+      "detectedPercent": 2.648148148148148,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "short_median_name_length",
+      "detected": 266,
+      "detectedPercent": 4.925925925925926,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "placeholder_name_ratio",
+      "detected": 84,
+      "detectedPercent": 1.5555555555555556,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "low_vocabulary",
+      "detected": 50,
+      "detectedPercent": 0.9259259259259258,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "name_repetition_ratio",
+      "detected": 53,
+      "detectedPercent": 0.9814814814814814,
+      "totalModels": 5400
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "type": "Dummy Filtering",
+      "technique": "language",
+      "detected": 422,
+      "detectedPercent": 7.814814814814815,
+      "totalModels": 5400
+    }
+  ],
+  "unionRows": [
+    {
+      "dataset": "modelset-ecore-xmi",
+      "variant": "all_enabled",
+      "filterSet": "All enabled filters",
+      "excludedFilterId": null,
+      "totalModels": 5400,
+      "removed": 660,
+      "remaining": 4740,
+      "removalRate": 12.222222222222221
+    },
+    {
+      "dataset": "modelset-ecore-xmi",
+      "variant": "without_language",
+      "filterSet": "Without language filter",
+      "excludedFilterId": "language",
+      "totalModels": 5400,
+      "removed": 404,
+      "remaining": 4996,
+      "removalRate": 7.481481481481482
+    }
+  ],
+  "generatedAt": 1782998477.463219
+}

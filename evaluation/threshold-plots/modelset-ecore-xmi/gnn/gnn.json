@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "dataset": "modelset-ecore-xmi",
+  "technique": "gnn",
+  "modelCount": 5400,
+  "thresholds": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "runtimeSeconds": 998.2409286670154,
+  "config": {
+    "thresholdScanStart": 0.0,
+    "trainingConfig": {
+      "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+      "embedding_dim": 128,
+      "layers": 2,
+      "epochs": 20,
+      "learning_rate": 0.001,
+      "temperature": 0.2,
+      "edge_dropout": 0.15,
+      "feature_mask_rate": 0.1,
+      "batch_size": 32,
+      "seed": 42,
+      "device": "auto"
+    },
+    "runtimeSeconds": 998.2409286670154
+  },
+  "results": [
+    {
+      "threshold": 0.05,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 4690080
+    },
+    {
+      "threshold": 0.1,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 2811407
+    },
+    {
+      "threshold": 0.15,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 1723050
+    },
+    {
+      "threshold": 0.2,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 1158029
+    },
+    {
+      "threshold": 0.25,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 849358
+    },
+    {
+      "threshold": 0.3,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 653114
+    },
+    {
+      "threshold": 0.35,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 514532
+    },
+    {
+      "threshold": 0.4,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 405162
+    },
+    {
+      "threshold": 0.45,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 321014
+    },
+    {
+      "threshold": 0.5,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 252872
+    },
+    {
+      "threshold": 0.55,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 197769
+    },
+    {
+      "threshold": 0.6,
+      "duplicates": 5399,
+      "unique": 1,
+      "matchingPairs": 152600
+    },
+    {
+      "threshold": 0.65,
+      "duplicates": 5396,
+      "unique": 4,
+      "matchingPairs": 116415
+    },
+    {
+      "threshold": 0.7,
+      "duplicates": 5377,
+      "unique": 23,
+      "matchingPairs": 87358
+    },
+    {
+      "threshold": 0.75,
+      "duplicates": 5306,
+      "unique": 94,
+      "matchingPairs": 63355
+    },
+    {
+      "threshold": 0.8,
+      "duplicates": 5100,
+      "unique": 300,
+      "matchingPairs": 44210
+    },
+    {
+      "threshold": 0.85,
+      "duplicates": 4631,
+      "unique": 769,
+      "matchingPairs": 29908
+    },
+    {
+      "threshold": 0.9,
+      "duplicates": 3754,
+      "unique": 1646,
+      "matchingPairs": 19706
+    },
+    {
+      "threshold": 0.95,
+      "duplicates": 2763,
+      "unique": 2637,
+      "matchingPairs": 12207
+    },
+    {
+      "threshold": 1.0,
+      "duplicates": 1280,
+      "unique": 4120,
+      "matchingPairs": 3178
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "dataset": "sap-sam-bpmn",
+  "datasetType": "bpmn",
+  "totalModels": 5000,
+  "totalPairs": 12497500,
+  "rows": [
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Duplicate Filtering",
+      "technique": "hash",
+      "techniqueLabel": "Hash",
+      "status": "ok",
+      "detected": 1848,
+      "detectedPercent": 36.96,
+      "pairCount": 173531,
+      "groupCount": 73,
+      "largestGroupSize": 266,
+      "totalModels": 5000,
+      "elapsedMs": 4024
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Duplicate Filtering",
+      "technique": "tfidf",
+      "techniqueLabel": "TF-IDF",
+      "status": "ok",
+      "detected": 2019,
+      "detectedPercent": 40.38,
+      "pairCount": 174604,
+      "groupCount": 96,
+      "largestGroupSize": 267,
+      "totalModels": 5000,
+      "elapsedMs": 10192
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Duplicate Filtering",
+      "technique": "graph_similarity",
+      "techniqueLabel": "Graph Metrics",
+      "status": "ok",
+      "detected": 2054,
+      "detectedPercent": 41.08,
+      "pairCount": 175385,
+      "groupCount": 100,
+      "largestGroupSize": 269,
+      "totalModels": 5000,
+      "elapsedMs": 99663
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Duplicate Filtering",
+      "technique": "bert_semantic",
+      "techniqueLabel": "BERT Semantic",
+      "status": "ok",
+      "detected": 2343,
+      "detectedPercent": 46.86,
+      "pairCount": 176234,
+      "groupCount": 162,
+      "largestGroupSize": 269,
+      "totalModels": 5000,
+      "elapsedMs": 40380
+    },
+    {
+      "dataset": "sap-sam-bpmn",
+      "type": "Duplicate Filtering",
+      "technique": "gnn",
+      "techniqueLabel": "Contrastive GNN",
+      "status": "ok",
+      "detected": 2068,
+      "detectedPercent": 41.36,
+      "pairCount": 175148,
+      "groupCount": 129,
+      "largestGroupSize": 268,
+      "totalModels": 5000,
+      "elapsedMs": 38437
+    }
+  ],
+  "generatedAt": 1782999308.793195
+}

@@ -19,7 +19,16 @@ modelset-uml*
 runtime-*
 threshold*
 
-evaluation/eamodelset-archimate-runtime/
-evaluation/modelset-ecore-xmi-runtime/
-evaluation/modelset-uml-xmi-runtime/
-evaluation/sap-sam-bpmn-runtime/
+# Evaluation runtime outputs: keep compact result/summary JSON, Markdown tables,
+# and generated threshold plots, but do not track large IR files or heavyweight statistics.
+!evaluation/
+!evaluation/*-runtime/
+!evaluation/*-runtime/*.json
+!evaluation/threshold-plots/
+!evaluation/threshold-plots/**
+evaluation/*-runtime/ir/
+evaluation/*-runtime/index.json
+evaluation/*-runtime/duplicate_detection.json
+evaluation/*-runtime/statistics.json
+evaluation/*-runtime/dummy_cleansing.json
+evaluation/.mcp4cm_embeddings/

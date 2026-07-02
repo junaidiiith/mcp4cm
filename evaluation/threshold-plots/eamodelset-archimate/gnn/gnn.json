@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "dataset": "eamodelset-archimate",
+  "technique": "gnn",
+  "modelCount": 961,
+  "thresholds": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "runtimeSeconds": 203.42451879102737,
+  "config": {
+    "thresholdScanStart": 0.0,
+    "trainingConfig": {
+      "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+      "embedding_dim": 128,
+      "layers": 2,
+      "epochs": 20,
+      "learning_rate": 0.001,
+      "temperature": 0.2,
+      "edge_dropout": 0.15,
+      "feature_mask_rate": 0.1,
+      "batch_size": 32,
+      "seed": 42,
+      "device": "auto"
+    },
+    "runtimeSeconds": 203.42451879102737
+  },
+  "results": [
+    {
+      "threshold": 0.05,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 201008
+    },
+    {
+      "threshold": 0.1,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 142564
+    },
+    {
+      "threshold": 0.15,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 97127
+    },
+    {
+      "threshold": 0.2,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 65778
+    },
+    {
+      "threshold": 0.25,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 45849
+    },
+    {
+      "threshold": 0.3,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 33068
+    },
+    {
+      "threshold": 0.35,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 24435
+    },
+    {
+      "threshold": 0.4,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 18272
+    },
+    {
+      "threshold": 0.45,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 13597
+    },
+    {
+      "threshold": 0.5,
+      "duplicates": 960,
+      "unique": 1,
+      "matchingPairs": 10107
+    },
+    {
+      "threshold": 0.55,
+      "duplicates": 957,
+      "unique": 4,
+      "matchingPairs": 7452
+    },
+    {
+      "threshold": 0.6,
+      "duplicates": 942,
+      "unique": 19,
+      "matchingPairs": 5394
+    },
+    {
+      "threshold": 0.65,
+      "duplicates": 896,
+      "unique": 65,
+      "matchingPairs": 3882
+    },
+    {
+      "threshold": 0.7,
+      "duplicates": 833,
+      "unique": 128,
+      "matchingPairs": 2701
+    },
+    {
+      "threshold": 0.75,
+      "duplicates": 702,
+      "unique": 259,
+      "matchingPairs": 1767
+    },
+    {
+      "threshold": 0.8,
+      "duplicates": 533,
+      "unique": 428,
+      "matchingPairs": 1154
+    },
+    {
+      "threshold": 0.85,
+      "duplicates": 367,
+      "unique": 594,
+      "matchingPairs": 699
+    },
+    {
+      "threshold": 0.9,
+      "duplicates": 236,
+      "unique": 725,
+      "matchingPairs": 394
+    },
+    {
+      "threshold": 0.95,
+      "duplicates": 135,
+      "unique": 826,
+      "matchingPairs": 198
+    },
+    {
+      "threshold": 1.0,
+      "duplicates": 37,
+      "unique": 924,
+      "matchingPairs": 45
+    }
+  ]
+}
