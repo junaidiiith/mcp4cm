@@ -116,6 +116,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument(
+        "--evaluation-dir",
+        dest="data_dir",
+        type=Path,
+        default=argparse.SUPPRESS,
+        help="Deprecated alias for --data-dir.",
+    )
+    parser.add_argument(
         "--technique",
         action="append",
         nargs="+",
@@ -135,7 +142,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("threshold-results_v1"),
+        default=Path("evaluation-results"),
         help="Root directory for generated artifacts.",
     )
     parser.add_argument(

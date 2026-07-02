@@ -56,6 +56,12 @@ def test_selects_multiple_datasets_and_techniques_with_aliases() -> None:
     assert duplicate_detection.selected_techniques(args) == ["tfidf", "bert", "gnn"]
 
 
+def test_evaluation_dir_alias_sets_data_dir(tmp_path: Path) -> None:
+    args = duplicate_detection.parse_args(["--evaluation-dir", str(tmp_path)])
+
+    assert args.data_dir == tmp_path
+
+
 def test_run_dataset_writes_artifacts_under_dataset_and_technique(monkeypatch, tmp_path: Path) -> None:
     def fake_plot(path: Path, technique: str, rows, model_count: int) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

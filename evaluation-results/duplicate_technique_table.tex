@@ -1,0 +1,34 @@
+\begin{table*}[t]
+    \centering
+    \caption{Duplicate candidates produced independently by each duplicate detector at threshold 0.9. ``Models'' counts distinct models that participate in at least one candidate duplicate relation. Hash is exact and does not use the threshold.}
+    \label{tab:duplicate-results}
+    \begin{tabular}{llrrrrrr}
+        \toprule
+        Dataset & Technique & Models & Models (\%) & Pairs & Groups & Largest group & Runtime \\
+        \midrule
+        \multirow{5}{*}{ModelSet UML} & Hash & 2,575 & 50.29 & 75,723 & 394 & 177 & 17.76 s \\
+         & TF-IDF & 4,004 & 78.20 & 261,084 & 331 & 588 & 88.89 s \\
+         & Graph metrics & 3,275 & 63.96 & 116,148 & 442 & 221 & 392.37 s \\
+         & BERT & 4,223 & 82.48 & 147,504 & 325 & 628 & 191.43 s \\
+         & GNN & 4,456 & 87.03 & 109,756 & 342 & 353 & 163.78 s \\
+        \midrule
+        \multirow{5}{*}{ModelSet Ecore} & Hash & 2,115 & 39.36 & 3,472 & 772 & 27 & 32.79 s \\
+         & TF-IDF & 3,695 & 68.77 & 22,702 & 817 & 294 & 129.61 s \\
+         & Graph metrics & 3,388 & 63.06 & 12,176 & 938 & 86 & 553.90 s \\
+         & BERT & 4,368 & 81.30 & 46,345 & 550 & 1,954 & 318.37 s \\
+         & GNN & 4,224 & 78.62 & 15,580 & 800 & 123 & 4346.99 s \\
+        \midrule
+        \multirow{5}{*}{EAModelSet} & Hash & 75 & 7.80 & 50 & 34 & 4 & 9.09 s \\
+         & TF-IDF & 205 & 21.33 & 237 & 75 & 11 & 13.35 s \\
+         & Graph metrics & 114 & 11.86 & 122 & 43 & 10 & 27.54 s \\
+         & BERT & 240 & 24.97 & 267 & 86 & 10 & 17.13 s \\
+         & GNN & 329 & 34.24 & 392 & 107 & 18 & 9.33 s \\
+        \midrule
+        \multirow{5}{*}{SAP-SAM BPMN} & Hash & 1,848 & 36.96 & 173,531 & 73 & 266 & 14.08 s \\
+         & TF-IDF & 2,832 & 56.64 & 499,327 & 96 & 2,503 & 100.65 s \\
+         & Graph metrics & 1,933 & 38.66 & 175,170 & 92 & 269 & 383.69 s \\
+         & BERT & 3,320 & 66.40 & 191,376 & 127 & 1,386 & 188.55 s \\
+         & GNN & 3,070 & 61.40 & 177,119 & 313 & 269 & 157.82 s \\
+        \bottomrule
+    \end{tabular}
+\end{table*}
