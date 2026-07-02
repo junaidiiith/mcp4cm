@@ -23,15 +23,16 @@ for import_path in (REPOSITORY_ROOT, SCRIPT_DIR):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
-from plot_embedding_thresholds import THRESHOLDS, plot, rows_for_thresholds, write_csv
-from run_duplicate_detection import (
+from plot_embedding_thresholds import THRESHOLDS, plot, rows_for_thresholds, write_csv  # noqa: E402
+from run_duplicate_detection import (  # noqa: E402
     DEFAULT_DATA_DIR,
     TechniqueProgressBar,
     dataset_choices,
     load_prepared_dataset,
     parse_data_dir_arg,
 )
+
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -104,10 +105,7 @@ def main() -> int:
         )
     finally:
         progress.close()
-    pairs = [
-        SimpleNamespace(left_id=left_id, right_id=right_id, score=score)
-        for left_id, right_id, score in triples
-    ]
+    pairs = [SimpleNamespace(left_id=left_id, right_id=right_id, score=score) for left_id, right_id, score in triples]
     rows = rows_for_thresholds(pairs, len(dataset), "gnn", progress_enabled=not args.no_progress)
     results = {"gnn": rows}
 

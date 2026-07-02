@@ -15,8 +15,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from mcp4cm.duplicates import bert_semantic_similarity_pairs, graph_embedding_pairs
-from run_duplicate_detection import DEFAULT_DATA_DIR, load_prepared_dataset
+from run_duplicate_detection import DEFAULT_DATA_DIR, load_prepared_dataset  # noqa: E402
+
+from mcp4cm.duplicates import bert_semantic_similarity_pairs, graph_embedding_pairs  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,9 +35,7 @@ def main() -> int:
     dataset = load_prepared_dataset(args.data_dir, args.dataset)
     cache_dir = args.cache_dir or (args.data_dir / ".mcp4cm_embeddings")
 
-    first_node2vec = graph_embedding_pairs(
-        dataset, threshold=args.threshold, embedding_cache_dir=cache_dir
-    )
+    first_node2vec = graph_embedding_pairs(dataset, threshold=args.threshold, embedding_cache_dir=cache_dir)
     first_bert = bert_semantic_similarity_pairs(
         dataset,
         threshold=args.threshold,
@@ -52,9 +51,7 @@ def main() -> int:
     if missing:
         raise RuntimeError(f"Embedding cache files were not written: {', '.join(map(str, missing))}")
 
-    second_node2vec = graph_embedding_pairs(
-        dataset, threshold=args.threshold, embedding_cache_dir=cache_dir
-    )
+    second_node2vec = graph_embedding_pairs(dataset, threshold=args.threshold, embedding_cache_dir=cache_dir)
     second_bert = bert_semantic_similarity_pairs(
         dataset,
         threshold=args.threshold,

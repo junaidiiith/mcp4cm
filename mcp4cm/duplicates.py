@@ -428,11 +428,28 @@ def graph_embedding_pairs(
         if graph.number_of_nodes() == 0 or graph.number_of_edges() == 0:
             embeddings = [np.zeros(dimensions, dtype=float) for _ in records]
         else:
-            print("Training one shared Node2Vec model for all graphs with total nodes:", graph.number_of_nodes(), "total edges:", graph.number_of_edges())
-            model = Node2Vec(graph, dimensions=dimensions, walk_length=walk_length, num_walks=num_walks, workers=workers, quiet=True, seed=seed).fit(window=5, min_count=1, batch_words=4, seed=seed)
-            embeddings = [_pooled_node_embeddings(model, model_nodes[record.model_id], np, dimensions) for record in records]
+            print(
+                "Training one shared Node2Vec model for all graphs with total nodes:",
+                graph.number_of_nodes(),
+                "total edges:",
+                graph.number_of_edges(),
+            )
+            model = Node2Vec(
+                graph,
+                dimensions=dimensions,
+                walk_length=walk_length,
+                num_walks=num_walks,
+                workers=workers,
+                quiet=True,
+                seed=seed,
+            ).fit(window=5, min_count=1, batch_words=4, seed=seed)
+            embeddings = [
+                _pooled_node_embeddings(model, model_nodes[record.model_id], np, dimensions) for record in records
+            ]
         for record, embedding in zip(records, embeddings, strict=True):
-            _save_embedding(_embedding_cache_path(embedding_cache_dir, dataset, record, "node2vec"), embedding, metadata, np)
+            _save_embedding(
+                _embedding_cache_path(embedding_cache_dir, dataset, record, "node2vec"), embedding, metadata, np
+            )
         action = "Trained shared"
     else:
         action = "Reloaded shared"
@@ -544,7 +561,10 @@ def bert_semantic_similarity_pairs(
         for batch_index, start in enumerate(range(0, len(missing), batch_size), start=1):
             batch_items = missing[start : start + batch_size]
             batch_embeddings = model.encode(
-                [item[2] for item in batch_items], batch_size=batch_size, normalize_embeddings=True, show_progress_bar=False
+                [item[2] for item in batch_items],
+                batch_size=batch_size,
+                normalize_embeddings=True,
+                show_progress_bar=False,
             )
             for item, embedding in zip(batch_items, batch_embeddings, strict=True):
                 index, _record, _text, cache_path, metadata = item
@@ -661,8 +681,8 @@ def _isomorphism_with_process_timeout(left_graph: Any, right_graph: Any, timeout
         return None
     try:
         status, value = result_queue.get(timeout=1)
-    except Empty as exc:
-        raise RuntimeError("Isomorphism worker exited without a result.")
+    except Empty:
+        raise RuntimeError("Isomorphism worker exited without a result.") from None
     finally:
         result_queue.close()
     if status == "error":

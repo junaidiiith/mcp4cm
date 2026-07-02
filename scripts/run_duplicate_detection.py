@@ -28,8 +28,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from mcp4cm.core import Dataset
-from mcp4cm.duplicates import (
+from mcp4cm.core import Dataset  # noqa: E402
+from mcp4cm.duplicates import (  # noqa: E402
     bert_semantic_similarity_pairs,
     detect_duplicates_by_name_hash,
     graph_embedding_pairs,
@@ -37,9 +37,8 @@ from mcp4cm.duplicates import (
     graph_similarity_pairs,
     tfidf_duplicate_pairs,
 )
-from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
-from mcp4cm.parsers.parse import parse_files
-
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs  # noqa: E402
+from mcp4cm.parsers.parse import parse_files  # noqa: E402
 
 DEFAULT_DATA_DIR = REPOSITORY_ROOT / "data"
 LOG = logging.getLogger(__name__)
@@ -186,9 +185,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gnn-learning-rate", type=float, default=1e-3, help="Contrastive GNN learning rate.")
     parser.add_argument("--gnn-temperature", type=float, default=0.2, help="NT-Xent contrastive temperature.")
     parser.add_argument("--gnn-edge-dropout", type=float, default=0.15, help="Edge dropout used for GraphCL views.")
-    parser.add_argument("--gnn-feature-mask-rate", type=float, default=0.10, help="Node feature masking used for GraphCL views.")
+    parser.add_argument(
+        "--gnn-feature-mask-rate",
+        type=float,
+        default=0.10,
+        help="Node feature masking used for GraphCL views.",
+    )
     parser.add_argument("--gnn-batch-size", type=int, default=32, help="Graphs per contrastive GNN batch.")
-    parser.add_argument("--gnn-model-name", default="sentence-transformers/all-MiniLM-L6-v2", help="Sentence-transformer model for node and edge text.")
+    parser.add_argument(
+        "--gnn-model-name",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="Sentence-transformer model for node and edge text.",
+    )
     parser.add_argument("--gnn-seed", type=int, default=42, help="Contrastive GNN random seed.")
     parser.add_argument("--gnn-device", choices=("auto", "cpu", "cuda"), default="auto", help="GNN training device.")
     parser.add_argument("--no-progress", action="store_true", help="Disable terminal progress bars.")
@@ -348,7 +356,11 @@ def run_detection(dataset: Dataset, args: argparse.Namespace) -> dict[str, objec
             lambda progress: [
                 type("GNNPair", (), {"left_id": left, "right_id": right, "score": score})
                 for left, right, score in gnn_duplicate_pairs(
-                    dataset, threshold=args.threshold, config=config, embedding_cache_dir=embedding_cache_dir, progress=progress
+                    dataset,
+                    threshold=args.threshold,
+                    config=config,
+                    embedding_cache_dir=embedding_cache_dir,
+                    progress=progress,
                 )
             ],
             duplicate_models_removed_from_pairs,

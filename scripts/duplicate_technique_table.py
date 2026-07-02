@@ -19,14 +19,15 @@ for import_path in (REPOSITORY_ROOT, SCRIPT_DIR):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from mcp4cm.duplicates import (
+from run_duplicate_detection import DEFAULT_DATA_DIR, TechniqueProgressBar, load_prepared_dataset  # noqa: E402
+
+from mcp4cm.duplicates import (  # noqa: E402
     bert_semantic_similarity_pairs,
     detect_duplicates_by_name_hash,
     graph_similarity_pairs,
     tfidf_duplicate_pairs,
 )
-from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
-from run_duplicate_detection import DEFAULT_DATA_DIR, TechniqueProgressBar, load_prepared_dataset
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs  # noqa: E402
 
 DEFAULT_DATASETS = ("modelset-uml-xmi", "modelset-ecore-xmi", "eamodelset-archimate", "sap-sam-bpmn")
 DEFAULT_TECHNIQUES = ("hash", "tfidf", "graph-similarity", "bert-similarity", "gnn")
@@ -90,7 +91,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--csv-output", type=Path, help="Optional CSV output path.")
     parser.add_argument("--json-output", type=Path, help="Optional JSON output path.")
     parser.add_argument("--embedding-cache-dir", type=Path, help="Default: <data-dir>/.mcp4cm_embeddings.")
-    parser.add_argument("--tfidf-token-mode", default="names_types_bag", choices=("names", "names_types_bag", "typed_name_pairs"))
+    parser.add_argument(
+        "--tfidf-token-mode",
+        default="names_types_bag",
+        choices=("names", "names_types_bag", "typed_name_pairs"),
+    )
     parser.add_argument("--bert-model", default="sentence-transformers/all-MiniLM-L6-v2")
     parser.add_argument("--bert-batch-size", type=int, default=8)
     parser.add_argument("--bert-max-length", type=int, default=256)
@@ -114,7 +119,9 @@ def canonical_dataset(name: str) -> str:
 
 
 def selected_techniques(args: argparse.Namespace) -> list[str]:
-    return [technique for group in args.technique for technique in group] if args.technique else list(DEFAULT_TECHNIQUES)
+    if args.technique:
+        return [technique for group in args.technique for technique in group]
+    return list(DEFAULT_TECHNIQUES)
 
 
 def gnn_config(args: argparse.Namespace) -> GNNTrainingConfig:

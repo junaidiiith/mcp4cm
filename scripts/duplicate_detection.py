@@ -129,8 +129,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=(*TECHNIQUES, "bert-similarity"),
         default=None,
         help=(
-            "Technique(s) to run. Repeat the option or provide several names "
-            f"(default: all: {', '.join(TECHNIQUES)})."
+            f"Technique(s) to run. Repeat the option or provide several names (default: all: {', '.join(TECHNIQUES)})."
         ),
     )
     parser.add_argument(
@@ -543,8 +542,7 @@ def compute_pair_technique(
                 progress=progress,
             )
             pairs = [
-                SimpleNamespace(left_id=left_id, right_id=right_id, score=score)
-                for left_id, right_id, score in triples
+                SimpleNamespace(left_id=left_id, right_id=right_id, score=score) for left_id, right_id, score in triples
             ]
             config = {"thresholdScanStart": 0.0, "trainingConfig": asdict(config_object)}
         else:

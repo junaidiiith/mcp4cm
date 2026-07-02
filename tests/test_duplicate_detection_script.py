@@ -85,7 +85,7 @@ def test_run_dataset_writes_artifacts_under_dataset_and_technique(monkeypatch, t
     monkeypatch.setattr(
         duplicate_detection,
         "plot_combined_dataset",
-        lambda dataset_dir: (dataset_dir / "combined_duplicate_techniques.png"),
+        lambda dataset_dir: dataset_dir / "combined_duplicate_techniques.png",
     )
 
     args = duplicate_detection.parse_args(

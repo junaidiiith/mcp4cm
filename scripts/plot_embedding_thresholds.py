@@ -26,19 +26,20 @@ for import_path in (REPOSITORY_ROOT, SCRIPT_DIR):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
-from mcp4cm.duplicates import (
-    bert_semantic_similarity_pairs,
-    graph_similarity_pairs,
-    tfidf_duplicate_pairs,
-)
-from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
-from run_duplicate_detection import (
+from run_duplicate_detection import (  # noqa: E402
     DEFAULT_DATA_DIR,
     TechniqueProgressBar,
     duplicate_models_removed_from_pairs,
     load_prepared_dataset,
     tqdm,
 )
+
+from mcp4cm.duplicates import (  # noqa: E402
+    bert_semantic_similarity_pairs,
+    graph_similarity_pairs,
+    tfidf_duplicate_pairs,
+)
+from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs  # noqa: E402
 
 THRESHOLDS = tuple(round(index * 0.05, 2) for index in range(1, 21))
 TECHNIQUES = ("bert", "graph-similarity", "tfidf", "gnn")
@@ -77,8 +78,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=TECHNIQUES,
         default=None,
         help=(
-            "Technique(s) to plot. Repeat the option or provide several names "
-            f"(default: all: {', '.join(TECHNIQUES)})."
+            f"Technique(s) to plot. Repeat the option or provide several names (default: all: {', '.join(TECHNIQUES)})."
         ),
     )
     parser.add_argument(
@@ -147,9 +147,11 @@ def rows_for_thresholds(
     pairs: list[Any], model_count: int, technique: str, *, progress_enabled: bool
 ) -> list[dict[str, int | float]]:
     rows: list[dict[str, int | float]] = []
-    progress = tqdm(total=len(THRESHOLDS), desc=f"{technique}: thresholds", unit="threshold", dynamic_ncols=True) if (
-        progress_enabled and tqdm is not None
-    ) else None
+    progress = (
+        tqdm(total=len(THRESHOLDS), desc=f"{technique}: thresholds", unit="threshold", dynamic_ncols=True)
+        if (progress_enabled and tqdm is not None)
+        else None
+    )
     try:
         for threshold in THRESHOLDS:
             matched_pairs = [pair for pair in pairs if pair.score >= threshold]
@@ -214,7 +216,9 @@ def output_dir_for_dataset(args: argparse.Namespace, dataset_name: str, dataset_
     return args.output_dir / dataset_name
 
 
-def run_dataset(args: argparse.Namespace, dataset_name: str, selected_techniques: list[str], dataset_count: int) -> Path:
+def run_dataset(
+    args: argparse.Namespace, dataset_name: str, selected_techniques: list[str], dataset_count: int
+) -> Path:
     dataset = load_prepared_dataset(args.data_dir, dataset_name)
     cache_dir = args.embedding_cache_dir or (args.data_dir / ".mcp4cm_embeddings")
     output_dir = output_dir_for_dataset(args, dataset_name, dataset_count)
@@ -241,9 +245,7 @@ def run_dataset(args: argparse.Namespace, dataset_name: str, selected_techniques
     if "graph-similarity" in selected_techniques:
         progress = TechniqueProgressBar("graph-similarity", enabled=not args.no_progress)
         try:
-            technique_pairs["graph-similarity"] = graph_similarity_pairs(
-                dataset, threshold=0.0, progress=progress
-            )
+            technique_pairs["graph-similarity"] = graph_similarity_pairs(dataset, threshold=0.0, progress=progress)
         finally:
             progress.close()
     if "tfidf" in selected_techniques:
@@ -271,8 +273,7 @@ def run_dataset(args: argparse.Namespace, dataset_name: str, selected_techniques
         finally:
             progress.close()
         technique_pairs["gnn"] = [
-            SimpleNamespace(left_id=left_id, right_id=right_id, score=score)
-            for left_id, right_id, score in gnn_triples
+            SimpleNamespace(left_id=left_id, right_id=right_id, score=score) for left_id, right_id, score in gnn_triples
         ]
 
     technique_rows = {
@@ -313,9 +314,9 @@ def run_dataset(args: argparse.Namespace, dataset_name: str, selected_techniques
 def main() -> int:
     args = parse_args()
     datasets = selected_datasets(args)
-    selected_techniques = [
-        technique for group in args.technique for technique in group
-    ] if args.technique else list(TECHNIQUES)
+    selected_techniques = (
+        [technique for group in args.technique for technique in group] if args.technique else list(TECHNIQUES)
+    )
 
     for dataset_name in datasets:
         run_dataset(args, dataset_name, selected_techniques, len(datasets))

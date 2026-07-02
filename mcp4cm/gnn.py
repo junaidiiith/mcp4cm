@@ -67,8 +67,7 @@ def gnn_graph_embeddings(
     corpus = _fingerprint("|".join(_record_fingerprint(record) for record in records))
     metadata = {"version": 1, "technique": "contrastive_gnn", "corpus": corpus, "config": asdict(config)}
     cached = {
-        record.model_id: _load_vector(_cache_path(embedding_cache_dir, dataset, record), metadata)
-        for record in records
+        record.model_id: _load_vector(_cache_path(embedding_cache_dir, dataset, record), metadata) for record in records
     }
     if all(vector is not None for vector in cached.values()):
         _report(progress, "embedding", len(records), len(records), "Reloaded cached contrastive GNN graph embeddings.")
@@ -86,7 +85,7 @@ def gnn_graph_embeddings(
     encoder = _edge_aware_encoder(torch, input_dim, config.embedding_dim, config.layers).to(device)
     optimizer = torch.optim.AdamW(encoder.parameters(), lr=config.learning_rate, weight_decay=1e-5)
     encoder.train()
-    batches = [graphs[index:index + config.batch_size] for index in range(0, len(graphs), config.batch_size)]
+    batches = [graphs[index : index + config.batch_size] for index in range(0, len(graphs), config.batch_size)]
     for epoch in range(1, config.epochs + 1):
         total_loss = 0.0
         for batch in batches:
@@ -167,7 +166,7 @@ def _tensorize_graphs(records, text_encoder, torch, device, batch_size):
     )
     input_dim, graphs = int(node_vectors.shape[1]), []
     for node_count, edges, node_start, edge_start in layouts:
-        x = torch.tensor(node_vectors[node_start:node_start + node_count], dtype=torch.float32, device=device)
+        x = torch.tensor(node_vectors[node_start : node_start + node_count], dtype=torch.float32, device=device)
         if not node_count:
             x = torch.zeros((1, input_dim), dtype=torch.float32, device=device)
         indices, features = [], []
@@ -220,6 +219,7 @@ def _edge_aware_encoder(torch, input_dim, output_dim, layers):
                 x = layer(x + messages)
             pooled = torch.cat((x.mean(dim=0), x.max(dim=0).values))
             return torch.nn.functional.normalize(self.project(pooled), dim=0)
+
     return Encoder()
 
 
@@ -250,8 +250,7 @@ def _record_fingerprint(record):
     payload = {
         "nodes": [(str(node), _node_text(attrs)) for node, attrs in record.graph.nodes(data=True)],
         "edges": [
-            (str(source), str(target), _edge_text(attrs))
-            for source, target, attrs in record.graph.edges(data=True)
+            (str(source), str(target), _edge_text(attrs)) for source, target, attrs in record.graph.edges(data=True)
         ],
     }
     return _fingerprint(json.dumps(payload, sort_keys=True, separators=(",", ":")))
@@ -259,9 +258,9 @@ def _record_fingerprint(record):
 
 def _cache_path(root, dataset, record):
     base = Path(root) if root is not None else Path(".mcp4cm_embeddings")
-    return base / quote(str(dataset.dataset_type), safe="._-") / quote(
-        record.model_id, safe="._-"
-    ) / "contrastive_gnn.npz"
+    return (
+        base / quote(str(dataset.dataset_type), safe="._-") / quote(record.model_id, safe="._-") / "contrastive_gnn.npz"
+    )
 
 
 def _fingerprint(value):

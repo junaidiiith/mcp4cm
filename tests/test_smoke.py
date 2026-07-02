@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from mcp4cm.core import Dataset
 from mcp4cm.dummy import (
     default_filter_configs,
@@ -458,9 +459,7 @@ def test_graph_isomorphism_skips_timed_out_pair(monkeypatch):
         model_id="second",
     )
     events = []
-    monkeypatch.setattr(
-        "mcp4cm.duplicates._prepared_graphs_are_isomorphic_with_timeout", lambda *_args: None
-    )
+    monkeypatch.setattr("mcp4cm.duplicates._prepared_graphs_are_isomorphic_with_timeout", lambda *_args: None)
 
     assert graph_isomorphism_pairs(Dataset([record, other], "archimate"), progress=events.append) == []
     assert "skipped 1 timed-out check(s)" in events[-1]["message"]

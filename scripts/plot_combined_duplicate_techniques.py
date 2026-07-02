@@ -88,7 +88,11 @@ def dataset_dir(results_dir: Path, dataset: str) -> Path:
 def load_model_counts(path: Path) -> dict[str, int]:
     model_counts: dict[str, int] = {}
     for json_path in sorted(path.glob("*.json")):
-        if json_path.name in {"duplicate_minus_iso.json", "duplicate_minus_iso_reload.json", "eam-duplicate-minus-iso.json"}:
+        if json_path.name in {
+            "duplicate_minus_iso.json",
+            "duplicate_minus_iso_reload.json",
+            "eam-duplicate-minus-iso.json",
+        }:
             continue
         payload = json.loads(json_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
