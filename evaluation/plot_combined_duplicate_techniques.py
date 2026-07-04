@@ -38,6 +38,8 @@ TARGET_GROUPS: dict[str, tuple[str, ...]] = {
 TARGET_CHOICES = tuple(TARGET_GROUPS) + DEFAULT_TARGETS
 THRESHOLDS = tuple(round(index * 0.05, 2) for index in range(1, 21))
 TECHNIQUES = ("tfidf", "graph_similarity", "bert_semantic", "gnn")
+AXIS_LABEL_FONT_SIZE = 15
+AXIS_TICK_FONT_SIZE = 13
 
 TECHNIQUE_LABELS = {
     "tfidf": "TF-IDF",
@@ -402,8 +404,8 @@ def plot_dataset(
     figure, axis = plt.subplots(figsize=(12, 7))
     draw_dataset(axis, dataset_name, rows_by_technique, model_counts)
     axis.set_title(f"{DATASET_LABELS.get(dataset_name, dataset_name)}: duplicate and unique models by threshold")
-    axis.set_xlabel("Similarity threshold")
-    axis.set_ylabel("Models (%)")
+    axis.set_xlabel("Similarity threshold", fontsize=AXIS_LABEL_FONT_SIZE)
+    axis.set_ylabel("Models (%)", fontsize=AXIS_LABEL_FONT_SIZE)
     axis.set_xticks(THRESHOLDS)
 
     technique_handles, metric_handles = legend_handles(mlines, rows_by_technique)
@@ -471,6 +473,7 @@ def draw_dataset(
     axis.set_ylim(0, 100)
     axis.set_xticks([round(index * 0.1, 2) for index in range(1, 11)])
     axis.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+    axis.tick_params(axis="both", labelsize=AXIS_TICK_FONT_SIZE)
     axis.grid(True, alpha=0.3)
 
 
@@ -528,9 +531,9 @@ def plot_all_datasets(
         axis.set_title(f"{subplot_label} {DATASET_LABELS.get(dataset_name, dataset_name)}")
 
     for axis in axes[:, 0]:
-        axis.set_ylabel("Models (%)")
+        axis.set_ylabel("Models (%)", fontsize=AXIS_LABEL_FONT_SIZE)
     for axis in axes[-1, :]:
-        axis.set_xlabel("Similarity threshold")
+        axis.set_xlabel("Similarity threshold", fontsize=AXIS_LABEL_FONT_SIZE)
 
     technique_handles, metric_handles = legend_handles(mlines, {technique: [] for technique in techniques})
     figure.legend(

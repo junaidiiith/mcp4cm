@@ -18,8 +18,8 @@ TECHNIQUE_ALIASES = {
 }
 TECHNIQUE_LABELS = {
     "tfidf": "TF-IDF",
-    "graph-similarity": "Graph similarity",
-    "bert": "BERT similarity",
+    "graph-similarity": "Graph Similarity",
+    "bert": "BERT Similarity",
     "gnn": "GNN",
 }
 TECHNIQUE_COLORS = {

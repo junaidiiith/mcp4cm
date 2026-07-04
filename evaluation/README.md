@@ -78,6 +78,12 @@ Plot duplicate and unique model counts over thresholds from the parsed runtime d
 uv run python evaluation/plot_combined_duplicate_techniques.py
 ```
 
+Render individual per-dataset threshold plots from already generated threshold CSV/JSON data:
+
+```bash
+uv run python evaluation/plot_individual_threshold_plots.py
+```
+
 To run only one dataset or dataset group, pass `--only` to any script:
 
 ```bash
@@ -127,6 +133,7 @@ Duplicate threshold plotting writes:
 evaluation/threshold-plots/<dataset>/<technique>/<technique>.csv
 evaluation/threshold-plots/<dataset>/<technique>/<technique>.json
 evaluation/threshold-plots/<dataset>/combined_duplicate_techniques.png
+evaluation/threshold-plots/<dataset>/individual_threshold_plot.png
 ```
 
 ## Current Duplicate Thresholds
@@ -147,4 +154,3 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
-

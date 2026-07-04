@@ -129,6 +129,8 @@ def run_gnn(
 
 # Comment out entries here to disable techniques for a run.
 # Node2Vec graph embeddings and graph isomorphism are intentionally excluded.
+
+
 DUPLICATE_TECHNIQUES = (
     TechniqueSpec(
         id="hash",
