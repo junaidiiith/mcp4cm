@@ -368,6 +368,8 @@ export interface DuplicatePairDecision {
   isDuplicate: boolean;
   voteCount: number;
   requiredVotes?: number;
+  mandatorySatisfied?: boolean;
+  minVotesSatisfied?: boolean;
   techniques: string[];
   scores?: Record<string, number>;
   metrics?: Record<string, Record<string, number>>;
@@ -377,10 +379,10 @@ export interface DuplicateGroupSummary {
   totalGroups: number;
   affectedModels: number;
   largestGroupSize: number;
-  completeGroups: number;
-  linkedGroups: number;
-  mixedGroups: number;
-  weakGroups: number;
+  strongGroups: number;
+  highGroups: number;
+  moderateGroups: number;
+  lowGroups: number;
 }
 
 export interface DuplicateModelSummary {
@@ -403,7 +405,7 @@ export interface DuplicateGroup {
   missingInternalPairs: number;
   possibleInternalPairs: number;
   density: number;
-  confidence: "complete" | "linked" | "mixed" | "weak" | string;
+  confidence: "strong" | "high" | "moderate" | "low" | string;
   warnings: string[];
   techniques: string[];
   canonicalModelId: string;

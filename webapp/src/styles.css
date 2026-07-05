@@ -722,27 +722,31 @@ th { color: #526675; background: #f7fafc; font-size: 12px; text-transform: upper
   font-weight: 800;
   text-transform: capitalize;
 }
+.qualityPill.strong,
 .qualityPill.complete,
 .decisionPill.approved {
   color: #146c43;
   border-color: #b7ddc8;
   background: #e8f4ef;
 }
+.qualityPill.high,
 .qualityPill.linked {
   color: #236868;
   border-color: #b9dbda;
   background: #edf7f6;
 }
+.qualityPill.moderate,
+.qualityPill.weak {
+  color: #8a5a00;
+  border-color: #eed39d;
+  background: #fff7e6;
+}
+.qualityPill.low,
 .qualityPill.mixed,
 .decisionPill.rejected {
   color: #9f1239;
   border-color: #fecdd3;
   background: #fff1f2;
-}
-.qualityPill.weak {
-  color: #8a5a00;
-  border-color: #eed39d;
-  background: #fff7e6;
 }
 .pairIds {
   display: grid;

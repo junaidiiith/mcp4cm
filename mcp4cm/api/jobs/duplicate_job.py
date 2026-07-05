@@ -9,6 +9,7 @@ from mcp4cm.api.http import paginate_items, parse_positive_int
 from mcp4cm.api.services.datasets import get_duplicate_detection_dataset
 from mcp4cm.api.services.duplicate_pipeline import (
     handle_duplicates,
+    normalize_duplicate_group_confidence,
     raise_no_duplicate_technique_error,
     selected_duplicate_techniques,
 )
@@ -155,8 +156,13 @@ def build_duplicate_groups_page(
     result: dict[str, Any], *, page: int, page_size: int, query: str, quality: str
 ) -> dict[str, Any]:
     groups = list(result.get("groups") or [])
-    if quality in {"complete", "linked", "mixed", "weak"}:
-        groups = [group for group in groups if str(group.get("confidence") or "") == quality]
+    normalized_quality = normalize_duplicate_group_confidence(quality)
+    if normalized_quality in {"strong", "high", "moderate", "low"}:
+        groups = [
+            group
+            for group in groups
+            if normalize_duplicate_group_confidence(group.get("confidence")) == normalized_quality
+        ]
     if query:
         query_lower = query.lower()
         groups = [

@@ -769,13 +769,13 @@ function DuplicateReviewTabs({
   );
 }
 
-type DuplicateGroupQuality = "complete" | "linked" | "mixed" | "weak";
+type DuplicateGroupQuality = "strong" | "high" | "moderate" | "low";
 
 const groupQualityOptions: Array<{ id: DuplicateGroupQuality; label: string; explanation: string }> = [
-  { id: "complete", label: "Complete", explanation: "All internal links approved." },
-  { id: "linked", label: "Linked", explanation: "Connected through approved links but not every pair has direct evidence." },
-  { id: "mixed", label: "Mixed", explanation: "Contains rejected internal candidate links." },
-  { id: "weak", label: "Weak", explanation: "At least one approved link has low vote support." },
+  { id: "strong", label: "Strong", explanation: "Every internal pair satisfies mandatory techniques and minimum votes." },
+  { id: "high", label: "High", explanation: "Every internal pair has enough votes, but at least one misses a mandatory technique." },
+  { id: "moderate", label: "Moderate", explanation: "Mandatory techniques approve every pair, but at least one lacks enough votes." },
+  { id: "low", label: "Low", explanation: "At least one internal pair lacks both conditions." },
 ];
 
 function DuplicateGroupsReview({
@@ -982,13 +982,11 @@ function DuplicateGroupsReview({
                   <strong>
                     {group.approvedInternalPairs} / {group.possibleInternalPairs}
                   </strong>
-                  <small>
-                    {group.candidateRejectedInternalPairs} not approved, {group.missingInternalPairs} missing
-                  </small>
                 </td>
                 <td>
-                  <span className={`qualityPill ${group.confidence}`}>{group.confidence}</span>
-                  {group.warnings?.length ? <small>{group.warnings[0]}</small> : <small>All direct evidence looks consistent.</small>}
+                  <span className={`qualityPill ${groupQuality(group.confidence)}`}>
+                    {groupQualityLabel(group.confidence)}
+                  </span>
                 </td>
                 <td>
                   <select
@@ -1003,7 +1001,6 @@ function DuplicateGroupsReview({
                       </option>
                     ))}
                   </select>
-                  <small>{representativeReason(group.canonicalReason)}</small>
                 </td>
                 <td>
                   <div className="scoreChips">
@@ -1068,10 +1065,10 @@ function DuplicateGroupsReview({
 function GroupQualityBreakdown({ result }: { result: DuplicateResult }) {
   const fallbackCounts = countGroupQualities(result.groups || result.groupsPage?.groups || []);
   const counts: Record<DuplicateGroupQuality, number> = {
-    complete: result.groupSummary?.completeGroups ?? fallbackCounts.complete,
-    linked: result.groupSummary?.linkedGroups ?? fallbackCounts.linked,
-    mixed: result.groupSummary?.mixedGroups ?? fallbackCounts.mixed,
-    weak: result.groupSummary?.weakGroups ?? fallbackCounts.weak,
+    strong: result.groupSummary?.strongGroups ?? fallbackCounts.strong,
+    high: result.groupSummary?.highGroups ?? fallbackCounts.high,
+    moderate: result.groupSummary?.moderateGroups ?? fallbackCounts.moderate,
+    low: result.groupSummary?.lowGroups ?? fallbackCounts.low,
   };
   const total = result.groupSummary?.totalGroups ?? Object.values(counts).reduce((sum, count) => sum + count, 0);
 
@@ -1099,19 +1096,26 @@ function GroupQualityBreakdown({ result }: { result: DuplicateResult }) {
 function countGroupQualities(groups: DuplicateGroup[]): Record<DuplicateGroupQuality, number> {
   return groups.reduce<Record<DuplicateGroupQuality, number>>(
     (counts, group) => {
-      if (isGroupQuality(group.confidence)) counts[group.confidence] += 1;
+      const quality = groupQuality(group.confidence);
+      if (quality) counts[quality] += 1;
       return counts;
     },
-    { complete: 0, linked: 0, mixed: 0, weak: 0 },
+    { strong: 0, high: 0, moderate: 0, low: 0 },
   );
 }
 
-function isGroupQuality(value: string): value is DuplicateGroupQuality {
-  return value === "complete" || value === "linked" || value === "mixed" || value === "weak";
+function groupQuality(value: string): DuplicateGroupQuality | "" {
+  if (value === "strong" || value === "complete") return "strong";
+  if (value === "high" || value === "linked") return "high";
+  if (value === "moderate" || value === "weak") return "moderate";
+  if (value === "low" || value === "mixed") return "low";
+  return "";
 }
 
-function representativeReason(reason: string | undefined) {
-  return reason ? reason.replace("canonical model", "representative model") : "Suggested representative model";
+function groupQualityLabel(value: string) {
+  const quality = groupQuality(value);
+  if (!quality) return value || "Unknown";
+  return quality.charAt(0).toUpperCase() + quality.slice(1);
 }
 
 function representativeModelSummary(group: DuplicateGroup, representativeModelId: string): DuplicateModelSummary | undefined {

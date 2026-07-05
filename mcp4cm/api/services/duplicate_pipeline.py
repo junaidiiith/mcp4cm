@@ -69,6 +69,18 @@ DUPLICATE_TECHNIQUE_ALIASES = {
     "isomorphism": "graph_isomorphism",
 }
 
+DUPLICATE_GROUP_CONFIDENCES = ("strong", "high", "moderate", "low")
+DUPLICATE_GROUP_CONFIDENCE_ALIASES = {
+    "strong": "strong",
+    "complete": "strong",
+    "high": "high",
+    "linked": "high",
+    "moderate": "moderate",
+    "weak": "moderate",
+    "low": "low",
+    "mixed": "low",
+}
+
 
 def selected_duplicate_techniques(body: dict[str, Any]) -> list[str]:
     raw_techniques = raw_duplicate_techniques(body)
@@ -84,6 +96,11 @@ def duplicate_technique_label(technique: str) -> str:
 def normalize_duplicate_technique(technique: Any) -> str:
     normalized = "_".join(str(technique or "").strip().lower().replace("-", "_").replace("+", "and").split())
     return DUPLICATE_TECHNIQUE_ALIASES.get(normalized, normalized)
+
+
+def normalize_duplicate_group_confidence(confidence: Any) -> str:
+    normalized = "_".join(str(confidence or "").strip().lower().replace("-", "_").split())
+    return DUPLICATE_GROUP_CONFIDENCE_ALIASES.get(normalized, normalized)
 
 
 def raw_duplicate_techniques(body: dict[str, Any]) -> list[Any]:
@@ -266,6 +283,9 @@ def graph_similarity_weights(
 def build_duplicate_groups(
     decisions: list[dict[str, Any]],
     model_summaries: dict[str, dict[str, Any]],
+    *,
+    mandatory: set[str],
+    min_votes: int,
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
     adjacency: dict[str, set[str]] = {}
     approved_lookup: dict[str, dict[str, Any]] = {}
@@ -307,6 +327,7 @@ def build_duplicate_groups(
         approved_internal = 0
         rejected_internal = 0
         vote_counts: list[int] = []
+        pair_conditions: list[tuple[bool, bool]] = []
         techniques: set[str] = set()
         score_values: list[float] = []
         internal_decision_keys: list[str] = []
@@ -314,6 +335,10 @@ def build_duplicate_groups(
             for right_id in model_ids[left_index + 1 :]:
                 lookup = pair_lookup_key(left_id, right_id)
                 decision = decision_lookup.get(lookup)
+                present = set(str(item) for item in (decision or {}).get("techniques", []))
+                mandatory_satisfied = mandatory.issubset(present)
+                min_votes_satisfied = len(present) >= min_votes
+                pair_conditions.append((mandatory_satisfied, min_votes_satisfied))
                 if not decision:
                     continue
                 internal_decision_keys.append(lookup)
@@ -333,17 +358,12 @@ def build_duplicate_groups(
         density = approved_internal / possible_pairs if possible_pairs else 0
         canonical_model_id = propose_canonical_model(model_ids, model_summaries)
         confidence = duplicate_group_confidence(
-            possible_pairs=possible_pairs,
-            approved_internal=approved_internal,
-            rejected_internal=rejected_internal,
-            missing_pairs=missing_pairs,
-            vote_counts=vote_counts,
+            pair_conditions=pair_conditions,
         )
         warnings = duplicate_group_warnings(
             confidence=confidence,
             rejected_internal=rejected_internal,
             missing_pairs=missing_pairs,
-            vote_counts=vote_counts,
         )
         groups.append(
             {
@@ -381,21 +401,24 @@ def propose_canonical_model(model_ids: list[str], model_summaries: dict[str, dic
 
 def duplicate_group_confidence(
     *,
-    possible_pairs: int,
-    approved_internal: int,
-    rejected_internal: int,
-    missing_pairs: int,
-    vote_counts: list[int],
+    pair_conditions: list[tuple[bool, bool]],
 ) -> str:
-    if possible_pairs and approved_internal == possible_pairs and rejected_internal == 0:
-        return "complete"
-    if rejected_internal:
-        return "mixed"
-    if vote_counts and min(vote_counts) <= 1:
-        return "weak"
-    if missing_pairs:
-        return "linked"
-    return "linked"
+    if not pair_conditions:
+        return "low"
+
+    all_mandatory = all(mandatory_satisfied for mandatory_satisfied, _ in pair_conditions)
+    all_min_votes = all(min_votes_satisfied for _, min_votes_satisfied in pair_conditions)
+    all_approved = all(
+        mandatory_satisfied and min_votes_satisfied for mandatory_satisfied, min_votes_satisfied in pair_conditions
+    )
+
+    if all_approved:
+        return "strong"
+    if all_min_votes:
+        return "high"
+    if all_mandatory:
+        return "moderate"
+    return "low"
 
 
 def duplicate_group_warnings(
@@ -403,15 +426,20 @@ def duplicate_group_warnings(
     confidence: str,
     rejected_internal: int,
     missing_pairs: int,
-    vote_counts: list[int],
 ) -> list[str]:
     warnings: list[str] = []
-    if confidence == "mixed":
+    if confidence == "high":
+        warnings.append("Every internal pair has enough votes, but at least one pair is missing a mandatory technique.")
+    if confidence == "moderate":
+        warnings.append(
+            "Mandatory techniques approve every internal pair, but at least one pair lacks enough total votes."
+        )
+    if confidence == "low":
+        warnings.append("At least one internal pair lacks both mandatory-technique support and enough total votes.")
+    if rejected_internal:
         warnings.append(f"{rejected_internal} internal candidate pair(s) were not approved.")
     if missing_pairs:
         warnings.append(f"{missing_pairs} internal pair(s) have no direct candidate evidence.")
-    if vote_counts and min(vote_counts) <= 1:
-        warnings.append("At least one approved link has only one technique vote.")
     return warnings
 
 
@@ -689,7 +717,9 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     for (left_id, right_id), pair_evidence in sorted(evidence.items()):
         score_map = dict(pair_evidence.get("scores", {}))
         present = set(score_map)
-        is_duplicate = mandatory.issubset(present) and len(present) >= min_votes
+        mandatory_satisfied = mandatory.issubset(present)
+        min_votes_satisfied = len(present) >= min_votes
+        is_duplicate = mandatory_satisfied and min_votes_satisfied
         decisions.append(
             {
                 "leftId": left_id,
@@ -697,6 +727,8 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
                 "isDuplicate": is_duplicate,
                 "voteCount": len(present),
                 "requiredVotes": min_votes,
+                "mandatorySatisfied": mandatory_satisfied,
+                "minVotesSatisfied": min_votes_satisfied,
                 "techniques": sorted(present),
                 "scores": score_map,
                 "metrics": dict(pair_evidence.get("metrics", {})),
@@ -707,7 +739,12 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
     approved_pairs = sum(1 for decision in decisions if decision["isDuplicate"])
     total_decisions = len(decisions)
     model_summaries = model_summary_lookup(projected_dataset)
-    groups, pair_group_lookup = build_duplicate_groups(decisions, model_summaries)
+    groups, pair_group_lookup = build_duplicate_groups(
+        decisions,
+        model_summaries,
+        mandatory=mandatory,
+        min_votes=min_votes,
+    )
     for decision in decisions:
         group_id = pair_group_lookup.get(pair_lookup_key(str(decision.get("leftId")), str(decision.get("rightId"))))
         if group_id:
@@ -719,10 +756,10 @@ def handle_duplicates(body: dict[str, Any], progress=None) -> dict[str, Any]:
         "totalGroups": len(groups),
         "affectedModels": len(affected_model_ids),
         "largestGroupSize": largest_group_size,
-        "completeGroups": sum(1 for group in groups if group.get("confidence") == "complete"),
-        "linkedGroups": sum(1 for group in groups if group.get("confidence") == "linked"),
-        "mixedGroups": sum(1 for group in groups if group.get("confidence") == "mixed"),
-        "weakGroups": sum(1 for group in groups if group.get("confidence") == "weak"),
+        "strongGroups": sum(1 for group in groups if group.get("confidence") == "strong"),
+        "highGroups": sum(1 for group in groups if group.get("confidence") == "high"),
+        "moderateGroups": sum(1 for group in groups if group.get("confidence") == "moderate"),
+        "lowGroups": sum(1 for group in groups if group.get("confidence") == "low"),
     }
 
     tfidf_threshold = float(
