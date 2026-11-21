@@ -1,6 +1,6 @@
 # MCP4CM
 
-`mcp4cm` is a Python library for cleansing model-driven engineering datasets such as UML, Ecore, and ArchiMate. It normalizes models into NetworkX graphs, then runs language-independent statistics, dummy-model detection, exact duplicate detection, and TF-IDF near-duplicate detection.
+`mcp4cm` is a Python library for cleansing model-driven engineering datasets such as UML, Ecore, BPMN, and ArchiMate. It normalizes models into NetworkX graphs, then runs language-independent statistics, dummy-model detection, and  (near-)duplicate detection.
 
 ## Install
 
@@ -24,31 +24,12 @@ Start the Flask backend:
 python -m mcp4cm.api
 ```
 
-Backend logs are written to stdout by default. Set `MCP4CM_LOG_LEVEL` and `MCP4CM_LOG_FILE` to control verbosity and file logging:
-
-```bash
-MCP4CM_LOG_LEVEL=DEBUG MCP4CM_LOG_FILE=backend.log python -m mcp4cm.api
-```
-
 In another terminal, start the React development server:
 
 ```bash
 cd webapp
 npm install
 npm run dev
-```
-
-During development, the React app calls Flask at `http://127.0.0.1:8765`. In a production-style build served by Flask, it calls same-origin `/api/*` routes.
-
-Large uploads are sent as `multipart/form-data` so the browser does not read the full dataset into JavaScript memory.
-
-To serve the built React app from Flask instead:
-
-```bash
-cd webapp
-npm run build
-cd ..
-python -m mcp4cm.api
 ```
 
 Then open `http://127.0.0.1:8765`.
