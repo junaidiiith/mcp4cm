@@ -187,6 +187,7 @@ near_by_graph_embeddings = graph_embedding_pairs(uml, threshold=0.90)
 
 # 7. GraphCL-style contrastive GNN similarity over sentence-encoded node/edge text.
 from mcp4cm.gnn import GNNTrainingConfig, gnn_duplicate_pairs
+
 near_by_gnn = gnn_duplicate_pairs(uml, threshold=0.85, config=GNNTrainingConfig(epochs=20))
 
 # 8. BERT semantic similarity over model names and types. Requires `pip install -e '.[ml]'`.

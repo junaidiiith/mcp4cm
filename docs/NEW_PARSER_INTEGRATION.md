@@ -136,9 +136,7 @@ ParserDescriptor(
     parser_id="my-language-tool",
     extensions=(".tool",),
     adapter_factory=MyToolAdapter,
-    option_specs=(
-        OptionSpec("includeDetails", "include_details", True, bool_option),
-    ),
+    option_specs=(OptionSpec("includeDetails", "include_details", True, bool_option),),
 )
 ```
 

@@ -339,9 +339,9 @@ parse_file("diagram.json", language="bpmn", format="signavio")
 Every parser returns a `ParsedModelResult`:
 
 ```python
-result.record       # ModelRecord
+result.record  # ModelRecord
 result.diagnostics  # ModelDiagnostics
-result.ir           # IR for source-file parsers, otherwise None
+result.ir  # IR for source-file parsers, otherwise None
 ```
 
 `ModelRecord.graph` is a NetworkX graph. Nodes usually expose `name`, `type`, or `eClass`; edges usually expose `type` or source-specific relationship fields.

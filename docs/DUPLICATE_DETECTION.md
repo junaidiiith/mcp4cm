@@ -66,15 +66,22 @@ pair must have an exact name-hash match even if other methods also find it simil
 Approved duplicate pairs are connected into groups. If `A-B` and `B-C` are approved, MCP4CM shows one group containing
 `A`, `B`, and `C`, even when `A-C` was not directly approved.
 
-Groups include confidence indicators:
+Groups include strength indicators derived from pair-level voting evidence. For each model pair in a group:
 
+- `k` is the observed number of technique votes for that pair.
+- `v` is the configured minimum vote count.
+- `c1` means all configured mandatory techniques voted for the pair.
+- `c2` means `k >= v`.
 
-| Confidence | Meaning                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| `complete` | Every internal pair in the group is approved.                                              |
-| `linked`   | The group is connected by approved pairs, but not every internal pair has direct evidence. |
-| `weak`     | At least one approved link has only one method vote.                                       |
-| `mixed`    | The group contains internal candidate pairs that were not approved.                        |
+A pair is approved as a duplicate only when both `c1` and `c2` are true. Group strength is then computed over every
+possible pair inside the connected group, including pairs that are only present through transitive closure.
+
+| Strength   | Group-level condition                                                 | Meaning                                                                                   |
+| ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `strong`   | All model pairs satisfy both `c1` and `c2`.                           | Every pair in the group is directly approved by the configured voting rule.                |
+| `high`     | At least one pair violates `c1`, but all pairs satisfy `c2`.          | Every pair has enough votes, but at least one pair lacks a mandatory technique.            |
+| `moderate` | At least one pair violates `c2`, but all pairs satisfy `c1`.          | Mandatory techniques approve all pairs, but at least one pair lacks enough total votes.    |
+| `low`      | At least one pair satisfies neither `c1` nor `c2`.                    | The group is connected by approved pairs, but at least one internal relation is unsupported. |
 
 
 ## Representative Model
